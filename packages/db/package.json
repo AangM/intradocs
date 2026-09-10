@@ -10,7 +10,8 @@
     "./uploads": "./src/uploads.ts",
     "./workflow": "./src/workflow.ts",
     "./taxonomy": "./src/taxonomy.ts",
-    "./discovery": "./src/discovery.ts"
+    "./discovery": "./src/discovery.ts",
+    "./rag": "./src/rag.ts"
   },
   "dependencies": {
     "@intradocs/core": "workspace:*",

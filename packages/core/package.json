@@ -17,6 +17,9 @@
     "./orphan-cleanup": "./src/orphan-cleanup.ts",
     "./workflow": "./src/workflow.ts",
     "./taxonomy": "./src/taxonomy.ts",
-    "./converter": "./src/converter.ts"
+    "./converter": "./src/converter.ts",
+    "./ai-config": "./src/ai-config.ts",
+    "./weknora": "./src/weknora.ts",
+    "./rag": "./src/rag.ts"
   }
 }

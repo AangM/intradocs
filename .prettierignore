@@ -11,3 +11,4 @@ test-results/
 playwright-report/
 
 .venv/
+apps/web/next-env.d.ts

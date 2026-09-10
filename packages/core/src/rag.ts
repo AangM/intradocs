@@ -330,3 +330,102 @@ export function parseChatBody(value: unknown, maxChars: number): { question: str
 /** The one answer we are allowed to give when nothing survived validation. */
 export const ABSTAIN_MESSAGE =
   'Tidak ada sumber resmi yang dapat Anda akses untuk menjawab pertanyaan ini. IntraDocs tidak menjawab tanpa bukti dokumen.';
+
+/* ------------------------------------------------------------------ *
+ * Export worker
+ *
+ * The worker role has EXECUTE on four fixed functions and no SELECT on business
+ * tables, so eligibility is decided in SQL during reconciliation and travels here
+ * as a claimed operation. This module never re-decides whether a version may be
+ * indexed; it only carries out the operation the lease describes.
+ * ------------------------------------------------------------------ */
+
+export interface RagExportClaim {
+  jobId: string;
+  leaseToken: string;
+  versionId: string;
+  documentId: string;
+  markdownKey: string;
+  markdownHash: string;
+  operation: 'upsert' | 'remove';
+  knowledgeId: string | null;
+  documentTitle: string;
+  versionLabel: string;
+  classification: string;
+  categoryName: string;
+}
+
+export interface RagExportRepository {
+  reconcile(): Promise<number>;
+  claim(): Promise<RagExportClaim | null>;
+  complete(
+    claim: RagExportClaim,
+    result: { knowledgeId: string | null; sourceHash: string; chunkCount: number },
+  ): Promise<void>;
+  fail(claim: RagExportClaim): Promise<void>;
+}
+
+/** The WeKnora side, narrowed to what the exporter needs so tests can substitute it. */
+export interface RagIndexTarget {
+  create(input: { title: string; content: string }): Promise<string>;
+  update(knowledgeId: string, input: { title: string; content: string }): Promise<void>;
+  remove(knowledgeId: string): Promise<void>;
+  findByTitle(title: string): Promise<string | null>;
+}
+
+export class RagExportError extends Error {}
+
+/**
+ * Runs one claimed export. Returns false when the queue is empty.
+ *
+ * Idempotency comes from three places rather than from hoping the job runs once:
+ * the SQL lease admits a single worker, the knowledge title carries the version ID so
+ * a crash between "created in WeKnora" and "recorded in IntraDocs" is recoverable by
+ * lookup instead of by creating a second record, and complete() stores the content
+ * hash so an unchanged version is never re-sent.
+ */
+export async function processRagExport(deps: {
+  repository: RagExportRepository;
+  index: RagIndexTarget;
+  read: (key: string, hash: string) => Promise<Uint8Array>;
+  digest: (bytes: Uint8Array) => string;
+}): Promise<boolean> {
+  const claim = await deps.repository.claim();
+  if (!claim) return false;
+  try {
+    if (claim.operation === 'remove') {
+      // A version that was never indexed has nothing to delete; recording the removal
+      // still clears the queue so a revoke cannot loop forever.
+      if (claim.knowledgeId) await deps.index.remove(claim.knowledgeId);
+      await deps.repository.complete(claim, { knowledgeId: null, sourceHash: '', chunkCount: 0 });
+      return true;
+    }
+    const bytes = await deps.read(claim.markdownKey, claim.markdownHash);
+    const actual = deps.digest(bytes);
+    if (actual !== claim.markdownHash)
+      throw new RagExportError('Checksum dokumen tidak cocok; ekspor dibatalkan.');
+    const payload = buildExportPayload({
+      documentId: claim.documentId,
+      versionId: claim.versionId,
+      documentTitle: claim.documentTitle,
+      versionLabel: claim.versionLabel,
+      classification: claim.classification,
+      categoryName: claim.categoryName,
+      markdown: new TextDecoder('utf-8', { fatal: true }).decode(bytes),
+    });
+    let knowledgeId = claim.knowledgeId;
+    if (!knowledgeId) knowledgeId = await deps.index.findByTitle(payload.title);
+    if (knowledgeId) await deps.index.update(knowledgeId, payload);
+    else knowledgeId = await deps.index.create(payload);
+    await deps.repository.complete(claim, {
+      knowledgeId,
+      sourceHash: claim.markdownHash,
+      chunkCount: 1,
+    });
+  } catch {
+    // The reason stays in the worker log; the queue records only a generic code so a
+    // provider message can never travel into the database or a user-facing surface.
+    await deps.repository.fail(claim);
+  }
+  return true;
+}

@@ -28,9 +28,11 @@ export function readRuntimeConfig(env: Record<string, string | undefined>): Runt
     );
   if (env.AUTH_MODE !== 'local')
     throw new ConfigurationError('SSO/OIDC belum diimplementasikan pada M1.');
-  if (env.AI_PROVIDER !== 'off')
+  // Off by default. The only alternative is a loopback WeKnora the operator started
+  // deliberately; no cloud provider, no fallback and no billing path exists here.
+  if (env.AI_PROVIDER !== 'off' && env.AI_PROVIDER !== 'weknora-local')
     throw new ConfigurationError(
-      'AI harus off pada M1. Tidak ada request cloud yang akan dikirim.',
+      'AI_PROVIDER hanya menerima off atau weknora-local. Provider cloud tidak diimplementasikan.',
     );
   if (env.STORAGE_DRIVER !== 'filesystem')
     throw new ConfigurationError('Adapter S3 belum diimplementasikan. Gunakan filesystem lokal.');
@@ -85,8 +87,10 @@ export function readRuntimeConfig(env: Record<string, string | undefined>): Runt
 }
 
 export function readWorkerConfig(env: Record<string, string | undefined>): { databaseUrl: string } {
-  if (env.APP_PROFILE !== 'local-dev' || env.AI_PROVIDER !== 'off')
-    throw new ConfigurationError('Worker M1 hanya untuk local-dev dengan AI off.');
+  if (env.APP_PROFILE !== 'local-dev')
+    throw new ConfigurationError('Worker hanya berjalan pada profil local-dev.');
+  if (env.AI_PROVIDER !== 'off' && env.AI_PROVIDER !== 'weknora-local')
+    throw new ConfigurationError('Worker hanya menerima AI_PROVIDER off atau weknora-local.');
   const raw = env.WORKER_DATABASE_URL ?? '';
   const u = assertLocalDatabase(raw);
   if (decodeURIComponent(u.username) !== 'intradocs_worker')

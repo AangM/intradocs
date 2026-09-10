@@ -1,10 +1,17 @@
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { Pool } from 'pg';
 import { PgBoss } from 'pg-boss';
 import { readWorkerConfig } from '@intradocs/core/config';
 import { LocalBlobStore } from '@intradocs/core/storage';
 import { processPublication } from '@intradocs/core/workflow';
+import { readAiConfig } from '@intradocs/core/ai-config';
+import { WeknoraClient } from '@intradocs/core/weknora';
+import { processRagExport } from '@intradocs/core/rag';
 import { PostgresPublicationRepository } from './publication.ts';
+import { PostgresRagExportRepository, WeknoraIndexTarget } from './rag-export.ts';
+
+const sha256Hex = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
 
 async function start() {
   const { databaseUrl: connectionString } = readWorkerConfig(process.env);
@@ -16,6 +23,16 @@ async function start() {
   const boss = new PgBoss({ connectionString, schema: 'jobs', createSchema: false });
   const storage = new LocalBlobStore(path.resolve(root, relative));
   const repository = new PostgresPublicationRepository(pool);
+  // AI stays off unless explicitly configured; with it off no exporter, client or
+  // outbound request exists at all, and publication keeps working unchanged.
+  const ai = readAiConfig(process.env);
+  const rag =
+    ai.retrieval === 'weknora-local' && ai.weknora
+      ? {
+          repository: new PostgresRagExportRepository(pool),
+          index: new WeknoraIndexTarget(new WeknoraClient(ai.weknora)),
+        }
+      : null;
   boss.on('error', () => console.error('Antrean worker gagal; periksa PostgreSQL.'));
   pool.on('error', () => console.error('Koneksi worker gagal.'));
   await boss.start();
@@ -38,6 +55,26 @@ async function start() {
         )
           break;
       }
+      if (rag) {
+        // Reconciliation is the only enqueue path, so revoke, expiry and supersede all
+        // reach WeKnora through one code path. A failure here must never stop publication.
+        try {
+          await rag.repository.reconcile();
+          for (let i = 0; i < 10 && !stopping; i++) {
+            if (
+              !(await processRagExport({
+                repository: rag.repository,
+                index: rag.index,
+                read: (key, hash) => storage.read(key, hash),
+                digest: sha256Hex,
+              }))
+            )
+              break;
+          }
+        } catch {
+          console.error('Ekspor RAG tertunda; antrean mempertahankan status dan retry.');
+        }
+      }
       await pool.query(
         "INSERT INTO app.worker_status(name,last_seen) VALUES('intradocs-worker',now()) ON CONFLICT(name) DO UPDATE SET last_seen=excluded.last_seen",
       );
@@ -59,7 +96,11 @@ async function start() {
   }
   process.on('SIGINT', () => void stop().then(() => process.exit(0)));
   process.on('SIGTERM', () => void stop().then(() => process.exit(0)));
-  console.log('Worker M3 siap: publikasi lexical, retry outbox, dan pengingat review. AI off.');
+  console.log(
+    rag
+      ? 'Worker M4 siap: publikasi lexical, retry outbox, pengingat review, dan ekspor WeKnora.'
+      : 'Worker M3 siap: publikasi lexical, retry outbox, dan pengingat review. AI off.',
+  );
 }
 start().catch((error: unknown) => {
   console.error('Worker tidak dapat dimulai.', {
