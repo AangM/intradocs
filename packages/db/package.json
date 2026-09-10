@@ -12,7 +12,8 @@
     "./taxonomy": "./src/taxonomy.ts",
     "./discovery": "./src/discovery.ts",
     "./rag": "./src/rag.ts",
-    "./versions": "./src/versions.ts"
+    "./versions": "./src/versions.ts",
+    "./access-requests": "./src/access-requests.ts"
   },
   "dependencies": {
     "@intradocs/core": "workspace:*",
