@@ -13,7 +13,8 @@
     "./discovery": "./src/discovery.ts",
     "./rag": "./src/rag.ts",
     "./versions": "./src/versions.ts",
-    "./access-requests": "./src/access-requests.ts"
+    "./access-requests": "./src/access-requests.ts",
+    "./required-reading": "./src/required-reading.ts"
   },
   "dependencies": {
     "@intradocs/core": "workspace:*",
