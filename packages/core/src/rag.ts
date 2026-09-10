@@ -206,6 +206,11 @@ export interface ValidatedRetrieval {
 /** Strips control characters and clamps length before any snippet reaches a client. */
 export function sanitizeSnippet(text: string, maxChars: number): string {
   const cleaned = text
+    // The exporter prepends a provenance header so a human inspecting the index can see
+    // where a record came from. It is metadata about the document, not part of it, and it
+    // was surfacing verbatim inside citation snippets shown to readers.
+    .replace(/<!--\s*intradocs:[^>]*-->/g, ' ')
+    .replace(/^\s*>\s*Sumber:\s*IntraDocs[^\n]*/gm, ' ')
     .replace(/[\u0000-\u001f\u007f]/g, ' ')
     .replace(/[ \t]+/g, ' ')
     .trim();

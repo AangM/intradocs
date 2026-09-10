@@ -39,14 +39,36 @@ test('home, metadata search, protected reader and accessible headings', async ({
   expect(await page.locator('script[src^="http"]').count()).toBe(0);
   await page.screenshot({ path: info.outputPath('reader.png'), fullPage: true });
 });
-test('no horizontal page overflow and truthful disabled AI composer', async ({ page }, info) => {
+test('no horizontal page overflow and an AI composer that matches the configuration', async ({
+  page,
+}, info) => {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
   await page.screenshot({ path: info.outputPath('home.png'), fullPage: true });
   await page.goto('/ai-assistant');
-  await expect(page.getByLabel('Pertanyaan AI')).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Kirim' })).toBeDisabled();
+  // The composer must tell the truth either way: usable only when retrieval is actually
+  // configured, and visibly inert when AI is off. A disabled box on a working install
+  // would be as wrong as an enabled box on an install with no engine behind it.
+  const composer = page.getByLabel('Pertanyaan AI');
+  if (process.env.AI_PROVIDER === 'weknora-local') {
+    await expect(composer).toBeEnabled();
+    // Send stays disabled until there is something to ask, so type before asserting.
+    await expect(page.getByRole('button', { name: 'Kirim' })).toBeDisabled();
+    // The composer is controlled by React state; filling it before hydration sets the DOM
+    // value but not the state, and the next render clears it again. Wait for the handler
+    // to exist rather than typing into a component that is not listening yet.
+    await page.waitForFunction(() => {
+      const el = document.querySelector('textarea');
+      return !!el && Object.keys(el).some((k) => k.startsWith('__react'));
+    });
+    await composer.fill('Bagaimana konfigurasi VPN?');
+    await expect(composer).toHaveValue('Bagaimana konfigurasi VPN?');
+    await expect(page.getByRole('button', { name: 'Kirim' })).toBeEnabled();
+  } else {
+    await expect(composer).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Kirim' })).toBeDisabled();
+  }
 });
 test('direct navigation to an unauthorized document never shows its title or body', async ({
   page,

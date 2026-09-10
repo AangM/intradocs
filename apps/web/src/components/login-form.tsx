@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import type { FormEvent } from 'react';
 import { safeReturnTo } from '@intradocs/core/validation';
@@ -8,6 +8,17 @@ export function LoginForm({ returnTo }: { returnTo: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  // The form has no action/method, so a submit before React attaches onSubmit falls back
+  // to a native GET and puts the password in the URL, the history and the server log --
+  // observed as `GET /login?email=...&password=...` in a real run. Staying disabled until
+  // mount closes that window; it also removes the click-before-hydration race in tests.
+  // false while server-rendered, true once the client store is read after hydration.
+  // useSyncExternalStore rather than an effect, so no state is set during render.
+  const ready = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (busy) return;
@@ -72,7 +83,7 @@ export function LoginForm({ returnTo }: { returnTo: string }) {
           {error}
         </p>
       )}
-      <button type="submit" className="btn btn-p full-width" disabled={busy}>
+      <button type="submit" className="btn btn-p full-width" disabled={busy || !ready}>
         {busy ? 'Memeriksa akun…' : 'Masuk ke IntraDocs'}
         <Icon name="arrow-r" size={16} />
       </button>
