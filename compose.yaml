@@ -141,9 +141,11 @@ services:
       # Risky subsystems stay off explicitly rather than by relying on defaults.
       WEKNORA_SANDBOX_DOCKER_ENABLED: 'false'
       OIDC_AUTH_ENABLE: 'false'
-      # WeKnora blocks host.docker.internal as an SSRF target by default. The embedding
-      # model runs as Ollama on the host, so exactly that one name is allowed back in --
-      # not a wildcard, not a CIDR. Everything else stays blocked.
+      # WeKnora blocks outbound targets by default. The embedding model runs as Ollama on
+      # the host, so exactly that one name is allowed back in -- not a wildcard, not a
+      # CIDR. Adding a cloud provider here means questions and document passages leave the
+      # machine, so it is opt-in through the environment and never a default; the portal
+      # additionally refuses to use it until AI_GENERATION_LOCATION says so out loud.
       SSRF_WHITELIST_EXTRA: ${WEKNORA_SSRF_WHITELIST_EXTRA:-host.docker.internal}
       OLLAMA_OPTIONAL: 'true'
       OLLAMA_BASE_URL: ${WEKNORA_OLLAMA_URL:-http://host.docker.internal:11434}

@@ -322,6 +322,34 @@ export class WeknoraClient {
     });
   }
 
+  /**
+   * Registers a model WeKnora may use. The provider key travels in this one request and
+   * is stored by WeKnora; it is never logged here, never echoed back, and never returned
+   * to a caller -- only the resulting model ID comes back.
+   */
+  async registerModel(input: {
+    name: string;
+    displayName: string;
+    type: 'KnowledgeQA' | 'Embedding' | 'Rerank';
+    source: string;
+    parameters: Record<string, unknown>;
+  }): Promise<string> {
+    const data = asRecord(
+      await this.json('POST', '/api/v1/models', {
+        body: {
+          name: input.name,
+          display_name: input.displayName,
+          type: input.type,
+          source: input.source,
+          parameters: input.parameters,
+        },
+      }),
+    );
+    const id = str(data.id);
+    if (!id) throw new WeknoraError('WeKnora tidak mengembalikan ID model.', 502, false);
+    return id;
+  }
+
   async deleteKnowledge(knowledgeId: string): Promise<void> {
     try {
       await this.json('DELETE', `/api/v1/knowledge/${encodeURIComponent(knowledgeId)}`);

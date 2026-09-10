@@ -355,18 +355,65 @@ async function status(): Promise<void> {
   });
 }
 
+/**
+ * Registers an external generation model inside WeKnora.
+ *
+ * The provider key is read from the environment and never printed, never written to a
+ * file this script owns, and never returned in any response: it goes straight into
+ * WeKnora's own model record. WeKnora is what talks to the provider; IntraDocs still
+ * only ever connects to loopback. That is precisely why AI_GENERATION_LOCATION exists --
+ * the egress is one hop further out than IntraDocs can observe, so it has to be declared
+ * rather than detected.
+ */
+async function registerExternalModel(): Promise<void> {
+  loadLocalEnv();
+  const ai = readAiConfig(process.env);
+  if (!ai.weknora) throw new Error('AI_PROVIDER masih off. Aktifkan weknora-local dulu.');
+  const key = process.env.EXTERNAL_MODEL_API_KEY ?? '';
+  if (!key.trim())
+    throw new Error(
+      'Isi EXTERNAL_MODEL_API_KEY di .env.local dengan kunci provider Anda. ' +
+        'Script ini tidak pernah mencetak atau menyalin kunci tersebut.',
+    );
+  const provider = process.env.EXTERNAL_MODEL_SOURCE ?? 'openai';
+  const model = process.env.EXTERNAL_MODEL_NAME ?? 'gpt-4o-mini';
+  const baseUrl = process.env.EXTERNAL_MODEL_BASE_URL ?? 'https://api.openai.com/v1';
+  if (!/^https:\/\//.test(baseUrl))
+    throw new Error('EXTERNAL_MODEL_BASE_URL harus https; kunci tidak dikirim lewat http.');
+  if (ai.generationLocation !== 'external')
+    throw new Error(
+      'Setel AI_GENERATION_LOCATION=external dan AI_EXTERNAL_ACKNOWLEDGED=synthetic-corpus-only ' +
+        'lebih dulu, supaya portal memberi tahu pengguna bahwa jawaban disusun di luar mesin ini.',
+    );
+
+  const client = new WeknoraClient(ai.weknora);
+  const created = await client.registerModel({
+    name: model,
+    displayName: `${provider} ${model}`,
+    type: 'KnowledgeQA',
+    source: provider,
+    parameters: { api_key: key, base_url: baseUrl },
+  });
+  console.log(`Model ${provider}/${model} terdaftar di WeKnora (id ${created}).`);
+  console.log('Kunci disimpan di WeKnora, tidak dicetak dan tidak disalin ke berkas lain.');
+  console.log('Jalankan pnpm weknora:status untuk memastikan, lalu restart pnpm dev.');
+}
+
 async function main(): Promise<void> {
   const action = process.argv[2];
   if (action === 'setup') return setup();
   if (action === 'sync') return sync();
   if (action === 'status') return status();
+  if (action === 'model') return registerExternalModel();
   if (action === 'stop') {
     loadLocalEnv();
     command('docker', ['compose', '--env-file', '.env.local', '--profile', 'weknora', 'stop']);
     console.log('Profil WeKnora berhenti; volume dan index dipertahankan.');
     return;
   }
-  throw new Error('Gunakan: pnpm weknora:setup | weknora:sync | weknora:status | weknora:stop.');
+  throw new Error(
+    'Gunakan: pnpm weknora:setup | weknora:sync | weknora:status | weknora:model | weknora:stop.',
+  );
 }
 
 main().catch(reportFailure);

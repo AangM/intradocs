@@ -41,7 +41,8 @@
     "weknora:status": "tsx scripts/weknora.ts status",
     "weknora:stop": "tsx scripts/weknora.ts stop",
     "test:rag": "tsx --test --test-concurrency=1 tests/rag/*.test.ts",
-    "rag:eval": "tsx scripts/rag-eval.ts"
+    "rag:eval": "tsx scripts/rag-eval.ts",
+    "weknora:model": "tsx scripts/weknora.ts model"
   },
   "devDependencies": {
     "@playwright/test": "1.56.1",

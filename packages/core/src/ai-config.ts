@@ -46,9 +46,23 @@ export interface WeknoraConfig extends WeknoraLimits {
   tenantId: string | null;
 }
 
+/**
+ * Where the generation model runs.
+ *
+ * 'local' means everything stays on this machine. 'external' means WeKnora forwards the
+ * question and the selected passages to a provider on the internet, which is a different
+ * product decision entirely -- so IntraDocs refuses to be unaware of it. The flag exists
+ * because the egress happens WeKnora -> provider, a hop IntraDocs cannot see from its own
+ * loopback connection; without an explicit acknowledgement here the policy gate would be
+ * telling people their documents never leave the laptop while they were leaving it.
+ */
+export type GenerationLocation = 'local' | 'external';
+
 export interface AiConfig {
   retrieval: AiMode;
   generation: AiMode;
+  /** Only meaningful when generation is on. */
+  generationLocation: GenerationLocation;
   weknora: WeknoraConfig | null;
 }
 
@@ -83,6 +97,28 @@ const CEILINGS: WeknoraLimits = {
 };
 
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+/**
+ * Reads the acknowledgement that generation may leave the machine.
+ *
+ * Default is 'local'. Choosing 'external' is a deliberate, typed decision by whoever
+ * edits .env.local, and it changes what the product tells its users: the assistant says
+ * so on screen and the readiness endpoint reports it. It is never inferred from whatever
+ * happens to be configured inside WeKnora, because a silent inference is exactly the
+ * failure this flag exists to prevent.
+ */
+function readGenerationLocation(env: Record<string, string | undefined>): GenerationLocation {
+  const raw = env.AI_GENERATION_LOCATION ?? 'local';
+  if (raw !== 'local' && raw !== 'external')
+    throw new ConfigurationError('AI_GENERATION_LOCATION hanya menerima local atau external.');
+  if (raw === 'external' && env.AI_EXTERNAL_ACKNOWLEDGED !== 'synthetic-corpus-only')
+    throw new ConfigurationError(
+      'Generasi eksternal mengirim pertanyaan dan potongan dokumen ke internet. ' +
+        'Setel AI_EXTERNAL_ACKNOWLEDGED=synthetic-corpus-only untuk menyatakan bahwa corpus ' +
+        'yang terpasang seluruhnya sintetis dan boleh keluar.',
+    );
+  return raw;
+}
 
 function readMode(env: Record<string, string | undefined>, key: string): AiMode {
   const raw = env[key] ?? 'off';
@@ -137,7 +173,9 @@ export function readAiConfig(env: Record<string, string | undefined>): AiConfig 
     throw new ConfigurationError(
       'AI_GENERATION membutuhkan AI_PROVIDER=weknora-local; jawaban tanpa retrieval tervalidasi ditolak.',
     );
-  if (retrieval === 'off') return { retrieval, generation: 'off', weknora: null };
+  const location = readGenerationLocation(env);
+  if (retrieval === 'off')
+    return { retrieval, generation: 'off', generationLocation: 'local', weknora: null };
 
   const baseUrl = assertLoopbackHttpOrigin(env.WEKNORA_BASE_URL ?? '', 'WEKNORA_BASE_URL');
   const apiKey = env.WEKNORA_API_KEY ?? '';
@@ -157,6 +195,7 @@ export function readAiConfig(env: Record<string, string | undefined>): AiConfig 
   return {
     retrieval,
     generation,
+    generationLocation: location,
     weknora: {
       baseUrl,
       apiKey,
@@ -180,6 +219,8 @@ export function readAiConfig(env: Record<string, string | undefined>): AiConfig 
 export interface AiStatus {
   retrieval: AiMode;
   generation: AiMode;
+  /** Whether answers are composed on this machine or by a provider on the internet. */
+  generationLocation: GenerationLocation;
   /** Origin only, so an operator can see which endpoint is bound without the token. */
   endpoint: string | null;
   knowledgeBaseId: string | null;
@@ -192,6 +233,7 @@ export function describeAiConfig(config: AiConfig): AiStatus {
   return {
     retrieval: config.retrieval,
     generation: config.generation,
+    generationLocation: config.generationLocation,
     endpoint: config.weknora?.baseUrl ?? null,
     knowledgeBaseId: config.weknora?.knowledgeBaseId ?? null,
     apiKeyConfigured: Boolean(config.weknora?.apiKey),

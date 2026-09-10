@@ -24,6 +24,7 @@ export default async function Assistant() {
         <AssistantChat
           maxQuestionChars={config.weknora.maxQuestionChars}
           generating={config.generation === 'weknora-local'}
+          external={config.generationLocation === 'external'}
         />
       </div>
     );

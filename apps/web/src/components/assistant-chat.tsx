@@ -35,9 +35,12 @@ const CLASSIFICATION_LABELS: Record<string, string> = {
 export function AssistantChat({
   maxQuestionChars,
   generating = false,
+  external = false,
 }: {
   maxQuestionChars: number;
   generating?: boolean;
+  /** Answers are composed by a provider on the internet, not on this machine. */
+  external?: boolean;
 }) {
   const fieldId = useId();
   const [question, setQuestion] = useState('');
@@ -99,6 +102,16 @@ export function AssistantChat({
           Jawaban hanya disusun dari dokumen final-approved yang boleh Anda baca. Tanpa sumber sah,
           IntraDocs menyatakan tidak tahu.
         </p>
+        {external && (
+          <p className="callout c-warn" role="note">
+            <Icon name="globe" size={16} />
+            <span>
+              Penyusunan jawaban memakai provider di internet. Pertanyaan Anda dan potongan dokumen
+              yang terpilih dikirim ke luar mesin ini. Jangan gunakan untuk dokumen nyata atau
+              rahasia.
+            </span>
+          </p>
+        )}
       </div>
 
       <form

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readAiConfig, describeAiConfig } from '../../packages/core/src/ai-config.ts';
 import {
   ROLES,
   CAPABILITIES,
@@ -234,4 +235,50 @@ test('app and worker never inherit migration/auth secrets they do not need', () 
   assert.equal(worker.AUTH_DATABASE_URL, undefined);
   assert.equal(worker.BETTER_AUTH_SECRET, undefined);
   assert.equal(worker.WORKER_DATABASE_URL, 'worker-secret');
+});
+
+test('external generation is refused until it is acknowledged in words', () => {
+  const base = {
+    APP_PROFILE: 'local-dev',
+    AI_PROVIDER: 'weknora-local',
+    AI_GENERATION: 'weknora-local',
+    WEKNORA_BASE_URL: 'http://127.0.0.1:47080',
+    WEKNORA_API_KEY: 'sk-local-abcdefghijklmnop',
+    WEKNORA_KNOWLEDGE_BASE_ID: 'kb-uji-1234',
+  };
+  // Default stays on this machine.
+  assert.equal(readAiConfig(base).generationLocation, 'local');
+  // Asking for external without the acknowledgement is refused, and the message says why.
+  assert.throws(
+    () => readAiConfig({ ...base, AI_GENERATION_LOCATION: 'external' }),
+    /AI_EXTERNAL_ACKNOWLEDGED/,
+  );
+  // With the acknowledgement it is allowed, and the status reports it rather than hiding it.
+  const external = readAiConfig({
+    ...base,
+    AI_GENERATION_LOCATION: 'external',
+    AI_EXTERNAL_ACKNOWLEDGED: 'synthetic-corpus-only',
+  });
+  assert.equal(external.generationLocation, 'external');
+  assert.equal(describeAiConfig(external).generationLocation, 'external');
+  // A typo is a hard error, never a silent fallback to local.
+  assert.throws(
+    () => readAiConfig({ ...base, AI_GENERATION_LOCATION: 'cloud' }),
+    /local atau external/,
+  );
+});
+
+test('the status shape still never carries the WeKnora key', () => {
+  const status = describeAiConfig(
+    readAiConfig({
+      APP_PROFILE: 'local-dev',
+      AI_PROVIDER: 'weknora-local',
+      AI_GENERATION: 'off',
+      WEKNORA_BASE_URL: 'http://127.0.0.1:47080',
+      WEKNORA_API_KEY: 'sk-local-abcdefghijklmnop',
+      WEKNORA_KNOWLEDGE_BASE_ID: 'kb-uji-1234',
+    }),
+  );
+  assert(!JSON.stringify(status).includes('sk-local-abcdefghijklmnop'));
+  assert.equal(status.apiKeyConfigured, true);
 });
