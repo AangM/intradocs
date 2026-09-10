@@ -20,6 +20,7 @@
     "./converter": "./src/converter.ts",
     "./ai-config": "./src/ai-config.ts",
     "./weknora": "./src/weknora.ts",
-    "./rag": "./src/rag.ts"
+    "./rag": "./src/rag.ts",
+    "./diff": "./src/diff.ts"
   }
 }

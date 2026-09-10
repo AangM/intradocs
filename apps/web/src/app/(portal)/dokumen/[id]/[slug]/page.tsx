@@ -273,6 +273,14 @@ export default async function Reader({
               <a className="btn btn-sm full-width mt20" href="#main-content">
                 Kembali ke awal
               </a>
+              {versions.length > 1 && (
+                <Link
+                  className="btn btn-sm full-width mt20"
+                  href={`/dokumen/${doc.id}/${doc.slug}/versi`}
+                >
+                  Bandingkan versi
+                </Link>
+              )}
               <p className="sub tiny">
                 Pilih versi immutable pada panel Versi & Persetujuan di bawah dokumen.
                 Diff/rollback: V1.

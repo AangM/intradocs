@@ -383,3 +383,76 @@ summary,
 .related-documents a {
   color: var(--blue-700);
 }
+
+/* S04 · perbandingan versi -------------------------------------------------- */
+.diff-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 12px 0;
+}
+.diff-picker label {
+  font-size: 12px;
+  color: var(--muted);
+}
+.diff-picker select {
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--white);
+  color: var(--ink);
+  max-width: 260px;
+}
+.diff-view {
+  display: grid;
+  gap: 14px;
+  margin-top: 10px;
+}
+.diff-hunk {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  border-collapse: collapse;
+  overflow: hidden;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  table-layout: fixed;
+}
+.diff-hunk td {
+  padding: 2px 6px;
+  vertical-align: top;
+}
+.diff-num {
+  width: 44px;
+  text-align: right;
+  color: var(--muted);
+  user-select: none;
+  background: var(--bg);
+}
+.diff-sign {
+  width: 16px;
+  text-align: center;
+  color: var(--muted);
+  user-select: none;
+}
+.diff-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+/* Colour is a hint, never the only signal: the +/- column and the screen-reader
+   prefix carry the same meaning for anyone who cannot distinguish these shades. */
+.diff-add {
+  background: var(--green-bg);
+}
+.diff-remove {
+  background: var(--red-bg);
+}
+@media (max-width: 640px) {
+  .diff-num {
+    width: 32px;
+  }
+  .diff-hunk {
+    font-size: 11.5px;
+  }
+}

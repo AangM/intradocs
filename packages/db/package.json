@@ -11,7 +11,8 @@
     "./workflow": "./src/workflow.ts",
     "./taxonomy": "./src/taxonomy.ts",
     "./discovery": "./src/discovery.ts",
-    "./rag": "./src/rag.ts"
+    "./rag": "./src/rag.ts",
+    "./versions": "./src/versions.ts"
   },
   "dependencies": {
     "@intradocs/core": "workspace:*",
