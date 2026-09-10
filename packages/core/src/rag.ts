@@ -332,9 +332,7 @@ export function parseChatBody(value: unknown, maxChars: number): { question: str
   return { question: parseQuestion(body.question, maxChars) };
 }
 
-/** The one answer we are allowed to give when nothing survived validation. */
-export const ABSTAIN_MESSAGE =
-  'Tidak ada sumber resmi yang dapat Anda akses untuk menjawab pertanyaan ini. IntraDocs tidak menjawab tanpa bukti dokumen.';
+export { ABSTAIN_MESSAGE } from './rag-messages.ts';
 
 /* ------------------------------------------------------------------ *
  * Export worker

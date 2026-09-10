@@ -1,6 +1,7 @@
 'use client';
 import { useId, useRef, useState } from 'react';
 import Link from 'next/link';
+import { answerToMarkdown } from '@intradocs/core/answer-export';
 import { Icon } from './icon';
 
 export interface AssistantCitation {
@@ -43,6 +44,8 @@ export function AssistantChat({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AssistantAnswer | null>(null);
+  const [asked, setAsked] = useState('');
+  const [copied, setCopied] = useState(false);
   const abort = useRef<AbortController | null>(null);
 
   async function ask(text: string) {
@@ -76,6 +79,8 @@ export function AssistantChat({
         return;
       }
       setResult(body as AssistantAnswer);
+      setAsked(trimmed);
+      setCopied(false);
     } catch (e) {
       if ((e as Error).name !== 'AbortError') setError('Tidak dapat menghubungi layanan lokal.');
     } finally {
@@ -175,9 +180,61 @@ export function AssistantChat({
                 ? ` ${result.rejectedCount} kandidat ditolak karena gagal validasi izin.`
                 : ''}
             </p>
+            {/* Built from what is already on screen -- the citations that survived
+                validation -- so exporting opens no path to anything else. */}
+            <div className="rag-export">
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={() => {
+                  void navigator.clipboard
+                    ?.writeText(markdown(result, asked))
+                    .then(() => setCopied(true))
+                    .catch(() => setCopied(false));
+                }}
+              >
+                <Icon name="file" size={14} />
+                {copied ? 'Tersalin' : 'Salin sebagai Markdown'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={() => download(markdown(result, asked), asked)}
+              >
+                <Icon name="download" size={14} />
+                Unduh .md
+              </button>
+              <span className="sub tiny">
+                Tautan sumber tetap mengarah ke IntraDocs dan tetap memeriksa izin saat dibuka.
+              </span>
+            </div>
           </>
         )}
       </div>
     </>
   );
+}
+
+function markdown(result: AssistantAnswer, question: string): string {
+  return answerToMarkdown({
+    question,
+    answer: result.answer,
+    abstained: result.abstained,
+    citations: result.citations,
+    origin: window.location.origin,
+  });
+}
+
+function download(text: string, question: string) {
+  const slug =
+    question
+      .slice(0, 40)
+      .replace(/[^\p{L}\p{N}]+/gu, '-')
+      .replace(/^-|-$/g, '') || 'jawaban';
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/markdown;charset=utf-8' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `intradocs-${slug}.md`;
+  link.click();
+  URL.revokeObjectURL(url);
 }

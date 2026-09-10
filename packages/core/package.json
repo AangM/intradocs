@@ -21,6 +21,8 @@
     "./ai-config": "./src/ai-config.ts",
     "./weknora": "./src/weknora.ts",
     "./rag": "./src/rag.ts",
-    "./diff": "./src/diff.ts"
+    "./diff": "./src/diff.ts",
+    "./answer-export": "./src/answer-export.ts",
+    "./rag-messages": "./src/rag-messages.ts"
   }
 }
