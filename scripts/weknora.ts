@@ -14,7 +14,7 @@ import { readAiConfig, assertLoopbackHttpOrigin } from '../packages/core/src/ai-
 import { readWorkerConfig } from '../packages/core/src/config.ts';
 import { WeknoraClient } from '../packages/core/src/weknora.ts';
 import { LocalBlobStore } from '../packages/core/src/storage.ts';
-import { processRagExport } from '../packages/core/src/rag.ts';
+import { processRagExport, sweepRagOrphans } from '../packages/core/src/rag.ts';
 import { PostgresRagExportRepository, WeknoraIndexTarget } from '../apps/worker/src/rag-export.ts';
 
 const ENV_FILE = path.join(ROOT, '.env.local');
@@ -312,11 +312,12 @@ async function sync(): Promise<void> {
       processed += 1;
       if (processed >= 500) break;
     }
+    const swept = await sweepRagOrphans({ repository, index });
     const { rows } = await pool.query<{ state: string; total: string }>(
       'SELECT state,total FROM app.rag_export_status()',
     );
     console.log(
-      `Sinkronisasi selesai: ${queued} diantre, ${processed} diproses. Antrean: ${
+      `Sinkronisasi selesai: ${queued} diantre, ${processed} diproses, ${swept.removed} yatim disapu dari ${swept.scanned} record. Antrean: ${
         rows.map((r) => `${r.state}=${r.total}`).join(' ') || 'kosong'
       }`,
     );

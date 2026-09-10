@@ -255,6 +255,39 @@ export class WeknoraClient {
     return out;
   }
 
+  /**
+   * Every knowledge record in the pinned knowledge base, paged.
+   *
+   * Used only by the orphan sweep. A record can outlive its IntraDocs row when the
+   * version is deleted outright: the cascade drops the mapping before the exporter can
+   * issue the matching delete, so the sweep finds it by title instead.
+   */
+  async listKnowledge(maxRecords = 1000): Promise<WeknoraKnowledge[]> {
+    const out: WeknoraKnowledge[] = [];
+    const pageSize = 100;
+    for (let page = 1; out.length < maxRecords; page += 1) {
+      const query = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
+      const data = await this.json(
+        'GET',
+        `/api/v1/knowledge-bases/${encodeURIComponent(this.config.knowledgeBaseId)}/knowledge?${query}`,
+      );
+      const rows = Array.isArray(data)
+        ? data
+        : Array.isArray(asRecord(data).data)
+          ? (asRecord(data).data as unknown[])
+          : [];
+      if (rows.length === 0) break;
+      for (const row of rows) {
+        if (!row || typeof row !== 'object') continue;
+        const r = row as Json;
+        const id = str(r.id);
+        if (id) out.push({ id, title: str(r.title), parseStatus: str(r.parse_status, 'unknown') });
+      }
+      if (rows.length < pageSize) break;
+    }
+    return out;
+  }
+
   async createManualKnowledge(input: { title: string; content: string }): Promise<string> {
     const data = asRecord(
       await this.json(

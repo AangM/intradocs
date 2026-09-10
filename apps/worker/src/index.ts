@@ -7,7 +7,7 @@ import { LocalBlobStore } from '@intradocs/core/storage';
 import { processPublication } from '@intradocs/core/workflow';
 import { readAiConfig } from '@intradocs/core/ai-config';
 import { WeknoraClient } from '@intradocs/core/weknora';
-import { processRagExport } from '@intradocs/core/rag';
+import { processRagExport, sweepRagOrphans } from '@intradocs/core/rag';
 import { PostgresPublicationRepository } from './publication.ts';
 import { PostgresRagExportRepository, WeknoraIndexTarget } from './rag-export.ts';
 
@@ -26,6 +26,9 @@ async function start() {
   // AI stays off unless explicitly configured; with it off no exporter, client or
   // outbound request exists at all, and publication keeps working unchanged.
   const ai = readAiConfig(process.env);
+  // The sweep lists the whole knowledge base, so it runs on its own slow cadence
+  // rather than on every export cycle.
+  let sweepDue = Date.now();
   const rag =
     ai.retrieval === 'weknora-local' && ai.weknora
       ? {
@@ -70,6 +73,14 @@ async function start() {
               }))
             )
               break;
+          }
+          // Records whose version was deleted outright never produce a removal job,
+          // because the cascade takes the mapping with the version. Sweep them here.
+          if (sweepDue <= Date.now()) {
+            sweepDue = Date.now() + 600000;
+            const swept = await sweepRagOrphans({ repository: rag.repository, index: rag.index });
+            if (swept.removed > 0)
+              console.log(`Menyapu ${swept.removed} record WeKnora tanpa pemilik.`);
           }
         } catch {
           console.error('Ekspor RAG tertunda; antrean mempertahankan status dan retry.');

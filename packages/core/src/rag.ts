@@ -362,6 +362,8 @@ export interface RagExportClaim {
 
 export interface RagExportRepository {
   reconcile(): Promise<number>;
+  /** Version IDs that legitimately hold an index record right now. */
+  knownVersions(): Promise<Set<string>>;
   claim(): Promise<RagExportClaim | null>;
   complete(
     claim: RagExportClaim,
@@ -376,6 +378,39 @@ export interface RagIndexTarget {
   update(knowledgeId: string, input: { title: string; content: string }): Promise<void>;
   remove(knowledgeId: string): Promise<void>;
   findByTitle(title: string): Promise<string | null>;
+  /** Everything currently stored, for the orphan sweep. */
+  list(): Promise<Array<{ id: string; title: string }>>;
+}
+
+/**
+ * Deletes WeKnora records whose IntraDocs version no longer has an index row.
+ *
+ * These appear when a version is deleted outright: the foreign-key cascade drops the
+ * mapping before the exporter can issue the delete, so nothing is left to queue a
+ * removal from. Retrieval is unaffected either way -- an orphan has no mapping row and
+ * therefore can never be resolved into a citation -- so this is storage hygiene.
+ *
+ * Only records carrying our own title marker are considered. Anything else in the
+ * knowledge base belongs to someone else and is left untouched.
+ */
+export async function sweepRagOrphans(deps: {
+  repository: Pick<RagExportRepository, 'knownVersions'>;
+  index: Pick<RagIndexTarget, 'list' | 'remove'>;
+  limit?: number;
+}): Promise<{ scanned: number; removed: number }> {
+  const known = await deps.repository.knownVersions();
+  const records = await deps.index.list();
+  let removed = 0;
+  const limit = deps.limit ?? 100;
+  for (const record of records) {
+    const versionId = versionIdFromIndexTitle(record.title);
+    // No marker means the record was not written by this exporter.
+    if (!versionId || known.has(versionId)) continue;
+    if (removed >= limit) break;
+    await deps.index.remove(record.id);
+    removed += 1;
+  }
+  return { scanned: records.length, removed };
 }
 
 export class RagExportError extends Error {}

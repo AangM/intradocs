@@ -13,6 +13,12 @@ export class PostgresRagExportRepository implements RagExportRepository {
     );
     return Number(rows[0]?.queued ?? 0);
   }
+  async knownVersions(): Promise<Set<string>> {
+    const { rows } = await this.pool.query<{ version_id: string }>(
+      'SELECT version_id FROM app.rag_known_versions()',
+    );
+    return new Set(rows.map((r) => r.version_id));
+  }
   async claim(): Promise<RagExportClaim | null> {
     const { rows } = await this.pool.query<{
       job_id: string;
@@ -85,6 +91,9 @@ export class WeknoraIndexTarget implements RagIndexTarget {
   }
   async remove(knowledgeId: string): Promise<void> {
     await this.client.deleteKnowledge(knowledgeId);
+  }
+  async list(): Promise<Array<{ id: string; title: string }>> {
+    return (await this.client.listKnowledge()).map((k) => ({ id: k.id, title: k.title }));
   }
   async findByTitle(title: string): Promise<string | null> {
     const versionId = versionIdFromIndexTitle(title);
