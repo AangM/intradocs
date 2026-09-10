@@ -31,7 +31,13 @@ const CLASSIFICATION_LABELS: Record<string, string> = {
   confidential: 'Rahasia',
 };
 
-export function AssistantChat({ maxQuestionChars }: { maxQuestionChars: number }) {
+export function AssistantChat({
+  maxQuestionChars,
+  generating = false,
+}: {
+  maxQuestionChars: number;
+  generating?: boolean;
+}) {
   const fieldId = useId();
   const [question, setQuestion] = useState('');
   const [pending, setPending] = useState(false);
@@ -121,7 +127,14 @@ export function AssistantChat({ maxQuestionChars }: { maxQuestionChars: number }
       </form>
 
       <div className="rag-result" aria-live="polite" aria-busy={pending}>
-        {pending && <p className="sub">Mengambil kandidat dan memvalidasi izin sumber…</p>}
+        {pending && (
+          <p className="sub">
+            Mengambil kandidat dan memvalidasi izin sumber…
+            {generating
+              ? ' Model bahasa berjalan lokal di CPU, jadi jawaban bisa memakan puluhan detik.'
+              : ''}
+          </p>
+        )}
         {error && (
           <div className="callout c-warn" role="alert">
             <Icon name="alert" size={18} />

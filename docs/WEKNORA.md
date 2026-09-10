@@ -199,6 +199,17 @@ Dijalankan pada RC M1–M3 dengan profil `weknora` hidup, PostgreSQL lokal, dan 
 | WeKnora sungguhan end-to-end                | **Lulus** — 7 dokumen terindeks, sync diulang 3× tetap 7      |
 | Q4 (40 gold questions, recall@5, grounding) | **BELUM DIKERJAKAN** — butuh corpus dan reviewer domain       |
 
+**Q4 pada corpus sintetis** (`pnpm rag:eval`, 40 pertanyaan di `tests/rag/gold-questions.ts`):
+
+| Kelompok                          | Hasil                                      |
+| --------------------------------- | ------------------------------------------ |
+| 20 answerable (2 multi-sumber)    | recall@5 **100%** — usulan PLAN ≥90%       |
+| 10 lintas izin (termasuk injeksi) | **10/10 tanpa kebocoran**                  |
+| 10 tanpa bukti                    | **0/10 abstain penuh** — lihat batas di §9 |
+| Latensi retrieval                 | p50 479 ms · p95 580 ms · maks 1,1 s       |
+
+Recall dilaporkan, bukan dijadikan gerbang: angkanya berlaku untuk fixture ini. Kebocoran nol adalah syarat mutlak, dan `pnpm rag:eval` keluar non-nol bila ada.
+
 Bukti perilaku yang paling menentukan, diukur langsung:
 
 | Tahap                   | Sitasi | Scope | Indeks | WeKnora |
@@ -215,8 +226,18 @@ Baris kedua adalah intinya: dokumen yang dicabut berhenti dikutip pada request b
 ## 9. Batas yang belum selesai
 
 - **Q4 belum dikerjakan.** Tidak ada 40 pertanyaan berlabel, tidak ada angka recall@5, tidak ada review grounding oleh pemilik domain. Tanpa itu kualitas jawaban belum terukur.
-- **Tidak ada ambang relevansi.** Dengan `AI_GENERATION=off`, pertanyaan di luar topik tetap mengembalikan sumber yang cocok lemah alih-alih abstain. Sistem tidak pernah mengarang jawaban, tetapi daftar sumbernya bisa tidak relevan. Angka ambang sengaja tidak ditebak sebelum ada data Q4.
-- **`AI_GENERATION` belum diuji end-to-end.** Seluruh bukti di atas diukur pada mode retrieval-only. Model KnowledgeQA lokal belum didaftarkan.
+- **Ambang relevansi tidak bisa dipasang dengan mesin ini, dan itu terukur.** Q4 menunjukkan 0/10 abstain pada pertanyaan tanpa bukti: sumber yang cocok lemah tetap dikembalikan. Penyebabnya bukan pilihan angka yang belum dibuat, melainkan tidak adanya sinyal: `score` pada hybrid-search WeKnora selalu bernilai 0,016 — konstanta RRF 1/61 — sehingga tidak membedakan relevansi sama sekali, dan parameter `vector_threshold` berperilaku tidak monotonik saat diukur (ambang 0,0–0,7 menghasilkan 14/14/14/12/15/15/15 hit). Memasang angka di atas sinyal yang tidak ada akan menyembunyikan masalah, bukan menyelesaikannya. Yang tidak pernah terjadi: mengarang jawaban. Perbaikan yang mungkin — menghitung kemiripan sendiri memakai model embedding, lalu mengkalibrasinya terhadap 40 pertanyaan Q4 yang kini tersedia.
+- **`AI_GENERATION` diuji, tetapi tidak dinyalakan secara default.** Dengan `qwen2.5:1.5b-instruct` di Ollama host, jawaban benar-benar grounded pada dokumen. Biayanya diukur: **35–42 detik per jawaban** pada laptop 7,7 GB RAM (target Q5 ≤15 detik), dan permintaan berbarengan membuatnya gagal `503` karena mesin kehabisan memori — saat pengujian hanya tersisa 0,35 GB. Karena itu default tetap `AI_GENERATION=off`: retrieval-only menjawab p95 di bawah 1 detik dan tidak pernah gagal. Untuk menyalakannya:
+
+  ```sh
+  ollama pull qwen2.5:1.5b-instruct
+  # daftarkan sebagai model type=KnowledgeQA di WeKnora, lalu di .env.local:
+  AI_GENERATION=weknora-local
+  WEKNORA_CHAT_TIMEOUT_MS=150000   # default 60 detik terlalu ketat untuk CPU lokal
+  ```
+
+  Perangkat dengan RAM lebih besar (≥16 GB) sebaiknya memakai model yang lebih mampu; 1.5B dipilih semata karena itu yang muat di sini.
+
 - **`WEKNORA_MAX_SCOPE_DOCUMENTS`** membatasi retrieval pada versi teraktif per actor. Cukup untuk corpus sintetis, belum untuk 1.000 dokumen pada budget Q5.
 - **Sinkronisasi otomatis** berjalan di worker tiap siklus; `pnpm weknora:sync` tetap disediakan untuk memaksa satu putaran.
 - **Cascade delete** pada FK RAG membuang `knowledge_id` sebelum exporter sempat menghapus record di WeKnora. Versi yang sudah disetujui bersifat immutable dan tidak pernah dihapus dalam operasi normal, jadi jalur ini hanya tersentuh oleh pembersihan test atau tindakan operator.
