@@ -104,6 +104,91 @@ export async function saveLabel(actorId: string, v: ReturnType<typeof parseLabel
     translateWorkflowError(e);
   }
 }
+/**
+ * Consolidates two labels of one category into one. Returns how many versions carried
+ * the old name, so the caller can tell the admin what the merge actually touched rather
+ * than reporting a silent success.
+ */
+export async function mergeLabels(
+  actorId: string,
+  source: string,
+  target: string,
+  revision: number,
+): Promise<{ aliasedName: string; mergedName: string; affectedVersions: number }> {
+  try {
+    return await withActor(actorId, async ({ client }) => {
+      const { rows } = await client.query<{
+        aliased_name: string;
+        merged_name: string;
+        affected_versions: number;
+      }>('SELECT aliased_name,merged_name,affected_versions FROM app.merge_labels($1,$2,$3)', [
+        source,
+        target,
+        revision,
+      ]);
+      const row = rows[0]!;
+      return {
+        aliasedName: row.aliased_name,
+        mergedName: row.merged_name,
+        affectedVersions: Number(row.affected_versions),
+      };
+    });
+  } catch (e) {
+    translateWorkflowError(e);
+  }
+}
+
+/**
+ * The taxonomy as this actor may see it, for export. RLS decides which categories exist,
+ * so an export can never describe a branch the actor has no scope over.
+ */
+export async function exportTaxonomy(actorId: string): Promise<{
+  exportedAt: string;
+  categories: Array<{
+    id: string;
+    parentId: string | null;
+    name: string;
+    minimumClassification: string;
+    approvalSteps: number;
+    labels: Array<{ name: string; color: string; usedBy: number; mergedInto: string | null }>;
+  }>;
+}> {
+  return withActor(actorId, async ({ client }) => {
+    const { rows } = await client.query<{
+      id: string;
+      parent_id: string | null;
+      name: string;
+      minimum_classification: string;
+      approval_steps: number;
+      labels: Array<{
+        name: string;
+        color: string;
+        usedBy: number;
+        mergedInto: string | null;
+      }> | null;
+    }>(
+      `SELECT c.id,c.parent_id,c.name,c.minimum_classification,c.approval_steps,
+        (SELECT json_agg(json_build_object('name',l.name,'color',l.color,'usedBy',
+          (SELECT count(*) FROM app.document_versions v WHERE v.category_id=c.id AND l.name=ANY(v.labels)),
+          'mergedInto',(SELECT m.name FROM app.labels m WHERE m.id=l.merged_into))
+          ORDER BY l.name)
+         FROM app.labels l WHERE l.category_id=c.id) AS labels
+       FROM app.categories c ORDER BY c.position,c.name`,
+    );
+    return {
+      exportedAt: new Date().toISOString(),
+      categories: rows.map((r) => ({
+        id: r.id,
+        parentId: r.parent_id,
+        name: r.name,
+        minimumClassification: r.minimum_classification,
+        approvalSteps: r.approval_steps,
+        labels: r.labels ?? [],
+      })),
+    };
+  });
+}
+
 export async function assignUser(
   actorId: string,
   target: string,
