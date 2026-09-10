@@ -1,0 +1,4 @@
+# Fixture regeneration only; runtime conversion uses requirements.txt.
+-r requirements.txt
+reportlab==5.0.1
+python-docx==1.2.0

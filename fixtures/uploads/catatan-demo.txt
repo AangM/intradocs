@@ -1,0 +1,7 @@
+Catatan demo, bukan data perusahaan.
+
+Contoh berikut harus tampil literal, bukan dijalankan:
+<script>alert('contoh teks')</script>
+# Ini teks biasa dalam file TXT.
+
+Tidak ada sistem operasional yang perlu diubah.

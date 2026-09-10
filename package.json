@@ -1,0 +1,64 @@
+{
+  "name": "intradocs",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": ">=24.0.0 <25"
+  },
+  "scripts": {
+    "setup:local": "tsx scripts/setup-local.ts",
+    "dev": "tsx scripts/dev.ts",
+    "start": "tsx scripts/dev.ts --production",
+    "build": "pnpm --filter @intradocs/web build",
+    "typecheck": "tsc --noEmit -p tsconfig.check.json && pnpm --filter @intradocs/web typecheck",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "pnpm lint && pnpm typecheck && pnpm test:unit && pnpm test:content && pnpm build",
+    "test:unit": "node --test tests/unit/*.test.ts",
+    "test:integration": "tsx --test --test-concurrency=1 tests/integration/*.test.ts",
+    "test:http": "tsx --test --test-concurrency=1 tests/http/*.test.ts",
+    "test:e2e": "playwright test",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "db:seed": "tsx scripts/seed.ts",
+    "services:stop": "tsx scripts/services.ts stop",
+    "doctor": "tsx scripts/doctor.ts",
+    "verify:source": "node scripts/verify-source.mjs",
+    "test:content": "tsx --tsconfig apps/web/tsconfig.json --test tests/content/*.test.ts",
+    "knowledge:start": "tsx scripts/knowledge.ts start",
+    "knowledge:stop": "tsx scripts/knowledge.ts stop",
+    "scanner:check": "tsx scripts/knowledge.ts check",
+    "test:upload-http": "tsx --test --test-concurrency=1 tests/http/uploads.test.ts",
+    "storage:gc": "tsx scripts/storage-gc.ts",
+    "verify:local": "node scripts/verify-local.ts",
+    "test:python": "python -m unittest discover -s tests/python -v",
+    "knowledge:check": "tsx scripts/knowledge.ts converter-check",
+    "test:workflow-http": "tsx --test --test-concurrency=1 tests/http/workflow.test.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "@types/mdast": "4.0.4",
+    "@types/node": "24.0.13",
+    "@types/pg": "8.15.5",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "better-auth": "1.7.1",
+    "eslint": "9.39.1",
+    "eslint-config-next": "16.3.4",
+    "pg": "8.23.0",
+    "prettier": "3.9.6",
+    "tsx": "4.23.13",
+    "typescript": "5.9.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "sharp",
+      "esbuild"
+    ],
+    "ignoredBuiltDependencies": [
+      "unrs-resolver"
+    ]
+  }
+}

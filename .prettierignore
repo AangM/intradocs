@@ -1,0 +1,13 @@
+reference/
+node_modules/
+.next/
+var/
+pnpm-lock.yaml
+artifacts/
+apps/web/public/icons.svg
+
+packages/db/migrations/
+test-results/
+playwright-report/
+
+.venv/

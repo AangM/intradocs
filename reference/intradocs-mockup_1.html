@@ -1,0 +1,1997 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IntraDocs — Mockup Knowledge Management Platform | Divisi IT</title>
+<style>
+:root{
+  --blue-50:#EFF6FF; --blue-100:#DBEAFE; --blue-200:#BFDBFE; --blue-500:#3B82F6;
+  --blue-600:#2563EB; --blue-700:#1D4ED8; --blue-900:#1E3A8A;
+  --ink:#0F172A; --ink-2:#1E293B; --muted:#64748B; --muted-2:#94A3B8;
+  --line:#E2E8F0; --line-2:#F1F5F9; --bg:#F8FAFC; --white:#fff;
+  --green:#059669; --green-bg:#ECFDF5; --amber:#B45309; --amber-bg:#FFFBEB;
+  --red:#DC2626; --red-bg:#FEF2F2; --violet:#7C3AED; --violet-bg:#F5F3FF;
+  --r:10px; --r-lg:14px;
+  --sh-sm:0 1px 2px rgba(15,23,42,.06);
+  --sh:0 1px 3px rgba(15,23,42,.08),0 1px 2px rgba(15,23,42,.04);
+  --sh-md:0 4px 12px rgba(15,23,42,.08);
+  --sh-lg:0 12px 32px rgba(15,23,42,.12);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  background:var(--bg); color:var(--ink); font-size:14px; line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;font-size:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,textarea,select{font-family:inherit;font-size:inherit;color:inherit}
+svg{display:block}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:6px}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ============ PRESENTATION FRAME ============ */
+.stage{max-width:1480px;margin:0 auto;padding:22px 22px 70px}
+.deck-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:6px 0 18px}
+.deck-badge{display:inline-flex;align-items:center;gap:8px;background:var(--blue-900);color:#fff;
+  padding:6px 13px;border-radius:999px;font-size:11.5px;font-weight:700;letter-spacing:.5px}
+.deck-title{font-size:19px;font-weight:800;letter-spacing:-.3px}
+.deck-sub{font-size:12.5px;color:var(--muted)}
+.screen-nav{display:flex;gap:6px;flex-wrap:wrap;background:#fff;border:1px solid var(--line);
+  padding:6px;border-radius:12px;box-shadow:var(--sh-sm);margin-bottom:16px;position:sticky;top:12px;z-index:80}
+.screen-nav button{padding:7px 12px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--muted);
+  display:flex;align-items:center;gap:7px;transition:.15s}
+.screen-nav button:hover{background:var(--line-2);color:var(--ink)}
+.screen-nav button.on{background:var(--blue-600);color:#fff;box-shadow:0 2px 6px rgba(37,99,235,.3)}
+.screen-nav .num{font-size:10px;opacity:.65;font-weight:700}
+.browser{background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--sh-lg)}
+.browser-bar{display:flex;align-items:center;gap:10px;padding:9px 14px;background:#F1F5F9;border-bottom:1px solid var(--line)}
+.dots{display:flex;gap:6px}
+.dots i{width:10px;height:10px;border-radius:50%;display:block}
+.dots i:nth-child(1){background:#FF5F57}.dots i:nth-child(2){background:#FEBC2E}.dots i:nth-child(3){background:#28C840}
+.url{flex:1;background:#fff;border:1px solid var(--line);border-radius:7px;padding:4px 12px;font-size:11.5px;
+  color:var(--muted);display:flex;align-items:center;gap:7px;max-width:520px}
+.screen{display:none}
+.screen.on{display:block}
+.note{margin-top:14px;background:#fff;border:1px solid var(--line);border-left:3px solid var(--blue-600);
+  border-radius:10px;padding:14px 18px;font-size:12.5px;color:var(--ink-2);box-shadow:var(--sh-sm)}
+.note b{color:var(--blue-700)}
+.note ul{margin:7px 0 0 17px;color:var(--muted);line-height:1.85}
+
+/* ============ APP SHELL ============ */
+.app{display:flex;flex-direction:column;height:840px;overflow:hidden;background:var(--bg)}
+.topbar{height:56px;flex:0 0 56px;background:#fff;border-bottom:1px solid var(--line);
+  display:flex;align-items:center;gap:16px;padding:0 18px;z-index:40}
+.logo{display:flex;align-items:center;gap:9px;font-weight:800;font-size:15px;letter-spacing:-.3px}
+.logo-mark{width:29px;height:29px;border-radius:8px;background:linear-gradient(135deg,var(--blue-600),var(--blue-900));
+  display:grid;place-items:center;color:#fff;flex:0 0 29px;box-shadow:0 2px 6px rgba(37,99,235,.35)}
+.logo small{display:block;font-size:9.5px;font-weight:600;color:var(--muted);letter-spacing:.3px;margin-top:-2px}
+.topnav{display:flex;gap:2px;margin-left:14px}
+.topnav a{padding:7px 12px;border-radius:8px;font-size:13px;font-weight:600;color:var(--muted)}
+.topnav a.on{background:var(--blue-50);color:var(--blue-700)}
+.spacer{flex:1}
+.tsearch{display:flex;align-items:center;gap:9px;background:var(--bg);border:1px solid var(--line);
+  border-radius:9px;padding:7px 11px;width:300px;color:var(--muted-2);font-size:13px}
+.kbd{margin-left:auto;background:#fff;border:1px solid var(--line);border-radius:5px;padding:1px 6px;
+  font-size:10.5px;font-weight:700;color:var(--muted);font-family:ui-monospace,monospace}
+.icon-btn{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;color:var(--muted);position:relative}
+.icon-btn:hover{background:var(--line-2);color:var(--ink)}
+.dot-badge{position:absolute;top:6px;right:6px;width:7px;height:7px;background:var(--red);border-radius:50%;border:2px solid #fff}
+.avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#818CF8,#4F46E5);color:#fff;
+  display:grid;place-items:center;font-size:11.5px;font-weight:700;flex:0 0 32px}
+.who{display:flex;align-items:center;gap:9px;padding:4px 8px 4px 4px;border-radius:10px;border:1px solid var(--line)}
+.who .nm{font-size:12.5px;font-weight:700;line-height:1.2}
+.who .rl{font-size:10.5px;color:var(--muted)}
+
+.body{flex:1;display:flex;min-height:0}
+.side{width:240px;flex:0 0 240px;background:#fff;border-right:1px solid var(--line);padding:14px 10px;overflow-y:auto}
+.side-lbl{font-size:10px;font-weight:800;letter-spacing:.9px;color:var(--muted-2);padding:14px 10px 6px;text-transform:uppercase}
+.side-lbl:first-child{padding-top:2px}
+.nav-i{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;font-size:13px;
+  font-weight:600;color:var(--ink-2);margin-bottom:1px;width:100%;text-align:left;transition:.12s}
+.nav-i:hover{background:var(--line-2)}
+.nav-i.on{background:var(--blue-50);color:var(--blue-700)}
+.nav-i.on svg{color:var(--blue-600)}
+.nav-i svg{color:var(--muted);flex:0 0 17px}
+.nav-i .cnt{margin-left:auto;background:var(--red);color:#fff;font-size:10px;font-weight:800;
+  padding:1px 6px;border-radius:999px}
+.nav-i.on .cnt{background:var(--red)}
+.nav-i .cnt.grey{background:var(--line);color:var(--muted)}
+.main{flex:1;overflow-y:auto;min-width:0}
+.pad{padding:26px 32px}
+
+/* ============ ATOMS ============ */
+.h1{font-size:23px;font-weight:800;letter-spacing:-.5px}
+.h2{font-size:17px;font-weight:750;letter-spacing:-.2px}
+.h3{font-size:14px;font-weight:700}
+.sub{color:var(--muted);font-size:13px}
+.card{background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--sh-sm)}
+.card-h{padding:15px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+.card-b{padding:18px}
+.btn{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;padding:8px 14px;border-radius:9px;font-size:13px;
+  font-weight:650;background:#fff;border:1px solid var(--line);color:var(--ink-2);box-shadow:var(--sh-sm);transition:.12s}
+.btn:hover{background:var(--line-2)}
+.btn-p{background:var(--blue-600);color:#fff;border-color:var(--blue-600);box-shadow:0 2px 6px rgba(37,99,235,.28)}
+.btn-p:hover{background:var(--blue-700)}
+.btn-g{background:var(--green);color:#fff;border-color:var(--green)}
+.btn-r{background:#fff;color:var(--red);border-color:#FECACA}
+.btn-sm{padding:5px 10px;font-size:12px;border-radius:8px}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:2.5px 9px;border-radius:999px;font-size:11px;font-weight:700}
+.p-blue{background:var(--blue-50);color:var(--blue-700)}
+.p-green{background:var(--green-bg);color:var(--green)}
+.p-amber{background:var(--amber-bg);color:var(--amber)}
+.p-red{background:var(--red-bg);color:var(--red)}
+.p-violet{background:var(--violet-bg);color:var(--violet)}
+.p-grey{background:var(--line-2);color:var(--muted)}
+.tag{display:inline-flex;align-items:center;gap:5px;padding:2.5px 9px;border-radius:7px;font-size:11px;
+  font-weight:650;background:var(--line-2);color:var(--muted);border:1px solid var(--line)}
+.tag i{width:6px;height:6px;border-radius:2px;display:block}
+.ft{width:32px;height:32px;border-radius:8px;display:grid;place-items:center;font-size:9px;font-weight:800;color:#fff;flex:0 0 32px}
+.ft-pdf{background:#DC2626}.ft-doc{background:#2563EB}.ft-md{background:#0F172A}
+.ft-xls{background:#059669}.ft-ppt{background:#EA580C}.ft-txt{background:#64748B}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:10.5px;font-weight:800;letter-spacing:.6px;color:var(--muted);
+  text-transform:uppercase;padding:10px 16px;background:var(--bg);border-bottom:1px solid var(--line)}
+td{padding:12px 16px;border-bottom:1px solid var(--line-2);font-size:13px;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tbody tr:hover{background:#FCFDFE}
+.grid{display:grid;gap:14px}
+.g2{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:repeat(3,1fr)}
+.g4{grid-template-columns:repeat(4,1fr)}
+.row{display:flex;align-items:center;gap:10px}
+.col{display:flex;flex-direction:column}
+.mt{margin-top:22px}.mb{margin-bottom:14px}
+.bar{height:6px;background:var(--line-2);border-radius:999px;overflow:hidden}
+.bar span{display:block;height:100%;background:var(--blue-600);border-radius:999px}
+.field{margin-bottom:15px}
+.field label{display:block;font-size:12px;font-weight:700;margin-bottom:6px;color:var(--ink-2)}
+.inp{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:#fff;font-size:13px;box-shadow:var(--sh-sm)}
+.inp::placeholder{color:var(--muted-2)}
+.hint{font-size:11.5px;color:var(--muted);margin-top:5px}
+.sw{width:36px;height:20px;border-radius:999px;background:var(--line);position:relative;flex:0 0 36px}
+.sw::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:var(--sh-sm)}
+.sw.on{background:var(--blue-600)}.sw.on::after{left:18px}
+.chk{width:17px;height:17px;border-radius:5px;border:1.5px solid var(--line);background:#fff;display:grid;place-items:center;flex:0 0 17px}
+.chk.on{background:var(--blue-600);border-color:var(--blue-600)}
+
+/* ============ HELP CENTER HOME ============ */
+.hero{background:
+    radial-gradient(900px 380px at 15% -10%,rgba(37,99,235,.16),transparent 60%),
+    radial-gradient(700px 340px at 88% 0%,rgba(124,58,237,.13),transparent 60%),
+    linear-gradient(180deg,#F8FAFF 0%,#fff 100%);
+  border-bottom:1px solid var(--line);padding:52px 32px 40px;position:relative;overflow:hidden}
+.hero::after{content:'';position:absolute;inset:0;
+  background-image:linear-gradient(rgba(37,99,235,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(37,99,235,.05) 1px,transparent 1px);
+  background-size:44px 44px;-webkit-mask-image:radial-gradient(600px 300px at 50% 0%,#000,transparent 75%);
+  mask-image:radial-gradient(600px 300px at 50% 0%,#000,transparent 75%);pointer-events:none}
+.hero-in{max-width:800px;margin:0 auto;text-align:center;position:relative;z-index:2}
+.hero-badge{display:inline-flex;align-items:center;gap:7px;background:#fff;border:1px solid var(--blue-200);
+  color:var(--blue-700);padding:5px 13px;border-radius:999px;font-size:11.5px;font-weight:700;box-shadow:var(--sh-sm)}
+.hero h1{font-size:38px;font-weight:820;letter-spacing:-1.2px;margin:16px 0 10px;line-height:1.15}
+.hero h1 em{font-style:normal;background:linear-gradient(90deg,var(--blue-600),var(--violet));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p{font-size:15px;color:var(--muted);max-width:560px;margin:0 auto}
+.bigsearch{margin:26px auto 0;max-width:640px;background:#fff;border:1.5px solid var(--line);border-radius:14px;
+  box-shadow:0 8px 28px rgba(15,23,42,.09);display:flex;align-items:center;gap:12px;padding:13px 16px;transition:.2s}
+.bigsearch:hover{border-color:var(--blue-500);box-shadow:0 10px 32px rgba(37,99,235,.16)}
+.bigsearch .txt{flex:1;text-align:left;font-size:14.5px;color:var(--muted-2)}
+.bigsearch .go{background:var(--blue-600);color:#fff;border-radius:9px;padding:7px 14px;font-size:12.5px;font-weight:700;
+  display:flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(37,99,235,.3)}
+.sugg{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:20px}
+.sugg-t{width:100%;font-size:11px;font-weight:800;letter-spacing:.8px;color:var(--muted-2);text-transform:uppercase;margin-bottom:2px}
+.chip{background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-size:12.5px;
+  font-weight:600;color:var(--ink-2);box-shadow:var(--sh-sm);display:inline-flex;align-items:center;gap:7px;transition:.15s}
+.chip:hover{border-color:var(--blue-500);color:var(--blue-700);transform:translateY(-1px);box-shadow:var(--sh-md)}
+.chip svg{color:var(--muted-2)}
+.chip:hover svg{color:var(--blue-600)}
+.hero-stats{display:flex;justify-content:center;gap:38px;margin-top:30px;padding-top:24px;border-top:1px solid var(--line)}
+.hs .n{font-size:21px;font-weight:820;letter-spacing:-.5px;color:var(--blue-700)}
+.hs .l{font-size:11.5px;color:var(--muted);font-weight:600}
+
+.sec{max-width:1120px;margin:0 auto;padding:34px 32px}
+.sec-h{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:16px}
+.sec-h .t{font-size:17px;font-weight:780;letter-spacing:-.3px;display:flex;align-items:center;gap:9px}
+.sec-h .d{font-size:12.5px;color:var(--muted);margin-top:2px}
+.sec-h a{font-size:12.5px;font-weight:700;color:var(--blue-600);display:flex;align-items:center;gap:5px}
+
+.cat{background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);padding:18px;box-shadow:var(--sh-sm);
+  transition:.18s;display:block;position:relative;overflow:hidden}
+.cat:hover{transform:translateY(-3px);box-shadow:var(--sh-md);border-color:var(--blue-200)}
+.cat .ic{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;margin-bottom:12px}
+.cat .t{font-size:14px;font-weight:730;margin-bottom:4px}
+.cat .d{font-size:12.2px;color:var(--muted);line-height:1.5;min-height:36px}
+.cat .m{margin-top:12px;padding-top:11px;border-top:1px solid var(--line-2);font-size:11.5px;color:var(--muted-2);
+  font-weight:650;display:flex;justify-content:space-between;align-items:center}
+
+.mostread{display:flex;gap:13px;align-items:flex-start;background:#fff;border:1px solid var(--line);
+  border-radius:12px;padding:15px 16px;box-shadow:var(--sh-sm);transition:.16s}
+.mostread:hover{border-color:var(--blue-200);box-shadow:var(--sh-md)}
+.rank{width:26px;height:26px;border-radius:8px;background:var(--blue-50);color:var(--blue-700);
+  display:grid;place-items:center;font-size:12px;font-weight:820;flex:0 0 26px}
+.mostread .t{font-size:13.4px;font-weight:700;line-height:1.4}
+.mostread .m{font-size:11.5px;color:var(--muted);margin-top:5px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+
+.ai-banner{background:linear-gradient(120deg,var(--blue-900),#312E81 55%,#4C1D95);border-radius:16px;padding:26px 28px;
+  color:#fff;display:flex;align-items:center;gap:26px;position:relative;overflow:hidden;box-shadow:0 12px 30px rgba(30,58,138,.28)}
+.ai-banner::before{content:'';position:absolute;right:-60px;top:-70px;width:280px;height:280px;border-radius:50%;
+  background:radial-gradient(circle,rgba(99,102,241,.55),transparent 68%)}
+.ai-banner .z{position:relative;z-index:2}
+.ai-banner h3{font-size:20px;font-weight:790;letter-spacing:-.4px;margin-bottom:7px}
+.ai-banner p{font-size:13px;color:#C7D2FE;max-width:470px;line-height:1.6}
+.ai-banner .btn-w{background:#fff;color:var(--blue-900);border:none;font-weight:750;padding:9px 16px;border-radius:10px;
+  display:inline-flex;align-items:center;gap:7px;font-size:13px;margin-top:15px;box-shadow:0 4px 14px rgba(0,0,0,.2)}
+.ai-mini{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.17);border-radius:13px;padding:14px;
+  width:310px;flex:0 0 310px;backdrop-filter:blur(6px)}
+.ai-mini .q{background:rgba(255,255,255,.94);color:var(--ink);border-radius:9px;padding:8px 11px;font-size:11.8px;
+  font-weight:600;margin-bottom:9px}
+.ai-mini .a{font-size:11.8px;color:#E0E7FF;line-height:1.65}
+.ai-mini .src{margin-top:9px;display:flex;gap:6px;flex-wrap:wrap}
+.ai-mini .src span{background:rgba(255,255,255,.14);border-radius:6px;padding:2px 7px;font-size:10px;font-weight:650;color:#DDD6FE}
+
+.foot{border-top:1px solid var(--line);background:#fff;padding:26px 32px;margin-top:20px}
+.foot-in{max-width:1120px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap}
+.foot .c{font-size:11.8px;color:var(--muted-2)}
+.foot .lk{display:flex;gap:18px;font-size:12.2px;color:var(--muted);font-weight:600}
+
+/* ============ SEARCH ============ */
+.filters{width:228px;flex:0 0 228px}
+.fgroup{margin-bottom:20px}
+.fgroup .ft-l{font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--muted-2);margin-bottom:9px}
+.fitem{display:flex;align-items:center;gap:9px;padding:5px 0;font-size:12.6px;color:var(--ink-2);font-weight:550}
+.fitem .n{margin-left:auto;font-size:11px;color:var(--muted-2);font-weight:650}
+.res{padding:16px 0;border-bottom:1px solid var(--line)}
+.res .t{font-size:15px;font-weight:720;color:var(--blue-700);margin-bottom:4px;letter-spacing:-.2px}
+.res .crumb{font-size:11.5px;color:var(--muted-2);margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.res .sn{font-size:12.8px;color:var(--muted);line-height:1.65}
+.res .sn mark{background:#FEF08A;color:var(--ink);padding:0 2px;border-radius:3px}
+.res .m{margin-top:9px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ai-answer{background:linear-gradient(135deg,#F5F3FF,#EFF6FF);border:1px solid #DDD6FE;border-radius:13px;padding:17px 19px;margin-bottom:8px}
+.ai-answer .hd{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:800;color:var(--violet);margin-bottom:9px;
+  letter-spacing:.3px;text-transform:uppercase}
+.ai-answer p{font-size:13.2px;line-height:1.72;color:var(--ink-2)}
+.cite{display:inline-flex;align-items:center;justify-content:center;background:var(--violet);color:#fff;border-radius:5px;
+  min-width:15px;height:15px;font-size:9px;font-weight:800;vertical-align:super;margin:0 1px;padding:0 3px;line-height:15px}
+
+/* ============ DOC VIEWER ============ */
+.docnav{width:250px;flex:0 0 250px;background:#fff;border-right:1px solid var(--line);overflow-y:auto;padding:16px 12px}
+.dn-sec{font-size:10.5px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--muted-2);padding:14px 10px 6px}
+.dn-i{display:block;padding:6px 10px;border-radius:8px;font-size:12.8px;color:var(--ink-2);font-weight:550;margin-bottom:1px}
+.dn-i:hover{background:var(--line-2)}
+.dn-i.on{background:var(--blue-50);color:var(--blue-700);font-weight:700}
+.dn-i.sub{padding-left:22px;font-size:12.4px;color:var(--muted)}
+.doc-main{flex:1;overflow-y:auto;background:#fff;min-width:0}
+.doc-wrap{max-width:760px;padding:34px 44px 60px}
+.crumbs{font-size:11.8px;color:var(--muted-2);display:flex;align-items:center;gap:7px;margin-bottom:14px;font-weight:600}
+.doc-wrap h1{font-size:31px;font-weight:820;letter-spacing:-.9px;line-height:1.2;margin-bottom:12px}
+.doc-meta{display:flex;align-items:center;gap:14px;padding:13px 0;border-top:1px solid var(--line-2);
+  border-bottom:1px solid var(--line-2);margin-bottom:24px;flex-wrap:wrap}
+.doc-wrap h2{font-size:20px;font-weight:760;letter-spacing:-.4px;margin:30px 0 11px;padding-top:6px}
+.doc-wrap h3{font-size:15.5px;font-weight:730;margin:22px 0 8px}
+.doc-wrap p{font-size:14.2px;line-height:1.78;color:var(--ink-2);margin-bottom:13px}
+.doc-wrap ul,.doc-wrap ol{margin:0 0 14px 20px;font-size:14.2px;line-height:1.85;color:var(--ink-2)}
+.doc-wrap li{margin-bottom:3px}
+.callout{border-radius:11px;padding:14px 16px;margin:18px 0;font-size:13.2px;line-height:1.68;display:flex;gap:11px}
+.c-info{background:var(--blue-50);border:1px solid var(--blue-200);color:#1E40AF}
+.c-warn{background:var(--amber-bg);border:1px solid #FDE68A;color:#92400E}
+.code{background:#0F172A;border-radius:11px;padding:15px 17px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:12.3px;line-height:1.75;color:#E2E8F0;overflow-x:auto;margin:16px 0}
+.code .k{color:#93C5FD}.code .s{color:#86EFAC}.code .c{color:#64748B}
+.toc{width:212px;flex:0 0 212px;padding:34px 20px;position:sticky;top:0;align-self:flex-start;height:100%;overflow-y:auto}
+.toc-t{font-size:10.5px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--muted-2);margin-bottom:11px}
+.toc a{display:block;font-size:12.3px;color:var(--muted);padding:4px 0 4px 11px;border-left:2px solid var(--line);line-height:1.5}
+.toc a.on{color:var(--blue-700);border-left-color:var(--blue-600);font-weight:700}
+.toc a.i2{padding-left:22px;font-size:12px}
+.feedback{margin-top:34px;padding:18px;border:1px solid var(--line);border-radius:12px;background:var(--bg);
+  display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+
+/* ============ UPLOAD ============ */
+.steps{display:flex;align-items:center;gap:0;margin-bottom:24px}
+.step{display:flex;align-items:center;gap:9px}
+.step .b{width:27px;height:27px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:800;
+  background:#fff;border:1.5px solid var(--line);color:var(--muted-2)}
+.step.done .b{background:var(--green);border-color:var(--green);color:#fff}
+.step.now .b{background:var(--blue-600);border-color:var(--blue-600);color:#fff;box-shadow:0 0 0 4px var(--blue-50)}
+.step .l{font-size:12.5px;font-weight:700;color:var(--muted-2)}
+.step.now .l{color:var(--blue-700)}.step.done .l{color:var(--ink-2)}
+.step-line{flex:1;height:1.5px;background:var(--line);margin:0 13px}
+.step-line.done{background:var(--green)}
+.drop{border:2px dashed var(--blue-200);border-radius:14px;background:linear-gradient(180deg,#F8FBFF,#fff);
+  padding:36px;text-align:center}
+.drop .ic{width:52px;height:52px;border-radius:14px;background:var(--blue-50);color:var(--blue-600);
+  display:grid;place-items:center;margin:0 auto 13px}
+.drop h3{font-size:15.5px;font-weight:750;margin-bottom:5px}
+.fmt{display:flex;gap:7px;justify-content:center;margin-top:15px;flex-wrap:wrap}
+.fmt span{background:#fff;border:1px solid var(--line);border-radius:7px;padding:3px 9px;font-size:11px;
+  font-weight:700;color:var(--muted)}
+.file-row{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);
+  border-radius:11px;margin-bottom:9px;background:#fff}
+.ai-extract{background:var(--violet-bg);border:1px solid #DDD6FE;border-radius:11px;padding:13px 15px}
+
+/* ============ APPROVAL ============ */
+.appr-list{width:352px;flex:0 0 352px;border-right:1px solid var(--line);background:#fff;overflow-y:auto}
+.appr-i{padding:14px 16px;border-bottom:1px solid var(--line-2);cursor:pointer;border-left:3px solid transparent}
+.appr-i:hover{background:#FCFDFE}
+.appr-i.on{background:var(--blue-50);border-left-color:var(--blue-600)}
+.appr-i .t{font-size:13.2px;font-weight:700;line-height:1.4;margin-bottom:5px}
+.appr-i .m{font-size:11.4px;color:var(--muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.timeline{position:relative;padding-left:24px}
+.timeline::before{content:'';position:absolute;left:8px;top:5px;bottom:5px;width:1.5px;background:var(--line)}
+.tl-i{position:relative;padding-bottom:16px}
+.tl-i::before{content:'';position:absolute;left:-20px;top:4px;width:9px;height:9px;border-radius:50%;
+  background:#fff;border:2px solid var(--line)}
+.tl-i.ok::before{background:var(--green);border-color:var(--green)}
+.tl-i.now::before{background:var(--blue-600);border-color:var(--blue-600);box-shadow:0 0 0 3px var(--blue-50)}
+.tl-i .t{font-size:12.8px;font-weight:700}
+.tl-i .d{font-size:11.5px;color:var(--muted);margin-top:1px}
+.preview-doc{background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:20px 22px;font-size:12.6px;
+  line-height:1.75;color:var(--ink-2);max-height:280px;overflow:hidden;position:relative}
+.preview-doc::after{content:'';position:absolute;bottom:0;left:0;right:0;height:60px;
+  background:linear-gradient(transparent,var(--bg))}
+
+/* ============ RBAC ============ */
+.matrix td,.matrix th{text-align:center;font-size:12.5px}
+.matrix td:first-child,.matrix th:first-child{text-align:left;font-weight:650}
+.ck{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:6px}
+.ck.y{background:var(--green-bg);color:var(--green)}
+.ck.n{background:var(--line-2);color:var(--muted-2)}
+.ck.p{background:var(--amber-bg);color:var(--amber)}
+.role-card{border:1px solid var(--line);border-radius:12px;padding:15px;background:#fff}
+.role-card .rt{display:flex;align-items:center;gap:9px;margin-bottom:8px}
+.role-card .rd{font-size:12px;color:var(--muted);line-height:1.55;min-height:34px}
+
+/* ============ AI CHAT ============ */
+.chat{flex:1;display:flex;flex-direction:column;min-width:0;background:#fff}
+.chat-body{flex:1;overflow-y:auto;padding:26px 0}
+.chat-in{max-width:730px;margin:0 auto;padding:0 24px}
+.msg{display:flex;gap:13px;margin-bottom:24px}
+.msg .av{width:31px;height:31px;border-radius:9px;display:grid;place-items:center;flex:0 0 31px;font-size:11px;font-weight:800}
+.msg.u .av{background:linear-gradient(135deg,#818CF8,#4F46E5);color:#fff}
+.msg.a .av{background:linear-gradient(135deg,var(--blue-600),var(--violet));color:#fff}
+.msg .c{flex:1;min-width:0}
+.msg .nm{font-size:12.2px;font-weight:800;margin-bottom:5px}
+.msg .tx{font-size:13.6px;line-height:1.75;color:var(--ink-2)}
+.msg .tx p{margin-bottom:10px}
+.msg .tx ol,.msg .tx ul{margin:0 0 11px 19px;line-height:1.85}
+.srcs{margin-top:13px;border:1px solid var(--line);border-radius:11px;overflow:hidden}
+.srcs .sh{padding:8px 13px;background:var(--bg);font-size:11px;font-weight:800;letter-spacing:.5px;
+  text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line)}
+.src-i{display:flex;align-items:center;gap:11px;padding:9px 13px;border-bottom:1px solid var(--line-2)}
+.src-i:last-child{border-bottom:none}
+.src-i .n{width:18px;height:18px;border-radius:5px;background:var(--violet);color:#fff;display:grid;
+  place-items:center;font-size:9.5px;font-weight:800;flex:0 0 18px}
+.src-i .t{font-size:12.4px;font-weight:650}
+.src-i .p{font-size:11px;color:var(--muted-2)}
+.chat-foot{border-top:1px solid var(--line);padding:16px 24px 20px;background:#fff}
+.chat-box{max-width:730px;margin:0 auto;border:1.5px solid var(--line);border-radius:13px;padding:12px 14px;
+  box-shadow:var(--sh-md);background:#fff}
+.chat-box .ph{font-size:13.5px;color:var(--muted-2);margin-bottom:11px}
+.chat-tools{display:flex;align-items:center;gap:8px}
+.send{margin-left:auto;width:32px;height:32px;border-radius:9px;background:var(--blue-600);color:#fff;display:grid;place-items:center}
+.qs{display:flex;gap:8px;flex-wrap:wrap;max-width:730px;margin:0 auto 12px}
+
+/* ============ DASHBOARD ============ */
+.kpi{background:#fff;border:1px solid var(--line);border-radius:13px;padding:16px 17px;box-shadow:var(--sh-sm)}
+.kpi .l{font-size:11.5px;color:var(--muted);font-weight:650;display:flex;align-items:center;gap:7px}
+.kpi .v{font-size:26px;font-weight:820;letter-spacing:-.8px;margin:7px 0 3px}
+.kpi .t{font-size:11.5px;font-weight:700;display:flex;align-items:center;gap:4px}
+.kpi .t.up{color:var(--green)}.kpi .t.dn{color:var(--red)}
+.chart{display:flex;align-items:flex-end;gap:9px;height:150px;padding-top:10px}
+.chart .cb{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:6px;height:100%}
+.chart .cb .bb{width:100%;background:linear-gradient(180deg,var(--blue-500),var(--blue-600));border-radius:6px 6px 3px 3px;min-height:6px}
+.chart .cb .bb.alt{background:linear-gradient(180deg,#A5B4FC,#818CF8)}
+.chart .cb .lb{font-size:10.5px;color:var(--muted-2);font-weight:650}
+.legend{display:flex;gap:15px;font-size:11.5px;color:var(--muted);font-weight:600}
+.legend i{width:9px;height:9px;border-radius:3px;display:inline-block;margin-right:5px}
+.donut{width:130px;height:130px;border-radius:50%;flex:0 0 130px;display:grid;place-items:center;position:relative}
+.donut::after{content:'';position:absolute;width:82px;height:82px;background:#fff;border-radius:50%}
+.donut .dv{position:relative;z-index:2;text-align:center}
+.donut .dv b{font-size:20px;font-weight:820;display:block;letter-spacing:-.5px}
+.donut .dv span{font-size:10.5px;color:var(--muted);font-weight:650}
+@media(max-width:1200px){.toc{display:none}}
+</style>
+</head>
+<body>
+<div class="stage">
+
+<div class="deck-head">
+  <span class="deck-badge">MOCKUP UI/UX · v1.0</span>
+  <div>
+    <div class="deck-title">IntraDocs — Enterprise Knowledge Management Platform</div>
+    <div class="deck-sub">Usulan Sistem Dokumentasi & Knowledge Base Dinamis · Divisi IT · Agustus 2026</div>
+  </div>
+</div>
+
+<div class="screen-nav" id="nav"></div>
+<style>
+svg.i{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+svg.i.s{width:14px;height:14px}
+svg.i.l{width:21px;height:21px}
+svg.i.xl{width:26px;height:26px}
+</style>
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+<symbol id="ic-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+<symbol id="ic-spark" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></symbol>
+<symbol id="ic-book" viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 016.5 3H19v15H6.5A2.5 2.5 0 004 20.5z"/><path d="M4 20.5A2.5 2.5 0 016.5 18H19v3H6.5A2.5 2.5 0 014 18.5"/></symbol>
+<symbol id="ic-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v13"/></symbol>
+<symbol id="ic-check-c" viewBox="0 0 24 24"><path d="M21.8 11.1V12a9 9 0 11-5.3-8.2"/><path d="M22 5l-10 10-3-3"/></symbol>
+<symbol id="ic-check" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></symbol>
+<symbol id="ic-users" viewBox="0 0 24 24"><path d="M16 20v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 20v-2a4 4 0 00-3-3.9"/><path d="M16 3.1a4 4 0 010 7.8"/></symbol>
+<symbol id="ic-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2.5h8a2 2 0 012 2V18a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></symbol>
+<symbol id="ic-tag" viewBox="0 0 24 24"><path d="M20.6 13.4l-7.2 7.2a2 2 0 01-2.8 0l-7.2-7.2a2 2 0 01-.6-1.4V4a1 1 0 011-1h8a2 2 0 011.4.6l7.4 7.4a2 2 0 010 2.4z"/><circle cx="7.5" cy="7.5" r="1.2"/></symbol>
+<symbol id="ic-chart" viewBox="0 0 24 24"><path d="M3 3v17a1 1 0 001 1h17"/><path d="M7 15l4-5 3.5 3L20 6"/></symbol>
+<symbol id="ic-bell" viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 01-3.4 0"/></symbol>
+<symbol id="ic-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.6 1.6 0 00-2.7 1.1V21a2 2 0 11-4 0v-.1A1.6 1.6 0 007.5 19.4l-.1.1a2 2 0 11-2.8-2.8l.1-.1A1.6 1.6 0 003 15H3a2 2 0 110-4h.1A1.6 1.6 0 004.6 9.5l-.1-.1a2 2 0 112.8-2.8l.1.1A1.6 1.6 0 009 4.6V3a2 2 0 114 0v.1a1.6 1.6 0 002.7 1.1l.1-.1a2 2 0 112.8 2.8l-.1.1A1.6 1.6 0 0021 11h.1a2 2 0 110 4H21"/></symbol>
+<symbol id="ic-chev-r" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></symbol>
+<symbol id="ic-chev-d" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+<symbol id="ic-arrow-r" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M13 5l7 7-7 7"/></symbol>
+<symbol id="ic-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></symbol>
+<symbol id="ic-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></symbol>
+<symbol id="ic-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></symbol>
+<symbol id="ic-filter" viewBox="0 0 24 24"><path d="M3 5h18l-7 8.5V20l-4-2v-4.5z"/></symbol>
+<symbol id="ic-home" viewBox="0 0 24 24"><path d="M3 10l9-7 9 7v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="M9 21v-7h6v7"/></symbol>
+<symbol id="ic-msg" viewBox="0 0 24 24"><path d="M21 12a8 8 0 01-8.5 8 9 9 0 01-3.8-.8L3 21l1.8-5.2A8 8 0 013 12a8 8 0 018-8h1a8 8 0 018 8z"/></symbol>
+<symbol id="ic-star" viewBox="0 0 24 24"><path d="M12 3l2.6 5.6 6 .8-4.4 4.2 1.1 6-5.3-3-5.3 3 1.1-6L3.4 9.4l6-.8z"/></symbol>
+<symbol id="ic-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="ic-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></symbol>
+<symbol id="ic-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="ic-more" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="12" cy="19" r="1.4"/></symbol>
+<symbol id="ic-edit" viewBox="0 0 24 24"><path d="M11 4H5a2 2 0 00-2 2v13a2 2 0 002 2h13a2 2 0 002-2v-6"/><path d="M18.5 2.5a2.1 2.1 0 013 3L12 15l-4 1 1-4z"/></symbol>
+<symbol id="ic-x" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+<symbol id="ic-alert" viewBox="0 0 24 24"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L14.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></symbol>
+<symbol id="ic-lock" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></symbol>
+<symbol id="ic-layers" viewBox="0 0 24 24"><path d="M12 2l9 5-9 5-9-5z"/><path d="M3 17l9 5 9-5"/><path d="M3 12l9 5 9-5"/></symbol>
+<symbol id="ic-db" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></symbol>
+<symbol id="ic-zap" viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></symbol>
+<symbol id="ic-up" viewBox="0 0 24 24"><path d="M7 14l5-5 5 5"/></symbol>
+<symbol id="ic-down" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></symbol>
+<symbol id="ic-thumb" viewBox="0 0 24 24"><path d="M7 22V11l5-9a3 3 0 013 3v4h5a2 2 0 012 2.4l-1.7 8A2 2 0 0118.3 21H7z"/><path d="M7 11H4a1 1 0 00-1 1v9a1 1 0 001 1h3"/></symbol>
+<symbol id="ic-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 007.5.6l3-3A5 5 0 0013.4 3.5l-1.7 1.7"/><path d="M14 11a5 5 0 00-7.5-.6l-3 3A5 5 0 0010.6 20.5l1.7-1.7"/></symbol>
+<symbol id="ic-cal" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></symbol>
+<symbol id="ic-act" viewBox="0 0 24 24"><path d="M22 12h-4l-3 8-6-16-3 8H2"/></symbol>
+<symbol id="ic-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.2 9a3 3 0 015.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></symbol>
+<symbol id="ic-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+<symbol id="ic-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></symbol>
+<symbol id="ic-flow" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="6" rx="1.5"/><rect x="14" y="15" width="7" height="6" rx="1.5"/><path d="M6.5 9v6a3 3 0 003 3H14"/></symbol>
+<symbol id="ic-branch" viewBox="0 0 24 24"><circle cx="6" cy="5" r="2.5"/><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="9" r="2.5"/><path d="M6 7.5v9M18 11.5c0 3-4 3.5-6 4"/></symbol>
+<symbol id="ic-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 010 18 14 14 0 010-18z"/></symbol>
+<symbol id="ic-mail" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2.5 6l9.5 7 9.5-7"/></symbol>
+<symbol id="ic-server" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="7" rx="2"/><rect x="2" y="14" width="20" height="7" rx="2"/><path d="M6 6.5h.01M6 17.5h.01"/></symbol>
+<symbol id="ic-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 01-15.5 6.2L3 16"/><path d="M3 12a9 9 0 0115.5-6.2L21 8"/><path d="M21 3v5h-5M3 21v-5h5"/></symbol>
+</svg>
+
+<!-- ============================= SCREEN 1 : HELP CENTER ============================= -->
+<div class="screen on" id="s1">
+<div class="browser">
+  <div class="browser-bar"><div class="dots"><i></i><i></i><i></i></div>
+    <div class="url"><svg class="i s"><use href="#ic-lock"/></svg> intradocs.perusahaan.co.id/help-center</div>
+  </div>
+  <div class="app" style="height:auto;overflow:visible">
+    <div class="topbar">
+      <div class="logo"><div class="logo-mark"><svg class="i"><use href="#ic-book"/></svg></div>
+        <div>IntraDocs<small>Knowledge Hub · Divisi IT</small></div></div>
+      <nav class="topnav">
+        <a class="on" href="#">Beranda</a><a href="#">Dokumentasi</a><a href="#">Katalog</a>
+        <a href="#">AI Assistant</a><a href="#">Kontribusi</a>
+      </nav>
+      <div class="spacer"></div>
+      <div class="tsearch"><svg class="i s"><use href="#ic-search"/></svg> Cari dokumen, SOP, panduan… <span class="kbd">⌘K</span></div>
+      <button class="btn btn-p btn-sm"><svg class="i s"><use href="#ic-spark"/></svg> Tanya AI <span class="kbd" style="background:rgba(255,255,255,.2);border-color:transparent;color:#fff">⌥I</span></button>
+      <div class="icon-btn"><svg class="i"><use href="#ic-bell"/></svg><span class="dot-badge"></span></div>
+      <div class="who"><div class="avatar">RA</div><div><div class="nm">Rizky Ananda</div><div class="rl">Contributor · IT Ops</div></div>
+        <svg class="i s" style="color:var(--muted-2)"><use href="#ic-chev-d"/></svg></div>
+    </div>
+
+    <div class="main">
+      <!-- HERO -->
+      <div class="hero"><div class="hero-in">
+        <span class="hero-badge"><svg class="i s"><use href="#ic-zap"/></svg> 1.284 dokumen terverifikasi · diperbarui hari ini</span>
+        <h1>Ada yang bisa kami <em>bantu?</em></h1>
+        <p>Cari SOP, panduan aplikasi, dan kebijakan IT — atau tanyakan langsung ke AI Assistant yang memahami seluruh knowledge base perusahaan.</p>
+        <div class="bigsearch">
+          <svg class="i l" style="color:var(--muted-2)"><use href="#ic-search"/></svg>
+          <div class="txt">Contoh: "cara reset password Active Directory"</div>
+          <span class="kbd">⌘K</span>
+          <button class="go"><svg class="i s"><use href="#ic-spark"/></svg> Tanya AI</button>
+        </div>
+        <div class="sugg">
+          <div class="sugg-t">Topik yang sering dicari</div>
+          <button class="chip"><svg class="i s"><use href="#ic-search"/></svg> Cara reset password Active Directory</button>
+          <button class="chip"><svg class="i s"><use href="#ic-search"/></svg> Prosedur pengajuan akses aplikasi core</button>
+          <button class="chip"><svg class="i s"><use href="#ic-search"/></svg> Setup VPN untuk kerja remote</button>
+          <button class="chip"><svg class="i s"><use href="#ic-search"/></svg> SOP penanganan insiden keamanan</button>
+          <button class="chip"><svg class="i s"><use href="#ic-search"/></svg> Onboarding karyawan baru IT</button>
+          <button class="chip"><svg class="i s"><use href="#ic-search"/></svg> Kebijakan backup & retensi data</button>
+        </div>
+        <div class="hero-stats">
+          <div class="hs"><div class="n">1.284</div><div class="l">Dokumen aktif</div></div>
+          <div class="hs"><div class="n">42</div><div class="l">Kategori</div></div>
+          <div class="hs"><div class="n">318</div><div class="l">Pengguna aktif</div></div>
+          <div class="hs"><div class="n">96%</div><div class="l">Akurasi jawaban AI</div></div>
+        </div>
+      </div></div>
+
+      <!-- KATEGORI -->
+      <div class="sec">
+        <div class="sec-h"><div><div class="t"><svg class="i l" style="color:var(--blue-600)"><use href="#ic-grid"/></svg> Jelajahi berdasarkan kategori</div>
+          <div class="d">Knowledge dikelompokkan per domain agar mudah ditemukan tim</div></div>
+          <a href="#">Lihat semua kategori <svg class="i s"><use href="#ic-arrow-r"/></svg></a></div>
+        <div class="grid g3">
+          <a class="cat"><div class="ic" style="background:var(--blue-50);color:var(--blue-600)"><svg class="i l"><use href="#ic-server"/></svg></div>
+            <div class="t">Infrastruktur & Jaringan</div><div class="d">Konfigurasi server, VPN, firewall, topologi jaringan, dan data center.</div>
+            <div class="m"><span>184 dokumen</span><span class="pill p-blue">Update 2 hari lalu</span></div></a>
+          <a class="cat"><div class="ic" style="background:var(--red-bg);color:var(--red)"><svg class="i l"><use href="#ic-shield"/></svg></div>
+            <div class="t">Keamanan Informasi</div><div class="d">Kebijakan ISMS, penanganan insiden, hardening, dan audit keamanan.</div>
+            <div class="m"><span>142 dokumen</span><span class="pill p-red">Terbatas</span></div></a>
+          <a class="cat"><div class="ic" style="background:var(--green-bg);color:var(--green)"><svg class="i l"><use href="#ic-layers"/></svg></div>
+            <div class="t">Aplikasi Internal</div><div class="d">Panduan penggunaan ERP, HRIS, ticketing, dan aplikasi core lainnya.</div>
+            <div class="m"><span>296 dokumen</span><span class="pill p-green">Populer</span></div></a>
+          <a class="cat"><div class="ic" style="background:var(--violet-bg);color:var(--violet)"><svg class="i l"><use href="#ic-flow"/></svg></div>
+            <div class="t">SOP & Proses Bisnis</div><div class="d">Standar operasional, alur persetujuan, dan matriks tanggung jawab.</div>
+            <div class="m"><span>231 dokumen</span><span class="pill p-violet">Wajib baca</span></div></a>
+          <a class="cat"><div class="ic" style="background:var(--amber-bg);color:var(--amber)"><svg class="i l"><use href="#ic-users"/></svg></div>
+            <div class="t">Onboarding & SDM</div><div class="d">Panduan karyawan baru, akses awal, perangkat kerja, dan pelatihan.</div>
+            <div class="m"><span>87 dokumen</span><span class="pill p-amber">Baru</span></div></a>
+          <a class="cat"><div class="ic" style="background:#F0F9FF;color:#0369A1"><svg class="i l"><use href="#ic-db"/></svg></div>
+            <div class="t">Data & Integrasi</div><div class="d">Skema database, API internal, ETL, dan tata kelola data perusahaan.</div>
+            <div class="m"><span>163 dokumen</span><span class="pill p-grey">Teknis</span></div></a>
+        </div>
+      </div>
+
+      <!-- PALING DIBACA -->
+      <div class="sec" style="padding-top:0">
+        <div class="sec-h"><div><div class="t"><svg class="i l" style="color:var(--amber)"><use href="#ic-star"/></svg> Paling banyak dibaca bulan ini</div>
+          <div class="d">Berdasarkan jumlah pembacaan & pencarian 30 hari terakhir</div></div>
+          <a href="#">Lihat peringkat lengkap <svg class="i s"><use href="#ic-arrow-r"/></svg></a></div>
+        <div class="grid g2">
+          <a class="mostread"><div class="rank">1</div><div><div class="t">Panduan Lengkap Reset Password & MFA Active Directory</div>
+            <div class="m"><span class="tag"><i style="background:var(--blue-600)"></i>Keamanan</span><span>4.281 dibaca</span><span>· Diperbarui 3 hari lalu</span></div></div></a>
+          <a class="mostread"><div class="rank">2</div><div><div class="t">SOP Pengajuan & Persetujuan Akses Aplikasi Core Banking</div>
+            <div class="m"><span class="tag"><i style="background:var(--violet)"></i>SOP</span><span>3.947 dibaca</span><span>· Diperbarui 1 minggu lalu</span></div></div></a>
+          <a class="mostread"><div class="rank">3</div><div><div class="t">Konfigurasi VPN Perusahaan untuk Windows, macOS & Mobile</div>
+            <div class="m"><span class="tag"><i style="background:var(--green)"></i>Infrastruktur</span><span>3.512 dibaca</span><span>· Diperbarui 5 hari lalu</span></div></div></a>
+          <a class="mostread"><div class="rank">4</div><div><div class="t">Prosedur Penanganan Insiden Keamanan Informasi (IRP)</div>
+            <div class="m"><span class="tag"><i style="background:var(--red)"></i>Kritikal</span><span>2.884 dibaca</span><span>· Diperbarui kemarin</span></div></div></a>
+        </div>
+      </div>
+
+      <!-- AI BANNER -->
+      <div class="sec" style="padding-top:0">
+        <div class="ai-banner">
+          <div class="z" style="flex:1">
+            <span class="pill" style="background:rgba(255,255,255,.16);color:#C7D2FE">AI ASSISTANT</span>
+            <h3 style="margin-top:11px">Tanya apa saja — jawabannya bersumber dari dokumen resmi</h3>
+            <p>Asisten AI membaca seluruh knowledge base yang sudah disetujui, menjawab dalam Bahasa Indonesia, dan selalu mencantumkan sumber dokumen agar dapat diverifikasi. Akses jawaban mengikuti hak akses (RBAC) masing-masing pengguna.</p>
+            <button class="btn-w">Mulai bertanya <svg class="i s"><use href="#ic-arrow-r"/></svg></button>
+          </div>
+          <div class="ai-mini z">
+            <div class="q">Berapa lama SLA reset password untuk user VIP?</div>
+            <div class="a">SLA reset password untuk user kategori VIP adalah <b>maksimal 15 menit</b> sejak tiket diterima, dengan verifikasi identitas melalui panggilan balik ke nomor terdaftar.</div>
+            <div class="src"><span>SOP-IT-014 hal. 3</span><span>Matriks SLA 2026</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TERBARU -->
+      <div class="sec" style="padding-top:0">
+        <div class="sec-h"><div><div class="t"><svg class="i l" style="color:var(--green)"><use href="#ic-check-c"/></svg> Baru disetujui &amp; dipublikasikan</div>
+          <div class="d">Dokumen yang lolos review admin dalam 7 hari terakhir</div></div>
+          <a href="#">Riwayat publikasi <svg class="i s"><use href="#ic-arrow-r"/></svg></a></div>
+        <div class="card"><div style="padding:4px 0">
+          <div class="row" style="padding:13px 18px;border-bottom:1px solid var(--line-2)">
+            <div class="ft ft-pdf">PDF</div>
+            <div style="flex:1"><div style="font-size:13.3px;font-weight:700">Kebijakan Backup &amp; Retensi Data v3.2</div>
+              <div style="font-size:11.5px;color:var(--muted);margin-top:2px">Data &amp; Integrasi · oleh Dwi Kurniawan · disetujui Andi Wijaya</div></div>
+            <span class="tag"><i style="background:#0369A1"></i>Tata Kelola</span><span class="pill p-green">Published</span>
+            <span style="font-size:11.5px;color:var(--muted-2);width:74px;text-align:right">2 jam lalu</span></div>
+          <div class="row" style="padding:13px 18px;border-bottom:1px solid var(--line-2)">
+            <div class="ft ft-doc">DOC</div>
+            <div style="flex:1"><div style="font-size:13.3px;font-weight:700">Panduan Instalasi Agent Monitoring pada Server Produksi</div>
+              <div style="font-size:11.5px;color:var(--muted);margin-top:2px">Infrastruktur &amp; Jaringan · oleh Siti Rahmawati · disetujui Andi Wijaya</div></div>
+            <span class="tag"><i style="background:var(--green)"></i>Runbook</span><span class="pill p-green">Published</span>
+            <span style="font-size:11.5px;color:var(--muted-2);width:74px;text-align:right">Kemarin</span></div>
+          <div class="row" style="padding:13px 18px">
+            <div class="ft ft-md">MD</div>
+            <div style="flex:1"><div style="font-size:13.3px;font-weight:700">Standar Penamaan Repository &amp; Branch Strategy</div>
+              <div style="font-size:11.5px;color:var(--muted);margin-top:2px">Aplikasi Internal · oleh Rizky Ananda · disetujui Maya Lestari</div></div>
+            <span class="tag"><i style="background:var(--violet)"></i>Standar</span><span class="pill p-green">Published</span>
+            <span style="font-size:11.5px;color:var(--muted-2);width:74px;text-align:right">3 hari lalu</span></div>
+        </div></div>
+      </div>
+
+      <div class="foot"><div class="foot-in">
+        <div class="row"><div class="logo-mark" style="width:24px;height:24px;flex:0 0 24px"><svg class="i s"><use href="#ic-book"/></svg></div>
+          <div class="c">© 2026 Divisi Teknologi Informasi · IntraDocs v1.0 · Klasifikasi: Internal</div></div>
+        <div class="lk"><span>Status Layanan</span><span>Panduan Kontribusi</span><span>Hubungi Admin KM</span><span>Kebijakan Privasi</span></div>
+      </div></div>
+    </div>
+  </div>
+</div>
+<div class="note"><b>Halaman Muka (Help Center).</b> Mengikuti pola docs.gitdoc.ai/help-center namun disesuaikan untuk konteks internal perusahaan.
+<ul>
+<li><b>Pencarian utama di tengah hero</b> — satu kotak untuk pencarian kata kunci sekaligus pintu masuk ke AI Assistant.</li>
+<li><b>Rekomendasi topik populer</b> — chip dinamis yang dihitung dari log pencarian 30 hari terakhir, sehingga konten yang tampil selalu relevan dengan kebutuhan nyata pengguna.</li>
+<li><b>Kategori & "Paling banyak dibaca"</b> — mengurangi waktu pencarian dan menyorot dokumen bernilai tinggi.</li>
+<li><b>Konten yang tampil mengikuti hak akses</b> — dokumen berklasifikasi "Terbatas" hanya muncul bagi role yang berwenang.</li>
+</ul></div>
+</div>
+
+<!-- ============================= SCREEN 2 : HASIL PENCARIAN ============================= -->
+<div class="screen" id="s2">
+<div class="browser">
+  <div class="browser-bar"><div class="dots"><i></i><i></i><i></i></div>
+    <div class="url"><svg class="i s"><use href="#ic-lock"/></svg> intradocs.perusahaan.co.id/search?q=reset+password+active+directory</div></div>
+  <div class="app">
+    <div class="topbar">
+      <div class="logo"><div class="logo-mark"><svg class="i"><use href="#ic-book"/></svg></div><div>IntraDocs<small>Knowledge Hub · Divisi IT</small></div></div>
+      <div class="spacer"></div>
+      <div class="tsearch" style="width:430px;border-color:var(--blue-500);background:#fff;color:var(--ink)">
+        <svg class="i s" style="color:var(--blue-600)"><use href="#ic-search"/></svg> reset password active directory
+        <svg class="i s" style="margin-left:auto;color:var(--muted-2)"><use href="#ic-x"/></svg></div>
+      <div class="spacer"></div>
+      <button class="btn btn-sm"><svg class="i s"><use href="#ic-spark"/></svg> Tanya AI</button>
+      <div class="icon-btn"><svg class="i"><use href="#ic-bell"/></svg><span class="dot-badge"></span></div>
+      <div class="who"><div class="avatar">RA</div><div><div class="nm">Rizky Ananda</div><div class="rl">Contributor</div></div></div>
+    </div>
+    <div class="body"><div class="main"><div class="pad" style="max-width:1080px">
+      <div class="row" style="align-items:flex-start;gap:32px">
+        <!-- FILTER -->
+        <div class="filters">
+          <div class="row mb" style="justify-content:space-between"><div class="h3">Filter</div><a style="font-size:11.5px;color:var(--blue-600);font-weight:700">Reset</a></div>
+          <div class="fgroup"><div class="ft-l">Kategori</div>
+            <div class="fitem"><span class="chk on"><svg class="i s" style="color:#fff;width:11px;height:11px"><use href="#ic-check"/></svg></span> Keamanan Informasi <span class="n">18</span></div>
+            <div class="fitem"><span class="chk"></span> Infrastruktur &amp; Jaringan <span class="n">11</span></div>
+            <div class="fitem"><span class="chk"></span> Aplikasi Internal <span class="n">7</span></div>
+            <div class="fitem"><span class="chk"></span> SOP &amp; Proses Bisnis <span class="n">5</span></div>
+          </div>
+          <div class="fgroup"><div class="ft-l">Label</div>
+            <div class="row" style="flex-wrap:wrap;gap:6px">
+              <span class="tag" style="background:var(--blue-50);border-color:var(--blue-200);color:var(--blue-700)"><i style="background:var(--blue-600)"></i>Identity</span>
+              <span class="tag"><i style="background:var(--green)"></i>Runbook</span><span class="tag"><i style="background:var(--amber)"></i>Helpdesk</span>
+              <span class="tag"><i style="background:var(--violet)"></i>SOP</span><span class="tag"><i style="background:var(--red)"></i>Kritikal</span></div>
+          </div>
+          <div class="fgroup"><div class="ft-l">Format berkas</div>
+            <div class="fitem"><span class="chk on"><svg class="i s" style="color:#fff;width:11px;height:11px"><use href="#ic-check"/></svg></span> PDF <span class="n">14</span></div>
+            <div class="fitem"><span class="chk on"><svg class="i s" style="color:#fff;width:11px;height:11px"><use href="#ic-check"/></svg></span> Word (.docx) <span class="n">9</span></div>
+            <div class="fitem"><span class="chk"></span> Markdown <span class="n">12</span></div>
+            <div class="fitem"><span class="chk"></span> Excel / PPT <span class="n">6</span></div>
+          </div>
+          <div class="fgroup"><div class="ft-l">Terakhir diperbarui</div>
+            <div class="fitem"><span class="chk"></span> 7 hari terakhir <span class="n">6</span></div>
+            <div class="fitem"><span class="chk on"><svg class="i s" style="color:#fff;width:11px;height:11px"><use href="#ic-check"/></svg></span> 90 hari terakhir <span class="n">27</span></div>
+            <div class="fitem"><span class="chk"></span> Semua waktu <span class="n">41</span></div>
+          </div>
+          <div class="fgroup"><div class="ft-l">Status</div>
+            <div class="fitem"><span class="chk on"><svg class="i s" style="color:#fff;width:11px;height:11px"><use href="#ic-check"/></svg></span> Published <span class="n">38</span></div>
+            <div class="fitem"><span class="chk"></span> Draft milik saya <span class="n">3</span></div>
+          </div>
+        </div>
+
+        <!-- HASIL -->
+        <div style="flex:1;min-width:0">
+          <div class="row mb" style="justify-content:space-between">
+            <div><div class="h2">41 hasil untuk “reset password active directory”</div>
+              <div class="sub" style="margin-top:2px">Ditemukan dalam 0,18 detik · pencarian semantik + kata kunci</div></div>
+            <div class="row"><span class="sub">Urutkan:</span><button class="btn btn-sm">Paling relevan <svg class="i s"><use href="#ic-chev-d"/></svg></button></div>
+          </div>
+
+          <div class="ai-answer">
+            <div class="hd"><svg class="i s"><use href="#ic-spark"/></svg> Jawaban ringkas dari AI Assistant</div>
+            <p>Reset password Active Directory dapat dilakukan melalui <b>Self-Service Password Reset (SSPR)</b> di portal <i>identity.perusahaan.co.id</i> setelah MFA terdaftar<span class="cite">1</span>. Jika akun terkunci, user harus menghubungi Service Desk dan verifikasi identitas melalui <i>callback</i> ke nomor terdaftar; SLA penyelesaian <b>30 menit</b> untuk user reguler dan <b>15 menit</b> untuk user VIP<span class="cite">2</span>. Password wajib minimal 12 karakter, berlaku 90 hari, dan tidak boleh sama dengan 5 password terakhir<span class="cite">3</span>.</p>
+            <div class="row" style="margin-top:12px;gap:8px;flex-wrap:wrap">
+              <span class="tag" style="background:#fff"><span class="cite">1</span> SOP-IT-014 Manajemen Identitas</span>
+              <span class="tag" style="background:#fff"><span class="cite">2</span> Matriks SLA Layanan IT 2026</span>
+              <span class="tag" style="background:#fff"><span class="cite">3</span> Kebijakan Password Perusahaan</span>
+              <button class="btn btn-sm" style="margin-left:auto"><svg class="i s"><use href="#ic-msg"/></svg> Lanjutkan di chat</button></div>
+          </div>
+
+          <div class="res">
+            <div class="crumb"><svg class="i s"><use href="#ic-folder"/></svg> Keamanan Informasi <svg class="i s"><use href="#ic-chev-r"/></svg> Manajemen Identitas</div>
+            <div class="t">SOP-IT-014 — Manajemen Identitas &amp; Reset Password Active Directory</div>
+            <div class="sn">…prosedur <mark>reset password</mark> pada domain controller <mark>Active Directory</mark> dibagi menjadi tiga jalur: self-service melalui portal SSPR, permintaan via Service Desk, dan reset darurat oleh administrator domain. Setiap permintaan wajib dicatat pada sistem ticketing…</div>
+            <div class="m"><span class="pill p-blue"><svg class="i s"><use href="#ic-file"/></svg> PDF · 14 hal.</span>
+              <span class="tag"><i style="background:var(--blue-600)"></i>Identity</span><span class="tag"><i style="background:var(--violet)"></i>SOP</span>
+              <span class="sub" style="font-size:11.5px">Diperbarui 3 hari lalu · v3.1 · Pemilik: Tim Security</span>
+              <span class="pill p-green" style="margin-left:auto"><svg class="i s"><use href="#ic-check"/></svg> Terverifikasi</span></div>
+          </div>
+          <div class="res">
+            <div class="crumb"><svg class="i s"><use href="#ic-folder"/></svg> Aplikasi Internal <svg class="i s"><use href="#ic-chev-r"/></svg> Service Desk</div>
+            <div class="t">Runbook Service Desk: Penanganan Akun Terkunci &amp; Lupa Password</div>
+            <div class="sn">…jika user gagal login 5 kali, akun akan terkunci otomatis selama 30 menit. Agent Service Desk dapat melakukan unlock setelah verifikasi identitas. Untuk <mark>reset password</mark> manual gunakan konsol ADUC atau perintah PowerShell berikut…</div>
+            <div class="m"><span class="pill p-blue"><svg class="i s"><use href="#ic-file"/></svg> Markdown</span>
+              <span class="tag"><i style="background:var(--green)"></i>Runbook</span><span class="tag"><i style="background:var(--amber)"></i>Helpdesk</span>
+              <span class="sub" style="font-size:11.5px">Diperbarui 12 hari lalu · v2.4 · Pemilik: Tim Service Desk</span></div>
+          </div>
+          <div class="res">
+            <div class="crumb"><svg class="i s"><use href="#ic-folder"/></svg> Onboarding &amp; SDM <svg class="i s"><use href="#ic-chev-r"/></svg> Panduan Karyawan</div>
+            <div class="t">Panduan Karyawan Baru: Aktivasi Akun &amp; Pendaftaran MFA</div>
+            <div class="sn">…karyawan baru menerima <mark>password</mark> sementara melalui email pribadi dan wajib menggantinya pada login pertama ke <mark>Active Directory</mark>. Pendaftaran MFA harus diselesaikan dalam 3 hari kerja…</div>
+            <div class="m"><span class="pill p-blue"><svg class="i s"><use href="#ic-file"/></svg> Word · 8 hal.</span>
+              <span class="tag"><i style="background:var(--amber)"></i>Onboarding</span>
+              <span class="sub" style="font-size:11.5px">Diperbarui 1 bulan lalu · v1.9 · Pemilik: IT Support</span></div>
+          </div>
+          <div class="res" style="border-bottom:none">
+            <div class="crumb"><svg class="i s"><use href="#ic-folder"/></svg> Keamanan Informasi <svg class="i s"><use href="#ic-chev-r"/></svg> Kebijakan</div>
+            <div class="t">Kebijakan Password &amp; Autentikasi Perusahaan (ISMS-POL-07)</div>
+            <div class="sn">…kompleksitas <mark>password</mark> minimal 12 karakter dengan kombinasi huruf besar, kecil, angka, dan simbol. Masa berlaku 90 hari. Riwayat 5 <mark>password</mark> terakhir tidak boleh digunakan kembali…</div>
+            <div class="m"><span class="pill p-blue"><svg class="i s"><use href="#ic-file"/></svg> PDF · 22 hal.</span>
+              <span class="tag"><i style="background:var(--red)"></i>Kritikal</span>
+              <span class="pill p-amber"><svg class="i s"><use href="#ic-lock"/></svg> Terbatas — akses via permintaan</span></div>
+          </div>
+        </div>
+      </div>
+    </div></div></div>
+  </div>
+</div>
+<div class="note"><b>Pencarian Hybrid.</b> Menggabungkan pencarian kata kunci (BM25) dan pencarian semantik berbasis <i>vector embedding</i>, sehingga pertanyaan dalam bahasa natural tetap menemukan dokumen yang tepat.
+<ul>
+<li><b>Ringkasan AI di atas hasil</b> — pengguna mendapat jawaban langsung, lengkap dengan sitasi nomor dokumen yang dapat diklik.</li>
+<li><b>Filter berlapis</b> — kategori, label, format berkas, periode pembaruan, dan status dokumen.</li>
+<li><b>Dokumen terbatas tetap terlihat judulnya</b> namun isinya terkunci, dengan opsi ajukan permintaan akses ke pemilik dokumen.</li>
+</ul></div>
+</div>
+
+<!-- ============================= SCREEN 3 : KATALOG DOKUMEN ============================= -->
+<div class="screen" id="s3">
+<div class="browser">
+  <div class="browser-bar"><div class="dots"><i></i><i></i><i></i></div>
+    <div class="url"><svg class="i s"><use href="#ic-lock"/></svg> intradocs.perusahaan.co.id/katalog</div></div>
+  <div class="app">
+    <div class="topbar">
+      <div class="logo"><div class="logo-mark"><svg class="i"><use href="#ic-book"/></svg></div><div>IntraDocs<small>Knowledge Hub · Divisi IT</small></div></div>
+      <div class="spacer"></div>
+      <div class="tsearch"><svg class="i s"><use href="#ic-search"/></svg> Cari dokumen… <span class="kbd">⌘K</span></div>
+      <button class="btn btn-p btn-sm"><svg class="i s"><use href="#ic-upload"/></svg> Unggah Knowledge</button>
+      <div class="icon-btn"><svg class="i"><use href="#ic-bell"/></svg><span class="dot-badge"></span></div>
+      <div class="who"><div class="avatar">RA</div><div><div class="nm">Rizky Ananda</div><div class="rl">Contributor</div></div></div>
+    </div>
+    <div class="body">
+      <div class="side">
+        <div class="side-lbl">Navigasi</div>
+        <button class="nav-i"><svg class="i"><use href="#ic-home"/></svg> Beranda</button>
+        <button class="nav-i on"><svg class="i"><use href="#ic-book"/></svg> Katalog Dokumen</button>
+        <button class="nav-i"><svg class="i"><use href="#ic-spark"/></svg> AI Assistant</button>
+        <button class="nav-i"><svg class="i"><use href="#ic-star"/></svg> Favorit Saya <span class="cnt grey">12</span></button>
+        <button class="nav-i"><svg class="i"><use href="#ic-clock"/></svg> Riwayat Baca</button>
+        <div class="side-lbl">Kontribusi</div>
+        <button class="nav-i"><svg class="i"><use href="#ic-upload"/></svg> Unggah Knowledge</button>
+        <button class="nav-i"><svg class="i"><use href="#ic-edit"/></svg> Draft Saya <span class="cnt grey">3</span></button>
+        <button class="nav-i"><svg class="i"><use href="#ic-refresh"/></svg> Menunggu Review <span class="cnt">2</span></button>
+        <div class="side-lbl">Kategori</div>
+        <button class="nav-i"><svg class="i"><use href="#ic-server"/></svg> Infrastruktur <span class="cnt grey">184</span></button>
+        <button class="nav-i"><svg class="i"><use href="#ic-shield"/></svg> Keamanan <span class="cnt grey">142</span></button>
+        <button class="nav-i"><svg class="i"><use href="#ic-layers"/></svg> Aplikasi Internal <span class="cnt grey">296</span></button>
+        <button class="nav-i"><svg class="i"><use href="#ic-flow"/></svg> SOP &amp; Proses <span class="cnt grey">231</span></button>
+        <button class="nav-i"><svg class="i"><use href="#ic-users"/></svg> Onboarding <span class="cnt grey">87</span></button>
+        <button class="nav-i"><svg class="i"><use href="#ic-db"/></svg> Data &amp; Integrasi <span class="cnt grey">163</span></button>
+      </div>
+      <div class="main"><div class="pad">
+        <div class="row mb" style="justify-content:space-between;align-items:flex-start">
+          <div><div class="crumbs">Katalog <svg class="i s"><use href="#ic-chev-r"/></svg> Semua dokumen</div>
+            <div class="h1">Katalog Dokumen</div>
+            <div class="sub" style="margin-top:3px">1.284 dokumen · 42 kategori · 68 label aktif</div></div>
+          <div class="row"><button class="btn btn-sm"><svg class="i s"><use href="#ic-filter"/></svg> Filter</button>
+            <button class="btn btn-sm"><svg class="i s"><use href="#ic-grid"/></svg></button>
+            <button class="btn btn-sm btn-p"><svg class="i s"><use href="#ic-list"/></svg></button></div>
+        </div>
+
+        <div class="row mb" style="gap:7px;flex-wrap:wrap">
+          <span class="pill p-blue" style="padding:5px 11px">Kategori: Semua <svg class="i s"><use href="#ic-chev-d"/></svg></span>
+          <span class="pill p-grey" style="padding:5px 11px">Label: Semua <svg class="i s"><use href="#ic-chev-d"/></svg></span>
+          <span class="pill p-grey" style="padding:5px 11px">Format: Semua <svg class="i s"><use href="#ic-chev-d"/></svg></span>
+          <span class="pill p-grey" style="padding:5px 11px">Pemilik: Semua <svg class="i s"><use href="#ic-chev-d"/></svg></span>
+          <span class="pill p-green" style="padding:5px 11px">Status: Published <svg class="i s"><use href="#ic-x"/></svg></span>
+        </div>
+
+        <div class="card"><table>
+          <thead><tr><th style="width:38%">Dokumen</th><th>Kategori</th><th>Label</th><th>Versi</th><th>Pemilik</th><th>Diperbarui</th><th>Status</th><th style="width:40px"></th></tr></thead>
+          <tbody>
+            <tr><td><div class="row"><div class="ft ft-pdf">PDF</div><div><div style="font-weight:700">SOP-IT-014 Manajemen Identitas &amp; Reset Password</div><div style="font-size:11.3px;color:var(--muted-2)">14 halaman · 2,4 MB · 4.281 dibaca</div></div></div></td>
+              <td><span class="tag" style="background:var(--red-bg);border-color:#FECACA;color:var(--red)">Keamanan</span></td>
+              <td><div class="row" style="gap:4px"><span class="tag"><i style="background:var(--blue-600)"></i>Identity</span><span class="tag">+2</span></div></td>
+              <td><span class="pill p-grey">v3.1</span></td><td>Tim Security</td><td style="color:var(--muted)">3 hari lalu</td>
+              <td><span class="pill p-green">Published</span></td><td><svg class="i s" style="color:var(--muted-2)"><use href="#ic-more"/></svg></td></tr>
+            <tr><td><div class="row"><div class="ft ft-md">MD</div><div><div style="font-weight:700">Runbook Service Desk: Akun Terkunci</div><div style="font-size:11.3px;color:var(--muted-2)">Markdown · 18 KB · 2.117 dibaca</div></div></div></td>
+              <td><span class="tag" style="background:var(--green-bg);border-color:#A7F3D0;color:var(--green)">Aplikasi Internal</span></td>
+              <td><div class="row" style="gap:4px"><span class="tag"><i style="background:var(--green)"></i>Runbook</span></div></td>
+              <td><span class="pill p-grey">v2.4</span></td><td>Service Desk</td><td style="color:var(--muted)">12 hari lalu</td>
+              <td><span class="pill p-green">Published</span></td><td><svg class="i s" style="color:var(--muted-2)"><use href="#ic-more"/></svg></td></tr>
+            <tr><td><div class="row"><div class="ft ft-doc">DOC</div><div><div style="font-weight:700">Panduan Instalasi Agent Monitoring Server Produksi</div><div style="font-size:11.3px;color:var(--muted-2)">Word · 1,1 MB · 894 dibaca</div></div></div></td>
+              <td><span class="tag" style="background:var(--blue-50);border-color:var(--blue-200);color:var(--blue-700)">Infrastruktur</span></td>
+              <td><div class="row" style="gap:4px"><span class="tag"><i style="background:var(--green)"></i>Runbook</span><span class="tag">+1</span></div></td>
+              <td><span class="pill p-grey">v1.0</span></td><td>Siti Rahmawati</td><td style="color:var(--muted)">Kemarin</td>
+              <td><span class="pill p-green">Published</span></td><td><svg class="i s" style="color:var(--muted-2)"><use href="#ic-more"/></svg></td></tr>
+            <tr style="background:var(--amber-bg)"><td><div class="row"><div class="ft ft-pdf">PDF</div><div><div style="font-weight:700">Prosedur Migrasi Database Core ke Cluster Baru</div><div style="font-size:11.3px;color:var(--muted-2)">31 halaman · 6,8 MB · diunggah Rizky Ananda</div></div></div></td>
+              <td><span class="tag" style="background:#F0F9FF;border-color:#BAE6FD;color:#0369A1">Data &amp; Integrasi</span></td>
+              <td><div class="row" style="gap:4px"><span class="tag"><i style="background:var(--red)"></i>Kritikal</span></div></td>
+              <td><span class="pill p-grey">v0.9</span></td><td>Rizky Ananda</td><td style="color:var(--muted)">4 jam lalu</td>
+              <td><span class="pill p-amber"><svg class="i s"><use href="#ic-clock"/></svg> Menunggu Approval</span></td><td><svg class="i s" style="color:var(--muted-2)"><use href="#ic-more"/></svg></td></tr>
+            <tr><td><div class="row"><div class="ft ft-xls">XLS</div><div><div style="font-weight:700">Matriks SLA Layanan IT 2026</div><div style="font-size:11.3px;color:var(--muted-2)">Excel · 340 KB · 1.552 dibaca</div></div></div></td>
+              <td><span class="tag" style="background:var(--violet-bg);border-color:#DDD6FE;color:var(--violet)">SOP &amp; Proses</span></td>
+              <td><div class="row" style="gap:4px"><span class="tag"><i style="background:var(--amber)"></i>Referensi</span></div></td>
+              <td><span class="pill p-grey">v4.0</span></td><td>Maya Lestari</td><td style="color:var(--muted)">2 minggu lalu</td>
+              <td><span class="pill p-green">Published</span></td><td><svg class="i s" style="color:var(--muted-2)"><use href="#ic-more"/></svg></td></tr>
+            <tr><td><div class="row"><div class="ft ft-ppt">PPT</div><div><div style="font-weight:700">Materi Sosialisasi Kebijakan Keamanan 2026</div><div style="font-size:11.3px;color:var(--muted-2)">PowerPoint · 12 MB · 623 dibaca</div></div></div></td>
+              <td><span class="tag" style="background:var(--red-bg);border-color:#FECACA;color:var(--red)">Keamanan</span></td>
+              <td><div class="row" style="gap:4px"><span class="tag"><i style="background:var(--violet)"></i>Sosialisasi</span></div></td>
+              <td><span class="pill p-grey">v2.0</span></td><td>Tim Security</td><td style="color:var(--muted)">1 bulan lalu</td>
+              <td><span class="pill p-green">Published</span></td><td><svg class="i s" style="color:var(--muted-2)"><use href="#ic-more"/></svg></td></tr>
+            <tr><td><div class="row"><div class="ft ft-doc">DOC</div><div><div style="font-weight:700">Standar Penamaan Repository &amp; Branch Strategy</div><div style="font-size:11.3px;color:var(--muted-2)">Word · 780 KB · 1.043 dibaca</div></div></div></td>
+              <td><span class="tag" style="background:var(--green-bg);border-color:#A7F3D0;color:var(--green)">Aplikasi Internal</span></td>
+              <td><div class="row" style="gap:4px"><span class="tag"><i style="background:var(--violet)"></i>Standar</span></div></td>
+              <td><span class="pill p-grey">v1.3</span></td><td>Rizky Ananda</td><td style="color:var(--muted)">3 hari lalu</td>
+              <td><span class="pill p-green">Published</span></td><td><svg class="i s" style="color:var(--muted-2)"><use href="#ic-more"/></svg></td></tr>
+            <tr><td><div class="row"><div class="ft ft-txt">TXT</div><div><div style="font-weight:700">Catatan Post-Mortem Insiden Gangguan Jaringan 12 Juli</div><div style="font-size:11.3px;color:var(--muted-2)">Teks · 42 KB · terbatas</div></div></div></td>
+              <td><span class="tag" style="background:var(--blue-50);border-color:var(--blue-200);color:var(--blue-700)">Infrastruktur</span></td>
+              <td><div class="row" style="gap:4px"><span class="tag"><i style="background:var(--red)"></i>Kritikal</span></div></td>
+              <td><span class="pill p-grey">v1.0</span></td><td>Dwi Kurniawan</td><td style="color:var(--muted)">1 bulan lalu</td>
+              <td><span class="pill p-red"><svg class="i s"><use href="#ic-lock"/></svg> Terbatas</span></td><td><svg class="i s" style="color:var(--muted-2)"><use href="#ic-more"/></svg></td></tr>
+          </tbody></table>
+          <div class="row" style="padding:13px 16px;border-top:1px solid var(--line);justify-content:space-between">
+            <span class="sub">Menampilkan 1–8 dari 1.284 dokumen</span>
+            <div class="row" style="gap:5px"><button class="btn btn-sm">Sebelumnya</button>
+              <button class="btn btn-sm btn-p">1</button><button class="btn btn-sm">2</button><button class="btn btn-sm">3</button>
+              <span class="sub">…</span><button class="btn btn-sm">161</button><button class="btn btn-sm">Berikutnya</button></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</div>
+<div class="note"><b>Manajemen Dokumen.</b> Satu tampilan untuk seluruh siklus hidup dokumen.
+<ul>
+<li><b>Kategorisasi &amp; label</b> — kategori bersifat hierarkis (satu dokumen satu kategori) sedangkan label bersifat bebas dan multi (Runbook, Kritikal, Standar, Referensi) untuk pencarian silang.</li>
+<li><b>Versioning</b> — setiap perubahan menghasilkan versi baru dengan riwayat lengkap dan opsi <i>rollback</i>.</li>
+<li><b>Status jelas</b> — Draft, Menunggu Approval, Published, Terbatas, Kedaluwarsa; ditandai warna agar mudah dipantau.</li>
+</ul></div>
+</div>
+
+<!-- ============================= SCREEN 4 : BACA DOKUMEN ============================= -->
+<div class="screen" id="s4">
+<div class="browser">
+  <div class="browser-bar"><div class="dots"><i></i><i></i><i></i></div>
+    <div class="url"><svg class="i s"><use href="#ic-lock"/></svg> intradocs.perusahaan.co.id/keamanan/sop-it-014-manajemen-identitas</div></div>
+  <div class="app">
+    <div class="topbar">
+      <div class="logo"><div class="logo-mark"><svg class="i"><use href="#ic-book"/></svg></div><div>IntraDocs<small>Knowledge Hub · Divisi IT</small></div></div>
+      <div class="spacer"></div>
+      <div class="tsearch"><svg class="i s"><use href="#ic-search"/></svg> Cari di dokumen ini… <span class="kbd">⌘K</span></div>
+      <button class="btn btn-sm"><svg class="i s"><use href="#ic-spark"/></svg> Tanya AI tentang halaman ini</button>
+      <div class="icon-btn"><svg class="i"><use href="#ic-star"/></svg></div>
+      <div class="icon-btn"><svg class="i"><use href="#ic-download"/></svg></div>
+      <div class="who"><div class="avatar">RA</div><div><div class="nm">Rizky Ananda</div><div class="rl">Contributor</div></div></div>
+    </div>
+    <div class="body">
+      <!-- NAV DOKUMEN -->
+      <div class="docnav">
+        <div style="padding:0 10px 12px;border-bottom:1px solid var(--line-2);margin-bottom:6px">
+          <div class="row"><div class="ft ft-pdf" style="width:26px;height:26px;flex:0 0 26px;font-size:8px">PDF</div>
+            <div><div style="font-size:12.5px;font-weight:750">SOP-IT-014</div><div style="font-size:10.5px;color:var(--muted-2)">Manajemen Identitas</div></div></div>
+        </div>
+        <div class="dn-sec">Bagian 1 — Umum</div>
+        <a class="dn-i">1.1 Tujuan &amp; Ruang Lingkup</a>
+        <a class="dn-i">1.2 Definisi &amp; Istilah</a>
+        <a class="dn-i">1.3 Peran &amp; Tanggung Jawab</a>
+        <div class="dn-sec">Bagian 2 — Prosedur</div>
+        <a class="dn-i on">2.1 Reset Password</a>
+        <a class="dn-i sub">2.1.1 Jalur Self-Service (SSPR)</a>
+        <a class="dn-i sub">2.1.2 Jalur Service Desk</a>
+        <a class="dn-i sub">2.1.3 Reset Darurat</a>
+        <a class="dn-i">2.2 Penguncian &amp; Pembukaan Akun</a>
+        <a class="dn-i">2.3 Penonaktifan Akun</a>
+        <div class="dn-sec">Bagian 3 — Pengendalian</div>
+        <a class="dn-i">3.1 Pencatatan &amp; Audit Trail</a>
+        <a class="dn-i">3.2 Matriks SLA</a>
+        <a class="dn-i">3.3 Lampiran &amp; Formulir</a>
+        <div style="margin:16px 10px 0;padding:11px;background:var(--bg);border-radius:10px">
+          <div style="font-size:10.5px;font-weight:800;letter-spacing:.6px;color:var(--muted-2);margin-bottom:7px">DOKUMEN TERKAIT</div>
+          <a class="dn-i" style="padding:4px 0;font-size:12px">Kebijakan Password (ISMS-POL-07)</a>
+          <a class="dn-i" style="padding:4px 0;font-size:12px">Matriks SLA Layanan IT 2026</a>
+          <a class="dn-i" style="padding:4px 0;font-size:12px">Runbook Akun Terkunci</a>
+        </div>
+      </div>
+
+      <!-- ISI -->
+      <div class="doc-main"><div class="row" style="align-items:flex-start;gap:0">
+        <div class="doc-wrap">
+          <div class="crumbs">Keamanan Informasi <svg class="i s"><use href="#ic-chev-r"/></svg> Manajemen Identitas <svg class="i s"><use href="#ic-chev-r"/></svg> <span style="color:var(--ink-2)">SOP-IT-014</span></div>
+          <h1>Manajemen Identitas &amp; Reset Password Active Directory</h1>
+          <div class="doc-meta">
+            <div class="row"><div class="avatar" style="width:26px;height:26px;flex:0 0 26px;font-size:9.5px;background:linear-gradient(135deg,#34D399,#059669)">TS</div>
+              <div><div style="font-size:12.3px;font-weight:700">Tim Security</div><div style="font-size:11px;color:var(--muted-2)">Pemilik dokumen</div></div></div>
+            <span class="pill p-grey">v3.1</span>
+            <span class="pill p-green"><svg class="i s"><use href="#ic-check-c"/></svg> Disetujui Andi Wijaya · 10 Agu 2026</span>
+            <span class="tag"><i style="background:var(--blue-600)"></i>Identity</span><span class="tag"><i style="background:var(--violet)"></i>SOP</span>
+            <div class="row" style="margin-left:auto;gap:9px;color:var(--muted-2);font-size:11.5px">
+              <span class="row" style="gap:4px"><svg class="i s"><use href="#ic-eye"/></svg> 4.281</span>
+              <span class="row" style="gap:4px"><svg class="i s"><use href="#ic-clock"/></svg> 9 menit baca</span></div>
+          </div>
+
+          <div class="callout c-info"><svg class="i" style="color:var(--blue-600);margin-top:2px"><use href="#ic-alert"/></svg>
+            <div><b>Ditinjau ulang setiap 6 bulan.</b> Peninjauan berikutnya dijadwalkan pada 10 Februari 2027. Sistem akan otomatis mengingatkan pemilik dokumen 14 hari sebelumnya.</div></div>
+
+          <h2 id="h1">2.1 Reset Password</h2>
+          <p>Prosedur reset password Active Directory dibagi menjadi tiga jalur sesuai tingkat urgensi dan kondisi akun pengguna. Seluruh permintaan wajib tercatat pada sistem ticketing untuk keperluan audit.</p>
+
+          <h3>2.1.1 Jalur Self-Service (SSPR)</h3>
+          <p>Pengguna yang telah mendaftarkan Multi-Factor Authentication dapat melakukan reset mandiri melalui portal identitas tanpa melibatkan Service Desk. Langkah-langkahnya:</p>
+          <ol>
+            <li>Akses <b>identity.perusahaan.co.id</b> dan pilih menu <i>Lupa Password</i>.</li>
+            <li>Masukkan alamat email korporat dan selesaikan verifikasi MFA (aplikasi authenticator atau OTP SMS).</li>
+            <li>Tentukan password baru sesuai ketentuan kompleksitas pada bagian 3.1.</li>
+            <li>Sistem melakukan sinkronisasi ke seluruh domain controller dalam waktu maksimal 5 menit.</li>
+          </ol>
+          <div class="callout c-warn"><svg class="i" style="color:var(--amber);margin-top:2px"><use href="#ic-alert"/></svg>
+            <div><b>Perhatian.</b> Jalur self-service tidak tersedia bagi akun layanan (<i>service account</i>) dan akun administrator domain. Kedua jenis akun tersebut wajib melalui jalur reset darurat pada bagian 2.1.3.</div></div>
+
+          <h3>2.1.2 Jalur Service Desk</h3>
+          <p>Apabila MFA belum terdaftar atau perangkat autentikator hilang, pengguna menghubungi Service Desk di ekstensi <b>1500</b>. Agent wajib melakukan verifikasi identitas melalui <i>callback</i> ke nomor telepon yang terdaftar pada HRIS sebelum melakukan reset.</p>
+          <div class="code"><span class="c"># Reset password melalui PowerShell (khusus agent Service Desk)</span>
+<span class="k">Set-ADAccountPassword</span> -Identity <span class="s">"nama.pengguna"</span> -Reset `
+  -NewPassword (<span class="k">ConvertTo-SecureString</span> -AsPlainText <span class="s">"P@ssw0rdSementara!"</span> -Force)
+<span class="k">Set-ADUser</span> -Identity <span class="s">"nama.pengguna"</span> -ChangePasswordAtLogon <span class="k">$true</span></div>
+          <p>Password sementara wajib diganti pada login pertama. Agent tidak diperkenankan menyampaikan password melalui email atau aplikasi pesan instan.</p>
+
+          <h3>2.1.3 Reset Darurat</h3>
+          <p>Reset darurat dilakukan oleh administrator domain untuk akun istimewa, dengan persetujuan tertulis dari Manajer Keamanan Informasi dan pencatatan pada log akses istimewa (PAM).</p>
+
+          <div class="feedback">
+            <div><div style="font-size:13.2px;font-weight:700">Apakah halaman ini membantu?</div>
+              <div style="font-size:11.8px;color:var(--muted);margin-top:2px">Masukan Anda membantu pemilik dokumen memperbaiki isi.</div></div>
+            <div class="row"><button class="btn btn-sm"><svg class="i s"><use href="#ic-thumb"/></svg> Ya</button>
+              <button class="btn btn-sm"><svg class="i s" style="transform:rotate(180deg)"><use href="#ic-thumb"/></svg> Belum</button>
+              <button class="btn btn-sm"><svg class="i s"><use href="#ic-edit"/></svg> Usulkan perbaikan</button></div>
+          </div>
+        </div>
+
+        <!-- TOC -->
+        <div class="toc">
+          <div class="toc-t">Di halaman ini</div>
+          <a class="on">2.1 Reset Password</a>
+          <a class="i2">2.1.1 Jalur Self-Service</a>
+          <a class="i2">2.1.2 Jalur Service Desk</a>
+          <a class="i2">2.1.3 Reset Darurat</a>
+          <a>2.2 Penguncian Akun</a>
+          <div style="margin-top:22px;padding:13px;border:1px solid var(--line);border-radius:11px;background:#fff">
+            <div class="toc-t" style="margin-bottom:9px">Riwayat versi</div>
+            <div style="font-size:11.5px;line-height:1.7;color:var(--muted)">
+              <div class="row" style="gap:6px"><span class="pill p-blue" style="font-size:10px">v3.1</span> 10 Agu 2026</div>
+              <div class="row" style="gap:6px;margin-top:5px"><span class="pill p-grey" style="font-size:10px">v3.0</span> 22 Feb 2026</div>
+              <div class="row" style="gap:6px;margin-top:5px"><span class="pill p-grey" style="font-size:10px">v2.5</span> 05 Sep 2025</div>
+            </div>
+            <button class="btn btn-sm" style="width:100%;justify-content:center;margin-top:10px">Bandingkan versi</button>
+          </div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</div>
+<div class="note"><b>Tampilan Baca ala GitBook.</b> Struktur tiga kolom: navigasi dokumen, isi, dan daftar isi halaman.
+<ul>
+<li><b>Semua format diseragamkan</b> — PDF/Word/Markdown yang diunggah dikonversi menjadi konten web yang dapat dicari, dengan berkas asli tetap dapat diunduh.</li>
+<li><b>Metadata kepemilikan &amp; approval</b> tampil di kepala dokumen sebagai bukti keabsahan.</li>
+<li><b>Siklus peninjauan otomatis</b> mencegah dokumen menjadi usang tanpa disadari.</li>
+<li><b>Umpan balik pembaca</b> dan usulan perbaikan langsung masuk ke antrean pemilik dokumen.</li>
+</ul></div>
+</div>
+
+<!-- ============================= SCREEN 5 : UNGGAH KNOWLEDGE ============================= -->
+<div class="screen" id="s5">
+<div class="browser">
+  <div class="browser-bar"><div class="dots"><i></i><i></i><i></i></div>
+    <div class="url"><svg class="i s"><use href="#ic-lock"/></svg> intradocs.perusahaan.co.id/unggah</div></div>
+  <div class="app">
+    <div class="topbar">
+      <div class="logo"><div class="logo-mark"><svg class="i"><use href="#ic-book"/></svg></div><div>IntraDocs<small>Knowledge Hub · Divisi IT</small></div></div>
+      <div class="spacer"></div>
+      <div class="tsearch"><svg class="i s"><use href="#ic-search"/></svg> Cari dokumen… <span class="kbd">⌘K</span></div>
+      <div class="icon-btn"><svg class="i"><use href="#ic-bell"/></svg><span class="dot-badge"></span></div>
+      <div class="who"><div class="avatar">RA</div><div><div class="nm">Rizky Ananda</div><div class="rl">Contributor</div></div></div>
+    </div>
+    <div class="body">
+      <div class="side">
+        <div class="side-lbl">Navigasi</div>
+        <button class="nav-i"><svg class="i"><use href="#ic-home"/></svg> Beranda</button>
+        <button class="nav-i"><svg class="i"><use href="#ic-book"/></svg> Katalog Dokumen</button>
+        <button class="nav-i"><svg class="i"><use href="#ic-spark"/></svg> AI Assistant</button>
+        <div class="side-lbl">Kontribusi</div>
+        <button class="nav-i on"><svg class="i"><use href="#ic-upload"/></svg> Unggah Knowledge</button>
+        <button class="nav-i"><svg class="i"><use href="#ic-edit"/></svg> Draft Saya <span class="cnt grey">3</span></button>
+        <button class="nav-i"><svg class="i"><use href="#ic-refresh"/></svg> Menunggu Review <span class="cnt">2</span></button>
+        <button class="nav-i"><svg class="i"><use href="#ic-check-c"/></svg> Kontribusi Disetujui <span class="cnt grey">24</span></button>
+        <div class="side-lbl">Bantuan</div>
+        <button class="nav-i"><svg class="i"><use href="#ic-help"/></svg> Panduan Kontribusi</button>
+        <button class="nav-i"><svg class="i"><use href="#ic-shield"/></svg> Aturan Klasifikasi</button>
+      </div>
+      <div class="main"><div class="pad" style="max-width:920px">
+        <div class="h1">Unggah Knowledge Baru</div>
+        <div class="sub mb" style="margin-bottom:22px">Dokumen akan melalui review admin sebelum dipublikasikan ke knowledge base.</div>
+
+        <div class="steps">
+          <div class="step done"><span class="b"><svg class="i s" style="width:13px;height:13px"><use href="#ic-check"/></svg></span><span class="l">1. Unggah Berkas</span></div>
+          <div class="step-line done"></div>
+          <div class="step now"><span class="b">2</span><span class="l">2. Metadata &amp; Klasifikasi</span></div>
+          <div class="step-line"></div>
+          <div class="step"><span class="b">3</span><span class="l">3. Pratinjau</span></div>
+          <div class="step-line"></div>
+          <div class="step"><span class="b">4</span><span class="l">4. Kirim untuk Approval</span></div>
+        </div>
+
+        <div class="card mb"><div class="card-b">
+          <div class="drop" style="padding:24px">
+            <div class="ic" style="width:42px;height:42px;margin-bottom:9px"><svg class="i l"><use href="#ic-upload"/></svg></div>
+            <h3 style="font-size:14px">Tarik berkas ke sini atau <span style="color:var(--blue-600)">pilih dari komputer</span></h3>
+            <div class="sub" style="font-size:12px">Maksimal 50 MB per berkas · dapat mengunggah beberapa berkas sekaligus</div>
+            <div class="fmt"><span>PDF</span><span>DOCX / DOC</span><span>MD</span><span>XLSX</span><span>PPTX</span><span>TXT</span><span>HTML</span><span>Gambar (OCR)</span><span>ZIP</span></div>
+          </div>
+          <div style="margin-top:16px">
+            <div class="file-row">
+              <div class="ft ft-pdf">PDF</div>
+              <div style="flex:1"><div style="font-weight:700;font-size:13px">Prosedur-Migrasi-Database-Core-v09.pdf</div>
+                <div style="font-size:11.3px;color:var(--muted-2)">6,8 MB · 31 halaman · teks berhasil diekstraksi</div></div>
+              <span class="pill p-green"><svg class="i s"><use href="#ic-check"/></svg> Siap diproses</span>
+              <svg class="i s" style="color:var(--muted-2)"><use href="#ic-x"/></svg></div>
+            <div class="file-row">
+              <div class="ft ft-xls">XLS</div>
+              <div style="flex:1"><div style="font-weight:700;font-size:13px">Checklist-Migrasi-Lampiran-A.xlsx</div>
+                <div style="font-size:11.3px;color:var(--muted-2)">210 KB · 3 sheet · dilampirkan sebagai lampiran</div>
+                <div class="bar" style="margin-top:6px"><span style="width:72%"></span></div></div>
+              <span class="pill p-blue">Mengunggah 72%</span>
+              <svg class="i s" style="color:var(--muted-2)"><use href="#ic-x"/></svg></div>
+          </div>
+          <div class="ai-extract" style="margin-top:14px">
+            <div class="row" style="align-items:flex-start;gap:11px">
+              <svg class="i l" style="color:var(--violet);margin-top:1px"><use href="#ic-spark"/></svg>
+              <div style="flex:1"><div style="font-size:12.8px;font-weight:750;color:var(--violet);margin-bottom:5px">Metadata otomatis dari AI</div>
+                <div style="font-size:12.4px;color:var(--ink-2);line-height:1.65">Sistem mendeteksi dokumen ini sebagai <b>prosedur teknis migrasi basis data</b>. Kategori, label, dan ringkasan di bawah telah diisi otomatis — silakan tinjau dan sesuaikan bila perlu.</div>
+                <div class="row" style="gap:6px;margin-top:9px;flex-wrap:wrap">
+                  <span class="tag" style="background:#fff">Usulan kategori: Data &amp; Integrasi</span>
+                  <span class="tag" style="background:#fff">Usulan label: Kritikal, Runbook, Migrasi</span>
+                  <span class="tag" style="background:#fff">Deteksi 4 dokumen serupa</span></div></div>
+            </div>
+          </div>
+        </div></div>
+
+        <div class="card"><div class="card-h"><svg class="i" style="color:var(--blue-600)"><use href="#ic-tag"/></svg><div class="h3">Metadata &amp; Klasifikasi</div>
+          <span class="pill p-violet" style="margin-left:auto"><svg class="i s"><use href="#ic-spark"/></svg> Terisi otomatis oleh AI</span></div>
+          <div class="card-b">
+            <div class="field"><label>Judul Dokumen *</label>
+              <input class="inp" value="Prosedur Migrasi Database Core ke Cluster Baru"></div>
+            <div class="field"><label>Ringkasan</label>
+              <textarea class="inp" rows="2">Prosedur lengkap migrasi basis data core dari cluster lama ke cluster baru, mencakup persiapan, eksekusi, verifikasi, dan rencana rollback.</textarea></div>
+            <div class="grid g2">
+              <div class="field"><label>Kategori *</label>
+                <div class="inp row" style="justify-content:space-between">Data &amp; Integrasi <svg class="i s" style="color:var(--muted-2)"><use href="#ic-chev-d"/></svg></div>
+                <div class="hint">Struktur hierarkis — satu dokumen satu kategori induk</div></div>
+              <div class="field"><label>Sub-kategori</label>
+                <div class="inp row" style="justify-content:space-between">Database Administration <svg class="i s" style="color:var(--muted-2)"><use href="#ic-chev-d"/></svg></div></div>
+            </div>
+            <div class="field"><label>Label</label>
+              <div class="inp row" style="gap:6px;flex-wrap:wrap;min-height:40px">
+                <span class="tag" style="background:var(--red-bg);border-color:#FECACA;color:var(--red)"><i style="background:var(--red)"></i>Kritikal <svg class="i s" style="width:11px;height:11px"><use href="#ic-x"/></svg></span>
+                <span class="tag" style="background:var(--green-bg);border-color:#A7F3D0;color:var(--green)"><i style="background:var(--green)"></i>Runbook <svg class="i s" style="width:11px;height:11px"><use href="#ic-x"/></svg></span>
+                <span class="tag" style="background:var(--blue-50);border-color:var(--blue-200);color:var(--blue-700)"><i style="background:var(--blue-600)"></i>Migrasi <svg class="i s" style="width:11px;height:11px"><use href="#ic-x"/></svg></span>
+                <span style="color:var(--muted-2);font-size:12.5px">+ tambah label…</span></div>
+              <div class="hint">Label bebas dan dapat lebih dari satu — memudahkan pencarian silang antar kategori</div></div>
+            <div class="grid g3">
+              <div class="field"><label>Klasifikasi Keamanan *</label>
+                <div class="inp row" style="justify-content:space-between">Internal <svg class="i s" style="color:var(--muted-2)"><use href="#ic-chev-d"/></svg></div></div>
+              <div class="field"><label>Pemilik Dokumen</label>
+                <div class="inp row" style="justify-content:space-between">Tim Database <svg class="i s" style="color:var(--muted-2)"><use href="#ic-chev-d"/></svg></div></div>
+              <div class="field"><label>Periode Tinjau Ulang</label>
+                <div class="inp row" style="justify-content:space-between">Setiap 6 bulan <svg class="i s" style="color:var(--muted-2)"><use href="#ic-chev-d"/></svg></div></div>
+            </div>
+            <div class="field" style="margin-bottom:0"><label>Reviewer / Approver *</label>
+              <div class="row" style="gap:9px">
+                <div class="inp row" style="justify-content:space-between;flex:1">
+                  <span class="row"><span class="avatar" style="width:22px;height:22px;flex:0 0 22px;font-size:9px">AW</span> Andi Wijaya — Admin Knowledge</span>
+                  <svg class="i s" style="color:var(--muted-2)"><use href="#ic-chev-d"/></svg></div>
+                <div class="row" style="gap:8px;font-size:12.5px;color:var(--muted)"><span class="sw on"></span> Perlu persetujuan berjenjang</div></div>
+              <div class="hint">Karena dokumen berlabel <b>Kritikal</b>, sistem otomatis menambahkan persetujuan kedua dari Manajer Infrastruktur.</div></div>
+          </div>
+          <div class="row" style="padding:14px 18px;border-top:1px solid var(--line);justify-content:space-between">
+            <button class="btn"><svg class="i s"><use href="#ic-chev-r"/></svg> Kembali</button>
+            <div class="row"><button class="btn">Simpan sebagai draft</button>
+              <button class="btn btn-p">Lanjut ke pratinjau <svg class="i s"><use href="#ic-arrow-r"/></svg></button></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</div>
+<div class="note"><b>Unggah Multi-Format dengan Bantuan AI.</b> Alur empat langkah yang menjaga kualitas metadata sejak awal.
+<ul>
+<li><b>Ekstraksi otomatis</b> — teks PDF/Word/Markdown diurai; berkas hasil pindai diproses OCR agar tetap dapat dicari.</li>
+<li><b>AI mengisi metadata</b> — usulan judul, ringkasan, kategori, dan label mengurangi beban kontributor sekaligus menjaga konsistensi taksonomi.</li>
+<li><b>Deteksi duplikasi</b> — sistem memperingatkan bila dokumen serupa sudah ada, mencegah knowledge base membengkak.</li>
+<li><b>Aturan approval otomatis</b> — dokumen berklasifikasi tinggi langsung dirutekan ke persetujuan berjenjang.</li>
+</ul></div>
+</div>
+
+<!-- ============================= SCREEN 6 : APPROVAL ADMIN ============================= -->
+<div class="screen" id="s6">
+<div class="browser">
+  <div class="browser-bar"><div class="dots"><i></i><i></i><i></i></div>
+    <div class="url"><svg class="i s"><use href="#ic-lock"/></svg> intradocs.perusahaan.co.id/admin/approval</div></div>
+  <div class="app">
+    <div class="topbar">
+      <div class="logo"><div class="logo-mark"><svg class="i"><use href="#ic-book"/></svg></div><div>IntraDocs<small>Konsol Administrasi</small></div></div>
+      <div class="spacer"></div>
+      <div class="tsearch"><svg class="i s"><use href="#ic-search"/></svg> Cari pengajuan… <span class="kbd">⌘K</span></div>
+      <div class="icon-btn"><svg class="i"><use href="#ic-bell"/></svg><span class="dot-badge"></span></div>
+      <div class="who"><div class="avatar" style="background:linear-gradient(135deg,#FBBF24,#D97706)">AW</div>
+        <div><div class="nm">Andi Wijaya</div><div class="rl">Admin Knowledge</div></div></div>
+    </div>
+    <div class="body">
+      <div class="side">
+        <div class="side-lbl">Administrasi</div>
+        <button class="nav-i"><svg class="i"><use href="#ic-chart"/></svg> Dashboard</button>
+        <button class="nav-i on"><svg class="i"><use href="#ic-check-c"/></svg> Antrean Approval <span class="cnt">7</span></button>
+        <button class="nav-i"><svg class="i"><use href="#ic-book"/></svg> Manajemen Dokumen</button>
+        <button class="nav-i"><svg class="i"><use href="#ic-folder"/></svg> Kategori &amp; Label</button>
+        <button class="nav-i"><svg class="i"><use href="#ic-users"/></svg> Pengguna &amp; Role</button>
+        <button class="nav-i"><svg class="i"><use href="#ic-spark"/></svg> Konfigurasi AI</button>
+        <button class="nav-i"><svg class="i"><use href="#ic-act"/></svg> Audit Log</button>
+        <button class="nav-i"><svg class="i"><use href="#ic-settings"/></svg> Pengaturan Sistem</button>
+        <div class="side-lbl">Antrean saya</div>
+        <button class="nav-i"><svg class="i"><use href="#ic-clock"/></svg> Menunggu Review <span class="cnt">7</span></button>
+        <button class="nav-i"><svg class="i"><use href="#ic-refresh"/></svg> Perlu Revisi <span class="cnt grey">3</span></button>
+        <button class="nav-i"><svg class="i"><use href="#ic-check"/></svg> Selesai Bulan Ini <span class="cnt grey">41</span></button>
+      </div>
+
+      <!-- LIST -->
+      <div class="appr-list">
+        <div style="padding:14px 16px;border-bottom:1px solid var(--line)">
+          <div class="row" style="justify-content:space-between"><div class="h3">Antrean Approval</div><span class="pill p-amber">7 menunggu</span></div>
+          <div class="row" style="gap:6px;margin-top:11px">
+            <span class="pill p-blue" style="padding:4px 10px">Semua</span><span class="pill p-grey" style="padding:4px 10px">Baru</span>
+            <span class="pill p-grey" style="padding:4px 10px">Revisi</span><span class="pill p-grey" style="padding:4px 10px">Kritikal</span></div>
+        </div>
+        <div class="appr-i on">
+          <div class="row" style="justify-content:space-between;margin-bottom:6px">
+            <span class="pill p-red">Prioritas Tinggi</span><span style="font-size:11px;color:var(--muted-2)">4 jam lalu</span></div>
+          <div class="t">Prosedur Migrasi Database Core ke Cluster Baru</div>
+          <div class="m"><div class="avatar" style="width:19px;height:19px;flex:0 0 19px;font-size:8px">RA</div> Rizky Ananda
+            <span>·</span><span class="tag" style="font-size:10px">PDF + 1 lampiran</span></div>
+          <div class="m" style="margin-top:6px"><span class="pill p-amber" style="font-size:10px">Tahap 1 dari 2</span>
+            <span class="pill p-violet" style="font-size:10px"><svg class="i s" style="width:10px;height:10px"><use href="#ic-spark"/></svg> Pra-cek AI: 2 catatan</span></div>
+        </div>
+        <div class="appr-i">
+          <div class="row" style="justify-content:space-between;margin-bottom:6px">
+            <span class="pill p-grey">Normal</span><span style="font-size:11px;color:var(--muted-2)">Kemarin</span></div>
+          <div class="t">Panduan Penggunaan Modul Pengadaan pada ERP v5</div>
+          <div class="m"><div class="avatar" style="width:19px;height:19px;flex:0 0 19px;font-size:8px;background:linear-gradient(135deg,#F472B6,#DB2777)">SR</div> Siti Rahmawati
+            <span>·</span><span class="tag" style="font-size:10px">DOCX</span></div>
+        </div>
+        <div class="appr-i">
+          <div class="row" style="justify-content:space-between;margin-bottom:6px">
+            <span class="pill p-blue">Revisi</span><span style="font-size:11px;color:var(--muted-2)">2 hari lalu</span></div>
+          <div class="t">Kebijakan Penggunaan Perangkat Pribadi (BYOD) v2.0</div>
+          <div class="m"><div class="avatar" style="width:19px;height:19px;flex:0 0 19px;font-size:8px;background:linear-gradient(135deg,#34D399,#059669)">DK</div> Dwi Kurniawan
+            <span>·</span><span class="tag" style="font-size:10px">PDF</span></div>
+        </div>
+        <div class="appr-i">
+          <div class="row" style="justify-content:space-between;margin-bottom:6px">
+            <span class="pill p-grey">Normal</span><span style="font-size:11px;color:var(--muted-2)">3 hari lalu</span></div>
+          <div class="t">Runbook Failover Data Center Sekunder</div>
+          <div class="m"><div class="avatar" style="width:19px;height:19px;flex:0 0 19px;font-size:8px;background:linear-gradient(135deg,#60A5FA,#2563EB)">BS</div> Bagus Santoso
+            <span>·</span><span class="tag" style="font-size:10px">Markdown</span></div>
+        </div>
+        <div class="appr-i">
+          <div class="row" style="justify-content:space-between;margin-bottom:6px">
+            <span class="pill p-grey">Normal</span><span style="font-size:11px;color:var(--muted-2)">4 hari lalu</span></div>
+          <div class="t">FAQ Layanan Helpdesk Kuartal III 2026</div>
+          <div class="m"><div class="avatar" style="width:19px;height:19px;flex:0 0 19px;font-size:8px;background:linear-gradient(135deg,#A78BFA,#7C3AED)">ML</div> Maya Lestari
+            <span>·</span><span class="tag" style="font-size:10px">XLSX</span></div>
+        </div>
+      </div>
+
+      <!-- DETAIL -->
+      <div class="main"><div class="pad">
+        <div class="row mb" style="justify-content:space-between;align-items:flex-start">
+          <div><div class="crumbs">Antrean Approval <svg class="i s"><use href="#ic-chev-r"/></svg> Pengajuan #KM-2026-0847</div>
+            <div class="h1" style="font-size:20px">Prosedur Migrasi Database Core ke Cluster Baru</div>
+            <div class="row" style="margin-top:8px;gap:9px;flex-wrap:wrap">
+              <span class="pill p-amber"><svg class="i s"><use href="#ic-clock"/></svg> Menunggu persetujuan Anda</span>
+              <span class="tag"><i style="background:#0369A1"></i>Data &amp; Integrasi</span>
+              <span class="tag"><i style="background:var(--red)"></i>Kritikal</span>
+              <span class="tag"><i style="background:var(--green)"></i>Runbook</span>
+              <span class="sub" style="font-size:11.5px">v0.9 · diajukan 4 jam lalu oleh Rizky Ananda</span></div></div>
+          <div class="row"><button class="btn btn-r"><svg class="i s"><use href="#ic-x"/></svg> Tolak</button>
+            <button class="btn"><svg class="i s"><use href="#ic-refresh"/></svg> Minta Revisi</button>
+            <button class="btn btn-g"><svg class="i s"><use href="#ic-check"/></svg> Setujui &amp; Publikasikan</button></div>
+        </div>
+
+        <div class="row" style="align-items:flex-start;gap:16px">
+          <div style="flex:1;min-width:0">
+            <div class="card mb"><div class="card-h"><svg class="i" style="color:var(--violet)"><use href="#ic-spark"/></svg>
+              <div class="h3">Pra-pemeriksaan AI</div><span class="pill p-amber" style="margin-left:auto">2 catatan perlu ditinjau</span></div>
+              <div class="card-b" style="padding-top:14px">
+                <div class="row" style="align-items:flex-start;gap:10px;padding-bottom:12px;border-bottom:1px solid var(--line-2)">
+                  <span class="ck y" style="margin-top:1px"><svg class="i s" style="width:12px;height:12px"><use href="#ic-check"/></svg></span>
+                  <div><div style="font-size:12.8px;font-weight:700">Struktur &amp; kelengkapan sesuai template SOP</div>
+                    <div style="font-size:11.8px;color:var(--muted)">Memuat tujuan, ruang lingkup, langkah kerja, verifikasi, dan rencana rollback.</div></div></div>
+                <div class="row" style="align-items:flex-start;gap:10px;padding:12px 0;border-bottom:1px solid var(--line-2)">
+                  <span class="ck p" style="margin-top:1px"><svg class="i s" style="width:12px;height:12px"><use href="#ic-alert"/></svg></span>
+                  <div><div style="font-size:12.8px;font-weight:700">Terindikasi memuat kredensial pada halaman 12</div>
+                    <div style="font-size:11.8px;color:var(--muted)">Ditemukan string menyerupai connection string dengan password. Disarankan disamarkan sebelum publikasi.</div></div>
+                  <button class="btn btn-sm" style="margin-left:auto">Lihat</button></div>
+                <div class="row" style="align-items:flex-start;gap:10px;padding-top:12px">
+                  <span class="ck p" style="margin-top:1px"><svg class="i s" style="width:12px;height:12px"><use href="#ic-alert"/></svg></span>
+                  <div><div style="font-size:12.8px;font-weight:700">Tumpang tindih 38% dengan “Runbook Maintenance Database v2.1”</div>
+                    <div style="font-size:11.8px;color:var(--muted)">Pertimbangkan penggabungan atau tautan silang antar dokumen.</div></div>
+                  <button class="btn btn-sm" style="margin-left:auto">Bandingkan</button></div>
+              </div></div>
+
+            <div class="card"><div class="card-h"><svg class="i" style="color:var(--blue-600)"><use href="#ic-file"/></svg><div class="h3">Pratinjau Dokumen</div>
+              <div class="row" style="margin-left:auto;gap:6px"><button class="btn btn-sm">Berkas asli</button>
+                <button class="btn btn-sm btn-p">Hasil konversi</button><button class="btn btn-sm">Perbandingan versi</button></div></div>
+              <div class="card-b">
+                <div class="preview-doc">
+                  <b style="font-size:15px">Prosedur Migrasi Database Core ke Cluster Baru</b><br><br>
+                  <b>1. Tujuan</b><br>Prosedur ini menjadi acuan pelaksanaan migrasi basis data core dari cluster PostgreSQL 13 ke cluster PostgreSQL 16 dengan waktu henti layanan minimal.<br><br>
+                  <b>2. Ruang Lingkup</b><br>Berlaku untuk seluruh instance basis data produksi pada lingkungan Data Center Utama dan replikasi di Data Center Sekunder.<br><br>
+                  <b>3. Prasyarat</b><br>a. Persetujuan Change Advisory Board (CAB) telah diperoleh.<br>b. Backup penuh terverifikasi maksimal 6 jam sebelum eksekusi.<br>c. Jendela pemeliharaan disepakati bersama unit bisnis terkait.<br><br>
+                  <b>4. Langkah Pelaksanaan</b><br>4.1 Aktifkan mode maintenance pada aplikasi core…
+                </div>
+                <div class="row" style="margin-top:13px;gap:8px;flex-wrap:wrap">
+                  <span class="tag"><svg class="i s"><use href="#ic-file"/></svg> Prosedur-Migrasi-Database-Core-v09.pdf · 6,8 MB</span>
+                  <span class="tag"><svg class="i s"><use href="#ic-file"/></svg> Checklist-Migrasi-Lampiran-A.xlsx · 210 KB</span>
+                  <button class="btn btn-sm" style="margin-left:auto"><svg class="i s"><use href="#ic-download"/></svg> Unduh semua</button></div>
+              </div></div>
+          </div>
+
+          <!-- SIDE REVIEW -->
+          <div style="width:310px;flex:0 0 310px">
+            <div class="card mb"><div class="card-h"><div class="h3">Alur Persetujuan</div></div>
+              <div class="card-b"><div class="timeline">
+                <div class="tl-i ok"><div class="t">Diajukan</div><div class="d">Rizky Ananda · 13 Agu, 09.14</div></div>
+                <div class="tl-i ok"><div class="t">Pra-pemeriksaan otomatis</div><div class="d">Sistem · 2 catatan ditemukan</div></div>
+                <div class="tl-i now"><div class="t">Review Admin Knowledge</div><div class="d">Andi Wijaya · menunggu tindakan</div></div>
+                <div class="tl-i"><div class="t">Persetujuan Manajer Infrastruktur</div><div class="d">Budi Hartono · belum mulai</div></div>
+                <div class="tl-i" style="padding-bottom:0"><div class="t">Publikasi &amp; indeks AI</div><div class="d">Otomatis setelah disetujui</div></div>
+              </div></div></div>
+
+            <div class="card mb"><div class="card-h"><div class="h3">Catatan Reviewer</div></div>
+              <div class="card-b" style="padding-top:13px">
+                <div style="background:var(--bg);border-radius:10px;padding:11px 13px;margin-bottom:10px">
+                  <div class="row" style="gap:7px;margin-bottom:5px"><div class="avatar" style="width:20px;height:20px;flex:0 0 20px;font-size:8px">RA</div>
+                    <span style="font-size:11.8px;font-weight:700">Rizky Ananda</span><span style="font-size:10.5px;color:var(--muted-2)">4 jam lalu</span></div>
+                  <div style="font-size:12.2px;color:var(--ink-2);line-height:1.6">Mohon direview sebelum jendela maintenance tanggal 20 Agustus. Lampiran checklist menyusul revisi kecil.</div></div>
+                <textarea class="inp" rows="3" placeholder="Tulis catatan untuk kontributor… (mendukung @mention)"></textarea>
+                <div class="row" style="margin-top:9px;justify-content:space-between">
+                  <div class="row" style="gap:8px;font-size:12px;color:var(--muted)"><span class="sw on"></span> Kirim notifikasi email</div>
+                  <button class="btn btn-sm btn-p">Kirim catatan</button></div>
+              </div></div>
+
+            <div class="card"><div class="card-h"><div class="h3">Ketentuan Publikasi</div></div>
+              <div class="card-b" style="padding-top:13px">
+                <div class="row" style="gap:9px;margin-bottom:11px"><span class="chk on"><svg class="i s" style="color:#fff;width:11px;height:11px"><use href="#ic-check"/></svg></span>
+                  <span style="font-size:12.4px">Indeks ke AI Assistant setelah publikasi</span></div>
+                <div class="row" style="gap:9px;margin-bottom:11px"><span class="chk on"><svg class="i s" style="color:#fff;width:11px;height:11px"><use href="#ic-check"/></svg></span>
+                  <span style="font-size:12.4px">Kirim pengumuman ke kanal #it-knowledge</span></div>
+                <div class="row" style="gap:9px"><span class="chk"></span>
+                  <span style="font-size:12.4px">Tandai sebagai bacaan wajib untuk Tim Database</span></div>
+              </div></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</div>
+<div class="note"><b>Approval Berjenjang.</b> Tidak ada dokumen yang masuk ke knowledge base tanpa persetujuan — inilah kontrol kualitas utama sistem.
+<ul>
+<li><b>Pra-pemeriksaan AI</b> menandai risiko sebelum manusia meninjau: kebocoran kredensial, duplikasi konten, dan ketidaksesuaian template.</li>
+<li><b>Alur dinamis</b> — jumlah tahap persetujuan mengikuti klasifikasi dan label dokumen (dokumen Kritikal butuh dua tahap).</li>
+<li><b>Tiga keputusan</b>: Setujui, Minta Revisi (kembali ke kontributor dengan catatan), atau Tolak — semuanya terekam pada audit log.</li>
+<li><b>Indeks AI hanya berjalan setelah approval</b>, sehingga asisten tidak pernah menjawab dari dokumen yang belum tervalidasi.</li>
+</ul></div>
+</div>
+
+<!-- ============================= SCREEN 7 : KATEGORI & LABEL ============================= -->
+<div class="screen" id="s7">
+<div class="browser">
+  <div class="browser-bar"><div class="dots"><i></i><i></i><i></i></div>
+    <div class="url"><svg class="i s"><use href="#ic-lock"/></svg> intradocs.perusahaan.co.id/admin/kategori-label</div></div>
+  <div class="app">
+    <div class="topbar">
+      <div class="logo"><div class="logo-mark"><svg class="i"><use href="#ic-book"/></svg></div><div>IntraDocs<small>Konsol Administrasi</small></div></div>
+      <div class="spacer"></div>
+      <div class="tsearch"><svg class="i s"><use href="#ic-search"/></svg> Cari kategori atau label… <span class="kbd">⌘K</span></div>
+      <div class="icon-btn"><svg class="i"><use href="#ic-bell"/></svg><span class="dot-badge"></span></div>
+      <div class="who"><div class="avatar" style="background:linear-gradient(135deg,#FBBF24,#D97706)">AW</div>
+        <div><div class="nm">Andi Wijaya</div><div class="rl">Admin Knowledge</div></div></div>
+    </div>
+    <div class="body">
+      <div class="side">
+        <div class="side-lbl">Administrasi</div>
+        <button class="nav-i"><svg class="i"><use href="#ic-chart"/></svg> Dashboard</button>
+        <button class="nav-i"><svg class="i"><use href="#ic-check-c"/></svg> Antrean Approval <span class="cnt">7</span></button>
+        <button class="nav-i"><svg class="i"><use href="#ic-book"/></svg> Manajemen Dokumen</button>
+        <button class="nav-i on"><svg class="i"><use href="#ic-folder"/></svg> Kategori &amp; Label</button>
+        <button class="nav-i"><svg class="i"><use href="#ic-users"/></svg> Pengguna &amp; Role</button>
+        <button class="nav-i"><svg class="i"><use href="#ic-spark"/></svg> Konfigurasi AI</button>
+        <button class="nav-i"><svg class="i"><use href="#ic-act"/></svg> Audit Log</button>
+        <button class="nav-i"><svg class="i"><use href="#ic-settings"/></svg> Pengaturan Sistem</button>
+      </div>
+      <div class="main"><div class="pad">
+        <div class="row mb" style="justify-content:space-between;align-items:flex-start">
+          <div><div class="h1">Kategori &amp; Label</div>
+            <div class="sub" style="margin-top:3px">Taksonomi knowledge base — 42 kategori (3 tingkat) dan 68 label aktif</div></div>
+          <div class="row"><button class="btn"><svg class="i s"><use href="#ic-download"/></svg> Ekspor taksonomi</button>
+            <button class="btn btn-p"><svg class="i s"><use href="#ic-plus"/></svg> Kategori Baru</button></div>
+        </div>
+
+        <div class="row" style="align-items:flex-start;gap:16px">
+          <div style="flex:1.35;min-width:0">
+            <div class="card"><div class="card-h"><svg class="i" style="color:var(--blue-600)"><use href="#ic-folder"/></svg>
+              <div class="h3">Struktur Kategori</div><span class="sub" style="margin-left:auto;font-size:11.5px">Seret untuk mengubah urutan &amp; hierarki</span></div>
+              <div class="card-b" style="padding:10px 12px">
+                <div class="row" style="padding:10px 10px;border-radius:9px;background:var(--blue-50)">
+                  <svg class="i s" style="color:var(--muted-2)"><use href="#ic-chev-d"/></svg>
+                  <svg class="i" style="color:var(--blue-600)"><use href="#ic-server"/></svg>
+                  <div style="flex:1"><div style="font-weight:700;font-size:13.2px">Infrastruktur &amp; Jaringan</div></div>
+                  <span class="pill p-grey">184 dok</span><span class="pill p-blue">3 sub-kategori</span>
+                  <svg class="i s" style="color:var(--muted-2)"><use href="#ic-more"/></svg></div>
+                <div class="row" style="padding:8px 10px 8px 40px"><svg class="i s" style="color:var(--muted-2)"><use href="#ic-folder"/></svg>
+                  <div style="flex:1;font-size:12.6px">Jaringan &amp; Konektivitas</div><span class="pill p-grey">62 dok</span></div>
+                <div class="row" style="padding:8px 10px 8px 40px"><svg class="i s" style="color:var(--muted-2)"><use href="#ic-folder"/></svg>
+                  <div style="flex:1;font-size:12.6px">Server &amp; Virtualisasi</div><span class="pill p-grey">78 dok</span></div>
+                <div class="row" style="padding:8px 10px 8px 40px"><svg class="i s" style="color:var(--muted-2)"><use href="#ic-folder"/></svg>
+                  <div style="flex:1;font-size:12.6px">Data Center &amp; Fasilitas</div><span class="pill p-grey">44 dok</span></div>
+                <div class="row" style="padding:10px;border-top:1px solid var(--line-2);margin-top:4px">
+                  <svg class="i s" style="color:var(--muted-2)"><use href="#ic-chev-r"/></svg>
+                  <svg class="i" style="color:var(--red)"><use href="#ic-shield"/></svg>
+                  <div style="flex:1;font-weight:700;font-size:13.2px">Keamanan Informasi</div>
+                  <span class="pill p-grey">142 dok</span><span class="pill p-red"><svg class="i s"><use href="#ic-lock"/></svg> Akses terbatas</span>
+                  <svg class="i s" style="color:var(--muted-2)"><use href="#ic-more"/></svg></div>
+                <div class="row" style="padding:10px"><svg class="i s" style="color:var(--muted-2)"><use href="#ic-chev-r"/></svg>
+                  <svg class="i" style="color:var(--green)"><use href="#ic-layers"/></svg>
+                  <div style="flex:1;font-weight:700;font-size:13.2px">Aplikasi Internal</div>
+                  <span class="pill p-grey">296 dok</span><span class="pill p-blue">5 sub-kategori</span>
+                  <svg class="i s" style="color:var(--muted-2)"><use href="#ic-more"/></svg></div>
+                <div class="row" style="padding:10px"><svg class="i s" style="color:var(--muted-2)"><use href="#ic-chev-r"/></svg>
+                  <svg class="i" style="color:var(--violet)"><use href="#ic-flow"/></svg>
+                  <div style="flex:1;font-weight:700;font-size:13.2px">SOP &amp; Proses Bisnis</div>
+                  <span class="pill p-grey">231 dok</span><span class="pill p-blue">4 sub-kategori</span>
+                  <svg class="i s" style="color:var(--muted-2)"><use href="#ic-more"/></svg></div>
+                <div class="row" style="padding:10px"><svg class="i s" style="color:var(--muted-2)"><use href="#ic-chev-r"/></svg>
+                  <svg class="i" style="color:var(--amber)"><use href="#ic-users"/></svg>
+                  <div style="flex:1;font-weight:700;font-size:13.2px">Onboarding &amp; SDM</div>
+                  <span class="pill p-grey">87 dok</span><svg class="i s" style="color:var(--muted-2)"><use href="#ic-more"/></svg></div>
+                <div class="row" style="padding:10px"><svg class="i s" style="color:var(--muted-2)"><use href="#ic-chev-r"/></svg>
+                  <svg class="i" style="color:#0369A1"><use href="#ic-db"/></svg>
+                  <div style="flex:1;font-weight:700;font-size:13.2px">Data &amp; Integrasi</div>
+                  <span class="pill p-grey">163 dok</span><span class="pill p-blue">2 sub-kategori</span>
+                  <svg class="i s" style="color:var(--muted-2)"><use href="#ic-more"/></svg></div>
+              </div></div>
+          </div>
+
+          <div style="flex:1;min-width:0">
+            <div class="card mb"><div class="card-h"><svg class="i" style="color:var(--violet)"><use href="#ic-tag"/></svg><div class="h3">Label</div>
+              <button class="btn btn-sm" style="margin-left:auto"><svg class="i s"><use href="#ic-plus"/></svg> Label baru</button></div>
+              <div class="card-b">
+                <div class="row" style="flex-wrap:wrap;gap:8px;margin-bottom:16px">
+                  <span class="tag" style="padding:5px 11px"><i style="background:var(--red)"></i>Kritikal <b style="color:var(--muted-2)">61</b></span>
+                  <span class="tag" style="padding:5px 11px"><i style="background:var(--green)"></i>Runbook <b style="color:var(--muted-2)">148</b></span>
+                  <span class="tag" style="padding:5px 11px"><i style="background:var(--violet)"></i>SOP <b style="color:var(--muted-2)">231</b></span>
+                  <span class="tag" style="padding:5px 11px"><i style="background:var(--blue-600)"></i>Identity <b style="color:var(--muted-2)">44</b></span>
+                  <span class="tag" style="padding:5px 11px"><i style="background:var(--amber)"></i>Helpdesk <b style="color:var(--muted-2)">92</b></span>
+                  <span class="tag" style="padding:5px 11px"><i style="background:#0369A1"></i>Referensi <b style="color:var(--muted-2)">73</b></span>
+                  <span class="tag" style="padding:5px 11px"><i style="background:#DB2777"></i>Onboarding <b style="color:var(--muted-2)">39</b></span>
+                  <span class="tag" style="padding:5px 11px"><i style="background:#0F172A"></i>Standar <b style="color:var(--muted-2)">57</b></span>
+                  <span class="tag" style="padding:5px 11px"><i style="background:#EA580C"></i>Sosialisasi <b style="color:var(--muted-2)">28</b></span>
+                  <span class="tag" style="padding:5px 11px;border-style:dashed;color:var(--blue-600)"><svg class="i s"><use href="#ic-plus"/></svg> 59 label lainnya</span>
+                </div>
+                <div class="ai-extract">
+                  <div class="row" style="align-items:flex-start;gap:10px">
+                    <svg class="i" style="color:var(--violet);margin-top:2px"><use href="#ic-spark"/></svg>
+                    <div><div style="font-size:12.5px;font-weight:750;color:var(--violet);margin-bottom:4px">Saran perapian taksonomi</div>
+                      <div style="font-size:12.2px;line-height:1.6;color:var(--ink-2)">Label <b>“Panduan”</b> dan <b>“Petunjuk”</b> memiliki kemiripan penggunaan 87% — pertimbangkan penggabungan. Terdapat pula 6 label yang tidak digunakan sejak 2025.</div>
+                      <div class="row" style="gap:7px;margin-top:9px"><button class="btn btn-sm btn-p">Tinjau saran</button><button class="btn btn-sm">Abaikan</button></div></div></div>
+                </div>
+              </div></div>
+
+            <div class="card"><div class="card-h"><div class="h3">Aturan Otomatis</div>
+              <span class="pill p-green" style="margin-left:auto">4 aturan aktif</span></div>
+              <div class="card-b" style="padding-top:12px">
+                <div class="row" style="gap:10px;padding-bottom:11px;border-bottom:1px solid var(--line-2)"><span class="sw on"></span>
+                  <div style="font-size:12.4px;line-height:1.5">Dokumen berlabel <b>Kritikal</b> → wajib persetujuan 2 tahap</div></div>
+                <div class="row" style="gap:10px;padding:11px 0;border-bottom:1px solid var(--line-2)"><span class="sw on"></span>
+                  <div style="font-size:12.4px;line-height:1.5">Kategori <b>Keamanan Informasi</b> → hanya role Security &amp; Admin</div></div>
+                <div class="row" style="gap:10px;padding:11px 0;border-bottom:1px solid var(--line-2)"><span class="sw on"></span>
+                  <div style="font-size:12.4px;line-height:1.5">Dokumen tanpa pembaruan &gt; 12 bulan → status <b>Kedaluwarsa</b></div></div>
+                <div class="row" style="gap:10px;padding-top:11px"><span class="sw on"></span>
+                  <div style="font-size:12.4px;line-height:1.5">Label otomatis dari AI saat unggah (dapat disunting kontributor)</div></div>
+              </div></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</div>
+<div class="note"><b>Taksonomi Terkendali.</b> Kategori hierarkis untuk struktur, label bebas untuk fleksibilitas — kombinasi yang mencegah knowledge base menjadi kacau saat jumlah dokumen bertambah.
+<ul>
+<li><b>Aturan otomatis</b> menghubungkan taksonomi dengan kebijakan akses dan alur approval, sehingga tata kelola berjalan tanpa intervensi manual.</li>
+<li><b>Deteksi label duplikat &amp; label mati</b> menjaga konsistensi jangka panjang.</li>
+</ul></div>
+</div>
+
+<!-- ============================= SCREEN 8 : PENGGUNA & RBAC ============================= -->
+<div class="screen" id="s8">
+<div class="browser">
+  <div class="browser-bar"><div class="dots"><i></i><i></i><i></i></div>
+    <div class="url"><svg class="i s"><use href="#ic-lock"/></svg> intradocs.perusahaan.co.id/admin/pengguna</div></div>
+  <div class="app">
+    <div class="topbar">
+      <div class="logo"><div class="logo-mark"><svg class="i"><use href="#ic-book"/></svg></div><div>IntraDocs<small>Konsol Administrasi</small></div></div>
+      <div class="spacer"></div>
+      <div class="tsearch"><svg class="i s"><use href="#ic-search"/></svg> Cari pengguna atau grup… <span class="kbd">⌘K</span></div>
+      <div class="icon-btn"><svg class="i"><use href="#ic-bell"/></svg><span class="dot-badge"></span></div>
+      <div class="who"><div class="avatar" style="background:linear-gradient(135deg,#FBBF24,#D97706)">AW</div>
+        <div><div class="nm">Andi Wijaya</div><div class="rl">Admin Knowledge</div></div></div>
+    </div>
+    <div class="body">
+      <div class="side">
+        <div class="side-lbl">Administrasi</div>
+        <button class="nav-i"><svg class="i"><use href="#ic-chart"/></svg> Dashboard</button>
+        <button class="nav-i"><svg class="i"><use href="#ic-check-c"/></svg> Antrean Approval <span class="cnt">7</span></button>
+        <button class="nav-i"><svg class="i"><use href="#ic-book"/></svg> Manajemen Dokumen</button>
+        <button class="nav-i"><svg class="i"><use href="#ic-folder"/></svg> Kategori &amp; Label</button>
+        <button class="nav-i on"><svg class="i"><use href="#ic-users"/></svg> Pengguna &amp; Role</button>
+        <button class="nav-i"><svg class="i"><use href="#ic-spark"/></svg> Konfigurasi AI</button>
+        <button class="nav-i"><svg class="i"><use href="#ic-act"/></svg> Audit Log</button>
+        <button class="nav-i"><svg class="i"><use href="#ic-settings"/></svg> Pengaturan Sistem</button>
+      </div>
+      <div class="main"><div class="pad">
+        <div class="row mb" style="justify-content:space-between;align-items:flex-start">
+          <div><div class="h1">Pengguna &amp; Kontrol Akses (RBAC)</div>
+            <div class="sub" style="margin-top:3px">318 pengguna aktif · 6 role · sinkronisasi otomatis dari Active Directory</div></div>
+          <div class="row"><button class="btn"><svg class="i s"><use href="#ic-refresh"/></svg> Sinkron AD</button>
+            <button class="btn btn-p"><svg class="i s"><use href="#ic-plus"/></svg> Undang Pengguna</button></div>
+        </div>
+
+        <div class="grid g3 mb" style="margin-bottom:18px">
+          <div class="role-card"><div class="rt"><span class="ft" style="background:var(--red)"><svg class="i s"><use href="#ic-shield"/></svg></span>
+            <div><div style="font-weight:750;font-size:13.4px">Super Admin</div><div style="font-size:11px;color:var(--muted-2)">3 pengguna</div></div></div>
+            <div class="rd">Akses penuh sistem, konfigurasi RBAC, integrasi, dan pengaturan AI.</div></div>
+          <div class="role-card"><div class="rt"><span class="ft" style="background:var(--amber)"><svg class="i s"><use href="#ic-check-c"/></svg></span>
+            <div><div style="font-weight:750;font-size:13.4px">Admin Knowledge</div><div style="font-size:11px;color:var(--muted-2)">8 pengguna</div></div></div>
+            <div class="rd">Menyetujui dokumen, mengelola taksonomi, dan memantau kualitas knowledge.</div></div>
+          <div class="role-card"><div class="rt"><span class="ft" style="background:var(--violet)"><svg class="i s"><use href="#ic-eye"/></svg></span>
+            <div><div style="font-weight:750;font-size:13.4px">Reviewer</div><div style="font-size:11px;color:var(--muted-2)">21 pengguna</div></div></div>
+            <div class="rd">Meninjau dokumen pada kategori tertentu sesuai keahlian domain.</div></div>
+          <div class="role-card"><div class="rt"><span class="ft" style="background:var(--blue-600)"><svg class="i s"><use href="#ic-edit"/></svg></span>
+            <div><div style="font-weight:750;font-size:13.4px">Contributor</div><div style="font-size:11px;color:var(--muted-2)">96 pengguna</div></div></div>
+            <div class="rd">Mengunggah dan menyunting dokumen, lalu mengajukannya untuk approval.</div></div>
+          <div class="role-card"><div class="rt"><span class="ft" style="background:var(--green)"><svg class="i s"><use href="#ic-book"/></svg></span>
+            <div><div style="font-weight:750;font-size:13.4px">Viewer</div><div style="font-size:11px;color:var(--muted-2)">184 pengguna</div></div></div>
+            <div class="rd">Membaca dokumen, mencari, bertanya ke AI, dan memberi umpan balik.</div></div>
+          <div class="role-card" style="border-style:dashed;display:grid;place-items:center;color:var(--blue-600)">
+            <div style="text-align:center"><svg class="i l" style="margin:0 auto 6px"><use href="#ic-plus"/></svg>
+              <div style="font-size:12.5px;font-weight:700">Buat role kustom</div>
+              <div style="font-size:11px;color:var(--muted-2)">Kombinasi izin sesuai kebutuhan unit</div></div></div>
+        </div>
+
+        <div class="card mb"><div class="card-h"><svg class="i" style="color:var(--blue-600)"><use href="#ic-lock"/></svg><div class="h3">Matriks Izin</div>
+          <div class="row" style="margin-left:auto;gap:12px;font-size:11.5px;color:var(--muted)">
+            <span class="row" style="gap:5px"><span class="ck y" style="width:16px;height:16px"><svg class="i s" style="width:10px;height:10px"><use href="#ic-check"/></svg></span> Diizinkan</span>
+            <span class="row" style="gap:5px"><span class="ck p" style="width:16px;height:16px"><svg class="i s" style="width:10px;height:10px"><use href="#ic-alert"/></svg></span> Terbatas</span>
+            <span class="row" style="gap:5px"><span class="ck n" style="width:16px;height:16px"><svg class="i s" style="width:10px;height:10px"><use href="#ic-x"/></svg></span> Tidak</span></div></div>
+          <table class="matrix">
+            <thead><tr><th style="width:30%">Izin / Kemampuan</th><th>Super Admin</th><th>Admin Knowledge</th><th>Reviewer</th><th>Contributor</th><th>Viewer</th></tr></thead>
+            <tbody>
+              <tr><td>Membaca dokumen Publik &amp; Internal</td>
+                <td><span class="ck y"><svg class="i s" style="width:12px;height:12px"><use href="#ic-check"/></svg></span></td>
+                <td><span class="ck y"><svg class="i s" style="width:12px;height:12px"><use href="#ic-check"/></svg></span></td>
+                <td><span class="ck y"><svg class="i s" style="width:12px;height:12px"><use href="#ic-check"/></svg></span></td>
+                <td><span class="ck y"><svg class="i s" style="width:12px;height:12px"><use href="#ic-check"/></svg></span></td>
+                <td><span class="ck y"><svg class="i s" style="width:12px;height:12px"><use href="#ic-check"/></svg></span></td></tr>
+              <tr><td>Membaca dokumen Rahasia / Terbatas</td>
+                <td><span class="ck y"><svg class="i s" style="width:12px;height:12px"><use href="#ic-check"/></svg></span></td>
+                <td><span class="ck y"><svg class="i s" style="width:12px;height:12px"><use href="#ic-check"/></svg></span></td>
+                <td><span class="ck p"><svg class="i s" style="width:12px;height:12px"><use href="#ic-alert"/></svg></span></td>
+                <td><span class="ck p"><svg class="i s" style="width:12px;height:12px"><use href="#ic-alert"/></svg></span></td>
+                <td><span class="ck n"><svg class="i s" style="width:12px;height:12px"><use href="#ic-x"/></svg></span></td></tr>
+              <tr><td>Mengunggah &amp; menyunting dokumen</td>
+                <td><span class="ck y"><svg class="i s" style="width:12px;height:12px"><use href="#ic-check"/></svg></span></td>
+                <td><span class="ck y"><svg class="i s" style="width:12px;height:12px"><use href="#ic-check"/></svg></span></td>
+                <td><span class="ck y"><svg class="i s" style="width:12px;height:12px"><use href="#ic-check"/></svg></span></td>
+                <td><span class="ck y"><svg class="i s" style="width:12px;height:12px"><use href="#ic-check"/></svg></span></td>
+                <td><span class="ck n"><svg class="i s" style="width:12px;height:12px"><use href="#ic-x"/></svg></span></td></tr>
+              <tr><td>Menyetujui / menolak pengajuan</td>
+                <td><span class="ck y"><svg class="i s" style="width:12px;height:12px"><use href="#ic-check"/></svg></span></td>
+                <td><span class="ck y"><svg class="i s" style="width:12px;height:12px"><use href="#ic-check"/></svg></span></td>
+                <td><span class="ck p"><svg class="i s" style="width:12px;height:12px"><use href="#ic-alert"/></svg></span></td>
+                <td><span class="ck n"><svg class="i s" style="width:12px;height:12px"><use href="#ic-x"/></svg></span></td>
+                <td><span class="ck n"><svg class="i s" style="width:12px;height:12px"><use href="#ic-x"/></svg></span></td></tr>
+              <tr><td>Mengelola kategori &amp; label</td>
+                <td><span class="ck y"><svg class="i s" style="width:12px;height:12px"><use href="#ic-check"/></svg></span></td>
+                <td><span class="ck y"><svg class="i s" style="width:12px;height:12px"><use href="#ic-check"/></svg></span></td>
+                <td><span class="ck n"><svg class="i s" style="width:12px;height:12px"><use href="#ic-x"/></svg></span></td>
+                <td><span class="ck n"><svg class="i s" style="width:12px;height:12px"><use href="#ic-x"/></svg></span></td>
+                <td><span class="ck n"><svg class="i s" style="width:12px;height:12px"><use href="#ic-x"/></svg></span></td></tr>
+              <tr><td>Menggunakan AI Assistant</td>
+                <td><span class="ck y"><svg class="i s" style="width:12px;height:12px"><use href="#ic-check"/></svg></span></td>
+                <td><span class="ck y"><svg class="i s" style="width:12px;height:12px"><use href="#ic-check"/></svg></span></td>
+                <td><span class="ck y"><svg class="i s" style="width:12px;height:12px"><use href="#ic-check"/></svg></span></td>
+                <td><span class="ck y"><svg class="i s" style="width:12px;height:12px"><use href="#ic-check"/></svg></span></td>
+                <td><span class="ck y"><svg class="i s" style="width:12px;height:12px"><use href="#ic-check"/></svg></span></td></tr>
+              <tr><td>Mengelola pengguna &amp; role</td>
+                <td><span class="ck y"><svg class="i s" style="width:12px;height:12px"><use href="#ic-check"/></svg></span></td>
+                <td><span class="ck p"><svg class="i s" style="width:12px;height:12px"><use href="#ic-alert"/></svg></span></td>
+                <td><span class="ck n"><svg class="i s" style="width:12px;height:12px"><use href="#ic-x"/></svg></span></td>
+                <td><span class="ck n"><svg class="i s" style="width:12px;height:12px"><use href="#ic-x"/></svg></span></td>
+                <td><span class="ck n"><svg class="i s" style="width:12px;height:12px"><use href="#ic-x"/></svg></span></td></tr>
+              <tr><td>Melihat audit log &amp; analitik</td>
+                <td><span class="ck y"><svg class="i s" style="width:12px;height:12px"><use href="#ic-check"/></svg></span></td>
+                <td><span class="ck y"><svg class="i s" style="width:12px;height:12px"><use href="#ic-check"/></svg></span></td>
+                <td><span class="ck p"><svg class="i s" style="width:12px;height:12px"><use href="#ic-alert"/></svg></span></td>
+                <td><span class="ck n"><svg class="i s" style="width:12px;height:12px"><use href="#ic-x"/></svg></span></td>
+                <td><span class="ck n"><svg class="i s" style="width:12px;height:12px"><use href="#ic-x"/></svg></span></td></tr>
+            </tbody></table>
+          <div class="row" style="padding:12px 16px;border-top:1px solid var(--line);gap:9px">
+            <svg class="i s" style="color:var(--muted-2)"><use href="#ic-alert"/></svg>
+            <span class="sub" style="font-size:11.8px">“Terbatas” berarti izin hanya berlaku pada kategori atau unit kerja yang ditugaskan kepada pengguna tersebut.</span></div>
+        </div>
+
+        <div class="card"><div class="card-h"><div class="h3">Daftar Pengguna</div>
+          <div class="row" style="margin-left:auto;gap:7px">
+            <span class="pill p-blue" style="padding:4px 10px">Semua role</span>
+            <span class="pill p-grey" style="padding:4px 10px">Semua unit</span>
+            <button class="btn btn-sm"><svg class="i s"><use href="#ic-filter"/></svg> Filter</button></div></div>
+          <table>
+            <thead><tr><th style="width:28%">Pengguna</th><th>Unit Kerja</th><th>Role</th><th>Cakupan Kategori</th><th>Terakhir Aktif</th><th>Status</th><th style="width:40px"></th></tr></thead>
+            <tbody>
+              <tr><td><div class="row"><div class="avatar" style="background:linear-gradient(135deg,#FBBF24,#D97706)">AW</div>
+                <div><div style="font-weight:700">Andi Wijaya</div><div style="font-size:11.3px;color:var(--muted-2)">andi.wijaya@perusahaan.co.id</div></div></div></td>
+                <td>IT Governance</td><td><span class="pill p-amber">Admin Knowledge</span></td><td style="color:var(--muted)">Semua kategori</td>
+                <td style="color:var(--muted)">Sekarang</td><td><span class="pill p-green">Aktif</span></td><td><svg class="i s" style="color:var(--muted-2)"><use href="#ic-more"/></svg></td></tr>
+              <tr><td><div class="row"><div class="avatar">RA</div>
+                <div><div style="font-weight:700">Rizky Ananda</div><div style="font-size:11.3px;color:var(--muted-2)">rizky.ananda@perusahaan.co.id</div></div></div></td>
+                <td>IT Operations</td><td><span class="pill p-blue">Contributor</span></td><td style="color:var(--muted)">Infrastruktur, Data &amp; Integrasi</td>
+                <td style="color:var(--muted)">12 menit lalu</td><td><span class="pill p-green">Aktif</span></td><td><svg class="i s" style="color:var(--muted-2)"><use href="#ic-more"/></svg></td></tr>
+              <tr><td><div class="row"><div class="avatar" style="background:linear-gradient(135deg,#F472B6,#DB2777)">SR</div>
+                <div><div style="font-weight:700">Siti Rahmawati</div><div style="font-size:11.3px;color:var(--muted-2)">siti.rahmawati@perusahaan.co.id</div></div></div></td>
+                <td>Application Support</td><td><span class="pill p-blue">Contributor</span></td><td style="color:var(--muted)">Aplikasi Internal</td>
+                <td style="color:var(--muted)">1 jam lalu</td><td><span class="pill p-green">Aktif</span></td><td><svg class="i s" style="color:var(--muted-2)"><use href="#ic-more"/></svg></td></tr>
+              <tr><td><div class="row"><div class="avatar" style="background:linear-gradient(135deg,#34D399,#059669)">DK</div>
+                <div><div style="font-weight:700">Dwi Kurniawan</div><div style="font-size:11.3px;color:var(--muted-2)">dwi.kurniawan@perusahaan.co.id</div></div></div></td>
+                <td>Information Security</td><td><span class="pill p-violet">Reviewer</span></td><td style="color:var(--muted)">Keamanan Informasi</td>
+                <td style="color:var(--muted)">3 jam lalu</td><td><span class="pill p-green">Aktif</span></td><td><svg class="i s" style="color:var(--muted-2)"><use href="#ic-more"/></svg></td></tr>
+              <tr><td><div class="row"><div class="avatar" style="background:linear-gradient(135deg,#60A5FA,#2563EB)">BH</div>
+                <div><div style="font-weight:700">Budi Hartono</div><div style="font-size:11.3px;color:var(--muted-2)">budi.hartono@perusahaan.co.id</div></div></div></td>
+                <td>Infrastructure</td><td><span class="pill p-red">Super Admin</span></td><td style="color:var(--muted)">Semua kategori</td>
+                <td style="color:var(--muted)">Kemarin</td><td><span class="pill p-green">Aktif</span></td><td><svg class="i s" style="color:var(--muted-2)"><use href="#ic-more"/></svg></td></tr>
+              <tr><td><div class="row"><div class="avatar" style="background:linear-gradient(135deg,#A78BFA,#7C3AED)">ML</div>
+                <div><div style="font-weight:700">Maya Lestari</div><div style="font-size:11.3px;color:var(--muted-2)">maya.lestari@perusahaan.co.id</div></div></div></td>
+                <td>Service Desk</td><td><span class="pill p-amber">Admin Knowledge</span></td><td style="color:var(--muted)">SOP, Onboarding</td>
+                <td style="color:var(--muted)">2 hari lalu</td><td><span class="pill p-green">Aktif</span></td><td><svg class="i s" style="color:var(--muted-2)"><use href="#ic-more"/></svg></td></tr>
+              <tr><td><div class="row"><div class="avatar" style="background:#94A3B8">FN</div>
+                <div><div style="font-weight:700">Fajar Nugroho</div><div style="font-size:11.3px;color:var(--muted-2)">fajar.nugroho@perusahaan.co.id</div></div></div></td>
+                <td>Finance (mitra)</td><td><span class="pill p-grey">Viewer</span></td><td style="color:var(--muted)">SOP &amp; Proses (baca)</td>
+                <td style="color:var(--muted)">3 minggu lalu</td><td><span class="pill p-grey">Nonaktif</span></td><td><svg class="i s" style="color:var(--muted-2)"><use href="#ic-more"/></svg></td></tr>
+            </tbody></table>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</div>
+<div class="note"><b>Multi-User dengan RBAC.</b> Lima role bawaan ditambah kemampuan membuat role kustom.
+<ul>
+<li><b>Izin dua dimensi</b> — role menentukan <i>apa</i> yang boleh dilakukan, cakupan kategori menentukan <i>di mana</i> izin itu berlaku. Reviewer Keamanan tidak dapat menyetujui dokumen Aplikasi Internal.</li>
+<li><b>Integrasi Active Directory / SSO</b> — pengguna dan unit kerja tersinkronisasi otomatis; karyawan keluar langsung kehilangan akses.</li>
+<li><b>AI Assistant menghormati RBAC</b> — jawaban hanya disusun dari dokumen yang boleh diakses penanya.</li>
+<li><b>Audit log</b> merekam setiap pembacaan dokumen rahasia, perubahan izin, dan keputusan approval.</li>
+</ul></div>
+</div>
+
+<!-- ============================= SCREEN 9 : AI ASSISTANT ============================= -->
+<div class="screen" id="s9">
+<div class="browser">
+  <div class="browser-bar"><div class="dots"><i></i><i></i><i></i></div>
+    <div class="url"><svg class="i s"><use href="#ic-lock"/></svg> intradocs.perusahaan.co.id/ai-assistant</div></div>
+  <div class="app">
+    <div class="topbar">
+      <div class="logo"><div class="logo-mark"><svg class="i"><use href="#ic-book"/></svg></div><div>IntraDocs<small>AI Assistant</small></div></div>
+      <div class="spacer"></div>
+      <span class="pill p-violet"><svg class="i s"><use href="#ic-shield"/></svg> Jawaban dibatasi hak akses Anda</span>
+      <button class="btn btn-sm"><svg class="i s"><use href="#ic-plus"/></svg> Percakapan baru</button>
+      <div class="icon-btn"><svg class="i"><use href="#ic-bell"/></svg></div>
+      <div class="who"><div class="avatar">RA</div><div><div class="nm">Rizky Ananda</div><div class="rl">Contributor</div></div></div>
+    </div>
+    <div class="body">
+      <div class="side">
+        <div class="side-lbl">Percakapan</div>
+        <button class="nav-i on"><svg class="i"><use href="#ic-msg"/></svg> SLA reset password VIP</button>
+        <button class="nav-i"><svg class="i"><use href="#ic-msg"/></svg> Syarat akses core banking</button>
+        <button class="nav-i"><svg class="i"><use href="#ic-msg"/></svg> Checklist migrasi database</button>
+        <button class="nav-i"><svg class="i"><use href="#ic-msg"/></svg> Kebijakan BYOD 2026</button>
+        <div class="side-lbl">Ruang lingkup jawaban</div>
+        <div style="padding:2px 10px">
+          <div class="row" style="gap:9px;padding:6px 0"><span class="chk on"><svg class="i s" style="color:#fff;width:11px;height:11px"><use href="#ic-check"/></svg></span>
+            <span style="font-size:12.4px">Seluruh knowledge base</span></div>
+          <div class="row" style="gap:9px;padding:6px 0"><span class="chk"></span>
+            <span style="font-size:12.4px">Kategori tertentu saja</span></div>
+          <div class="row" style="gap:9px;padding:6px 0"><span class="chk"></span>
+            <span style="font-size:12.4px">Dokumen yang saya buka</span></div>
+        </div>
+        <div style="margin:14px 10px 0;padding:12px;background:var(--violet-bg);border:1px solid #DDD6FE;border-radius:11px">
+          <div class="row" style="gap:7px;margin-bottom:6px"><svg class="i s" style="color:var(--violet)"><use href="#ic-alert"/></svg>
+            <span style="font-size:11.5px;font-weight:800;color:var(--violet)">CATATAN</span></div>
+          <div style="font-size:11.5px;line-height:1.6;color:#5B21B6">Asisten hanya menjawab dari dokumen yang telah disetujui admin. Bila informasi tidak ditemukan, asisten akan menyatakannya secara eksplisit — bukan mengarang jawaban.</div>
+        </div>
+      </div>
+
+      <div class="chat">
+        <div class="chat-body"><div class="chat-in">
+          <div class="msg u"><div class="av">RA</div><div class="c"><div class="nm">Rizky Ananda</div>
+            <div class="tx">Berapa lama SLA reset password untuk user VIP, dan apa saja syarat verifikasinya?</div></div></div>
+
+          <div class="msg a"><div class="av"><svg class="i s"><use href="#ic-spark"/></svg></div><div class="c">
+            <div class="nm">IntraDocs AI</div>
+            <div class="tx">
+              <p>Berdasarkan dokumen yang berlaku saat ini:</p>
+              <p><b>SLA reset password user VIP</b> adalah <b>maksimal 15 menit</b> sejak tiket diterima Service Desk, dibandingkan 30 menit untuk user reguler<span class="cite">1</span>.</p>
+              <p><b>Syarat verifikasi identitas</b> yang wajib dipenuhi sebelum reset dilakukan:</p>
+              <ol>
+                <li><i>Callback</i> ke nomor telepon yang terdaftar pada HRIS — verifikasi melalui email tidak diperkenankan<span class="cite">2</span>.</li>
+                <li>Konfirmasi tiga data identitas: NIK karyawan, unit kerja, dan nama atasan langsung<span class="cite">2</span>.</li>
+                <li>Untuk user VIP, notifikasi tembusan wajib dikirim ke Manajer Keamanan Informasi<span class="cite">3</span>.</li>
+              </ol>
+              <p>Password sementara berlaku 24 jam dan wajib diganti pada login pertama<span class="cite">2</span>.</p>
+            </div>
+            <div class="srcs">
+              <div class="sh">Sumber jawaban — 3 dokumen</div>
+              <div class="src-i"><span class="n">1</span><div class="ft ft-xls" style="width:24px;height:24px;flex:0 0 24px;font-size:7px">XLS</div>
+                <div style="flex:1"><div class="t">Matriks SLA Layanan IT 2026</div><div class="p">Sheet “Identity Services”, baris 14 · v4.0</div></div>
+                <span class="pill p-green" style="font-size:10px">Terverifikasi</span>
+                <svg class="i s" style="color:var(--muted-2)"><use href="#ic-arrow-r"/></svg></div>
+              <div class="src-i"><span class="n">2</span><div class="ft ft-pdf" style="width:24px;height:24px;flex:0 0 24px;font-size:7px">PDF</div>
+                <div style="flex:1"><div class="t">SOP-IT-014 Manajemen Identitas</div><div class="p">Bagian 2.1.2, halaman 7 · v3.1</div></div>
+                <span class="pill p-green" style="font-size:10px">Terverifikasi</span>
+                <svg class="i s" style="color:var(--muted-2)"><use href="#ic-arrow-r"/></svg></div>
+              <div class="src-i"><span class="n">3</span><div class="ft ft-md" style="width:24px;height:24px;flex:0 0 24px;font-size:7px">MD</div>
+                <div style="flex:1"><div class="t">Runbook Service Desk: Akun Terkunci</div><div class="p">Bagian “Penanganan User VIP” · v2.4</div></div>
+                <span class="pill p-green" style="font-size:10px">Terverifikasi</span>
+                <svg class="i s" style="color:var(--muted-2)"><use href="#ic-arrow-r"/></svg></div>
+            </div>
+            <div class="row" style="margin-top:11px;gap:7px">
+              <button class="btn btn-sm"><svg class="i s"><use href="#ic-thumb"/></svg> Membantu</button>
+              <button class="btn btn-sm"><svg class="i s" style="transform:rotate(180deg)"><use href="#ic-thumb"/></svg></button>
+              <button class="btn btn-sm"><svg class="i s"><use href="#ic-link"/></svg> Salin tautan</button>
+              <button class="btn btn-sm"><svg class="i s"><use href="#ic-file"/></svg> Ekspor jawaban</button>
+              <span class="sub" style="margin-left:auto;font-size:11.2px">Dijawab dalam 2,4 detik · 3 dokumen dirujuk</span></div>
+          </div></div>
+
+          <div class="msg u"><div class="av">RA</div><div class="c"><div class="nm">Rizky Ananda</div>
+            <div class="tx">Kalau perangkat authenticator-nya hilang bagaimana?</div></div></div>
+
+          <div class="msg a"><div class="av"><svg class="i s"><use href="#ic-spark"/></svg></div><div class="c">
+            <div class="nm">IntraDocs AI</div>
+            <div class="tx"><p>Bila perangkat authenticator hilang, jalur self-service tidak dapat digunakan. Pengguna harus menghubungi Service Desk untuk <b>pendaftaran ulang MFA</b> setelah verifikasi identitas seperti di atas<span class="cite">2</span>. Perangkat lama wajib dicabut pendaftarannya lebih dulu…</p>
+            <div class="row" style="gap:6px;color:var(--muted-2);font-size:12px"><span style="width:6px;height:6px;background:var(--violet);border-radius:50%;display:block"></span> sedang mengetik…</div></div>
+          </div></div>
+        </div></div>
+
+        <div class="chat-foot">
+          <div class="qs">
+            <button class="chip"><svg class="i s"><use href="#ic-spark"/></svg> Bandingkan dengan kebijakan tahun lalu</button>
+            <button class="chip"><svg class="i s"><use href="#ic-spark"/></svg> Buat ringkasan untuk tim Service Desk</button>
+            <button class="chip"><svg class="i s"><use href="#ic-spark"/></svg> Apa saja dokumen terkait MFA?</button>
+          </div>
+          <div class="chat-box">
+            <div class="ph">Tanyakan apa saja tentang dokumen perusahaan…</div>
+            <div class="chat-tools">
+              <button class="btn btn-sm"><svg class="i s"><use href="#ic-file"/></svg> Lampirkan dokumen</button>
+              <button class="btn btn-sm"><svg class="i s"><use href="#ic-folder"/></svg> Batasi kategori</button>
+              <span class="sub" style="font-size:11.2px;margin-left:4px">Jawaban selalu menyertakan sumber</span>
+              <button class="send"><svg class="i s"><use href="#ic-arrow-r"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="note"><b>AI Assistant Berbasis RAG (Retrieval-Augmented Generation).</b> Asisten tidak menebak — ia mencari potongan dokumen yang relevan lalu menyusun jawaban darinya.
+<ul>
+<li><b>Sitasi wajib</b> — setiap pernyataan ditautkan ke dokumen, halaman, dan versi sehingga dapat diverifikasi manajemen maupun auditor.</li>
+<li><b>Penyaringan hak akses saat pengambilan data</b> — dokumen di luar hak akses penanya tidak pernah masuk ke konteks jawaban.</li>
+<li><b>Menjawab “tidak ditemukan”</b> bila knowledge base belum memuat informasi tersebut, sekaligus menjadi masukan untuk konten yang perlu dibuat.</li>
+<li><b>Percakapan berkelanjutan</b> dengan konteks, serta ekspor jawaban menjadi dokumen baru.</li>
+</ul></div>
+</div>
+
+<!-- ============================= SCREEN 10 : DASHBOARD ============================= -->
+<div class="screen" id="s10">
+<div class="browser">
+  <div class="browser-bar"><div class="dots"><i></i><i></i><i></i></div>
+    <div class="url"><svg class="i s"><use href="#ic-lock"/></svg> intradocs.perusahaan.co.id/admin/dashboard</div></div>
+  <div class="app">
+    <div class="topbar">
+      <div class="logo"><div class="logo-mark"><svg class="i"><use href="#ic-book"/></svg></div><div>IntraDocs<small>Konsol Administrasi</small></div></div>
+      <div class="spacer"></div>
+      <div class="tsearch"><svg class="i s"><use href="#ic-search"/></svg> Cari… <span class="kbd">⌘K</span></div>
+      <button class="btn btn-sm"><svg class="i s"><use href="#ic-download"/></svg> Ekspor laporan</button>
+      <div class="icon-btn"><svg class="i"><use href="#ic-bell"/></svg><span class="dot-badge"></span></div>
+      <div class="who"><div class="avatar" style="background:linear-gradient(135deg,#FBBF24,#D97706)">AW</div>
+        <div><div class="nm">Andi Wijaya</div><div class="rl">Admin Knowledge</div></div></div>
+    </div>
+    <div class="body">
+      <div class="side">
+        <div class="side-lbl">Administrasi</div>
+        <button class="nav-i on"><svg class="i"><use href="#ic-chart"/></svg> Dashboard</button>
+        <button class="nav-i"><svg class="i"><use href="#ic-check-c"/></svg> Antrean Approval <span class="cnt">7</span></button>
+        <button class="nav-i"><svg class="i"><use href="#ic-book"/></svg> Manajemen Dokumen</button>
+        <button class="nav-i"><svg class="i"><use href="#ic-folder"/></svg> Kategori &amp; Label</button>
+        <button class="nav-i"><svg class="i"><use href="#ic-users"/></svg> Pengguna &amp; Role</button>
+        <button class="nav-i"><svg class="i"><use href="#ic-spark"/></svg> Konfigurasi AI</button>
+        <button class="nav-i"><svg class="i"><use href="#ic-act"/></svg> Audit Log</button>
+        <button class="nav-i"><svg class="i"><use href="#ic-settings"/></svg> Pengaturan Sistem</button>
+      </div>
+      <div class="main"><div class="pad">
+        <div class="row mb" style="justify-content:space-between;align-items:flex-start">
+          <div><div class="h1">Dashboard Knowledge Management</div>
+            <div class="sub" style="margin-top:3px">Periode: 1–13 Agustus 2026 · dibandingkan periode sebelumnya</div></div>
+          <div class="row"><button class="btn btn-sm">30 hari terakhir <svg class="i s"><use href="#ic-chev-d"/></svg></button>
+            <button class="btn btn-sm">Semua unit <svg class="i s"><use href="#ic-chev-d"/></svg></button></div>
+        </div>
+
+        <div class="grid g4 mb">
+          <div class="kpi"><div class="l"><svg class="i s"><use href="#ic-book"/></svg> Total Dokumen Aktif</div>
+            <div class="v">1.284</div><div class="t up"><svg class="i s"><use href="#ic-up"/></svg> +64 dokumen bulan ini</div></div>
+          <div class="kpi"><div class="l"><svg class="i s"><use href="#ic-search"/></svg> Pencarian &amp; Pertanyaan AI</div>
+            <div class="v">18.402</div><div class="t up"><svg class="i s"><use href="#ic-up"/></svg> +23,4% vs bulan lalu</div></div>
+          <div class="kpi"><div class="l"><svg class="i s"><use href="#ic-clock"/></svg> Rata-rata Waktu Approval</div>
+            <div class="v">6,2 <span style="font-size:14px;color:var(--muted)">jam</span></div><div class="t up"><svg class="i s"><use href="#ic-down"/></svg> −38% (target &lt; 8 jam)</div></div>
+          <div class="kpi"><div class="l"><svg class="i s"><use href="#ic-alert"/></svg> Pencarian Tanpa Hasil</div>
+            <div class="v">4,1%</div><div class="t up"><svg class="i s"><use href="#ic-down"/></svg> −2,3 poin · 61 topik kosong</div></div>
+        </div>
+
+        <div class="row mb" style="gap:14px;align-items:stretch">
+          <div class="card" style="flex:1.5"><div class="card-h"><div class="h3">Aktivitas Knowledge Base</div>
+            <div class="legend" style="margin-left:auto"><span><i style="background:var(--blue-600)"></i>Pembacaan dokumen</span><span><i style="background:#818CF8"></i>Pertanyaan ke AI</span></div></div>
+            <div class="card-b">
+              <div class="chart">
+                <div class="cb"><div class="bb" style="height:38%"></div><div class="bb alt" style="height:20%"></div><div class="lb">1 Agu</div></div>
+                <div class="cb"><div class="bb" style="height:52%"></div><div class="bb alt" style="height:28%"></div><div class="lb">3</div></div>
+                <div class="cb"><div class="bb" style="height:47%"></div><div class="bb alt" style="height:31%"></div><div class="lb">5</div></div>
+                <div class="cb"><div class="bb" style="height:61%"></div><div class="bb alt" style="height:36%"></div><div class="lb">7</div></div>
+                <div class="cb"><div class="bb" style="height:55%"></div><div class="bb alt" style="height:42%"></div><div class="lb">9</div></div>
+                <div class="cb"><div class="bb" style="height:72%"></div><div class="bb alt" style="height:48%"></div><div class="lb">11</div></div>
+                <div class="cb"><div class="bb" style="height:66%"></div><div class="bb alt" style="height:57%"></div><div class="lb">12</div></div>
+                <div class="cb"><div class="bb" style="height:84%"></div><div class="bb alt" style="height:63%"></div><div class="lb">13</div></div>
+              </div>
+              <div class="sub" style="font-size:11.8px;margin-top:12px">Pertumbuhan penggunaan AI Assistant konsisten — kini mencakup 43% dari seluruh interaksi pencarian.</div>
+            </div></div>
+
+          <div class="card" style="flex:1"><div class="card-h"><div class="h3">Status Dokumen</div></div>
+            <div class="card-b"><div class="row" style="gap:20px">
+              <div class="donut" style="background:conic-gradient(var(--green) 0 74%,var(--amber) 74% 84%,var(--blue-500) 84% 94%,var(--line) 94% 100%)">
+                <div class="dv"><b>1.284</b><span>dokumen</span></div></div>
+              <div style="flex:1;font-size:12.4px">
+                <div class="row" style="justify-content:space-between;padding:5px 0"><span class="row" style="gap:7px"><i style="width:9px;height:9px;border-radius:3px;background:var(--green);display:block"></i> Published</span><b>950</b></div>
+                <div class="row" style="justify-content:space-between;padding:5px 0"><span class="row" style="gap:7px"><i style="width:9px;height:9px;border-radius:3px;background:var(--amber);display:block"></i> Menunggu Approval</span><b>128</b></div>
+                <div class="row" style="justify-content:space-between;padding:5px 0"><span class="row" style="gap:7px"><i style="width:9px;height:9px;border-radius:3px;background:var(--blue-500);display:block"></i> Draft</span><b>129</b></div>
+                <div class="row" style="justify-content:space-between;padding:5px 0"><span class="row" style="gap:7px"><i style="width:9px;height:9px;border-radius:3px;background:var(--line);display:block"></i> Kedaluwarsa</span><b>77</b></div>
+                <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line-2);font-size:11.6px;color:var(--muted)">
+                  77 dokumen belum diperbarui &gt; 12 bulan dan perlu ditinjau pemiliknya.</div>
+              </div>
+            </div></div></div>
+        </div>
+
+        <div class="row" style="gap:14px;align-items:stretch">
+          <div class="card" style="flex:1"><div class="card-h"><div class="h3">Pencarian Terpopuler</div>
+            <span class="sub" style="margin-left:auto;font-size:11.5px">Dasar rekomendasi topik di halaman muka</span></div>
+            <div class="card-b" style="padding-top:12px">
+              <div class="row" style="justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line-2)">
+                <span style="font-size:12.8px">reset password active directory</span><div class="row" style="gap:9px;width:150px"><div class="bar" style="flex:1"><span style="width:100%"></span></div><b style="font-size:11.8px;width:38px;text-align:right">1.842</b></div></div>
+              <div class="row" style="justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line-2)">
+                <span style="font-size:12.8px">pengajuan akses aplikasi core</span><div class="row" style="gap:9px;width:150px"><div class="bar" style="flex:1"><span style="width:79%"></span></div><b style="font-size:11.8px;width:38px;text-align:right">1.455</b></div></div>
+              <div class="row" style="justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line-2)">
+                <span style="font-size:12.8px">setup vpn kerja remote</span><div class="row" style="gap:9px;width:150px"><div class="bar" style="flex:1"><span style="width:64%"></span></div><b style="font-size:11.8px;width:38px;text-align:right">1.178</b></div></div>
+              <div class="row" style="justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line-2)">
+                <span style="font-size:12.8px">sop insiden keamanan</span><div class="row" style="gap:9px;width:150px"><div class="bar" style="flex:1"><span style="width:51%"></span></div><b style="font-size:11.8px;width:38px;text-align:right">938</b></div></div>
+              <div class="row" style="justify-content:space-between;padding:7px 0">
+                <span style="font-size:12.8px">onboarding karyawan baru it</span><div class="row" style="gap:9px;width:150px"><div class="bar" style="flex:1"><span style="width:44%"></span></div><b style="font-size:11.8px;width:38px;text-align:right">807</b></div></div>
+            </div></div>
+
+          <div class="card" style="flex:1"><div class="card-h"><div class="h3">Kesenjangan Knowledge</div>
+            <span class="pill p-amber" style="margin-left:auto">61 topik</span></div>
+            <div class="card-b" style="padding-top:12px">
+              <div class="sub" style="font-size:11.8px;margin-bottom:11px">Pertanyaan yang sering diajukan namun belum terjawab dokumen — usulan prioritas penulisan.</div>
+              <div class="row" style="justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line-2)">
+                <div><div style="font-size:12.8px;font-weight:650">Prosedur klaim garansi perangkat laptop</div>
+                  <div style="font-size:11.2px;color:var(--muted-2)">128 pertanyaan · 0 dokumen relevan</div></div>
+                <button class="btn btn-sm">Tugaskan</button></div>
+              <div class="row" style="justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line-2)">
+                <div><div style="font-size:12.8px;font-weight:650">Integrasi SSO untuk aplikasi pihak ketiga</div>
+                  <div style="font-size:11.2px;color:var(--muted-2)">94 pertanyaan · 1 dokumen kedaluwarsa</div></div>
+                <button class="btn btn-sm">Tugaskan</button></div>
+              <div class="row" style="justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line-2)">
+                <div><div style="font-size:12.8px;font-weight:650">Kebijakan penggunaan AI generatif</div>
+                  <div style="font-size:11.2px;color:var(--muted-2)">86 pertanyaan · 0 dokumen relevan</div></div>
+                <button class="btn btn-sm">Tugaskan</button></div>
+              <div class="row" style="justify-content:space-between;padding:8px 0">
+                <div><div style="font-size:12.8px;font-weight:650">Panduan penggunaan aplikasi absensi baru</div>
+                  <div style="font-size:11.2px;color:var(--muted-2)">72 pertanyaan · draft belum disetujui</div></div>
+                <button class="btn btn-sm">Tugaskan</button></div>
+            </div></div>
+
+          <div class="card" style="flex:.85"><div class="card-h"><div class="h3">Kontributor Teratas</div></div>
+            <div class="card-b" style="padding-top:12px">
+              <div class="row" style="padding:8px 0;gap:10px"><span class="rank">1</span><div class="avatar" style="width:26px;height:26px;flex:0 0 26px;font-size:9px">RA</div>
+                <div style="flex:1"><div style="font-size:12.6px;font-weight:650">Rizky Ananda</div><div style="font-size:11px;color:var(--muted-2)">IT Operations</div></div><b style="font-size:12px">24</b></div>
+              <div class="row" style="padding:8px 0;gap:10px"><span class="rank">2</span><div class="avatar" style="width:26px;height:26px;flex:0 0 26px;font-size:9px;background:linear-gradient(135deg,#F472B6,#DB2777)">SR</div>
+                <div style="flex:1"><div style="font-size:12.6px;font-weight:650">Siti Rahmawati</div><div style="font-size:11px;color:var(--muted-2)">Application Support</div></div><b style="font-size:12px">19</b></div>
+              <div class="row" style="padding:8px 0;gap:10px"><span class="rank">3</span><div class="avatar" style="width:26px;height:26px;flex:0 0 26px;font-size:9px;background:linear-gradient(135deg,#34D399,#059669)">DK</div>
+                <div style="flex:1"><div style="font-size:12.6px;font-weight:650">Dwi Kurniawan</div><div style="font-size:11px;color:var(--muted-2)">Information Security</div></div><b style="font-size:12px">17</b></div>
+              <div class="row" style="padding:8px 0;gap:10px"><span class="rank">4</span><div class="avatar" style="width:26px;height:26px;flex:0 0 26px;font-size:9px;background:linear-gradient(135deg,#60A5FA,#2563EB)">BS</div>
+                <div style="flex:1"><div style="font-size:12.6px;font-weight:650">Bagus Santoso</div><div style="font-size:11px;color:var(--muted-2)">Infrastructure</div></div><b style="font-size:12px">14</b></div>
+              <div class="row" style="padding:8px 0;gap:10px"><span class="rank">5</span><div class="avatar" style="width:26px;height:26px;flex:0 0 26px;font-size:9px;background:linear-gradient(135deg,#A78BFA,#7C3AED)">ML</div>
+                <div style="flex:1"><div style="font-size:12.6px;font-weight:650">Maya Lestari</div><div style="font-size:11px;color:var(--muted-2)">Service Desk</div></div><b style="font-size:12px">11</b></div>
+            </div></div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</div>
+<div class="note"><b>Dashboard untuk Pengambilan Keputusan.</b> Bukan sekadar statistik, melainkan indikator kesehatan pengetahuan organisasi.
+<ul>
+<li><b>Kesenjangan knowledge</b> — pertanyaan yang sering muncul namun tidak terjawab menjadi backlog penulisan dokumen yang terukur.</li>
+<li><b>Waktu approval</b> memantau apakah tata kelola menghambat atau mendukung produktivitas.</li>
+<li><b>Dokumen kedaluwarsa</b> mendorong pemilik dokumen melakukan pemutakhiran berkala.</li>
+<li><b>Data pencarian terpopuler</b> secara langsung menjadi sumber rekomendasi topik di halaman muka.</li>
+</ul></div>
+</div>
+
+<!-- ============================= SCREEN 11 : ARSITEKTUR & ROADMAP ============================= -->
+<div class="screen" id="s11">
+<div class="browser">
+  <div class="browser-bar"><div class="dots"><i></i><i></i><i></i></div>
+    <div class="url"><svg class="i s"><use href="#ic-file"/></svg> Ringkasan Teknis — Bahan Diskusi Manajemen Divisi IT</div></div>
+  <div class="app" style="height:auto;min-height:840px">
+    <div class="pad" style="padding:30px 34px">
+      <div class="row mb" style="justify-content:space-between;align-items:flex-start">
+        <div><div class="h1">Ringkasan Teknis &amp; Rencana Implementasi</div>
+          <div class="sub" style="margin-top:3px">Lampiran presentasi — arsitektur, alur proses, dan tahapan penerapan IntraDocs</div></div>
+        <span class="pill p-blue" style="padding:6px 12px">Usulan Divisi IT · Agustus 2026</span>
+      </div>
+
+      <div class="row mb" style="gap:14px;align-items:stretch">
+        <div class="card" style="flex:1.3"><div class="card-h"><svg class="i" style="color:var(--blue-600)"><use href="#ic-layers"/></svg><div class="h3">Arsitektur Sistem</div></div>
+          <div class="card-b">
+            <div style="border:1px solid var(--line);border-radius:11px;padding:13px;margin-bottom:10px;background:var(--blue-50)">
+              <div style="font-size:11px;font-weight:800;letter-spacing:.6px;color:var(--blue-700);margin-bottom:8px">LAPISAN PENGGUNA</div>
+              <div class="row" style="gap:8px;flex-wrap:wrap">
+                <span class="tag" style="background:#fff">Portal Web (Help Center)</span><span class="tag" style="background:#fff">Konsol Admin</span>
+                <span class="tag" style="background:#fff">AI Assistant</span><span class="tag" style="background:#fff">Mobile Web / PWA</span></div></div>
+            <div style="border:1px solid var(--line);border-radius:11px;padding:13px;margin-bottom:10px">
+              <div style="font-size:11px;font-weight:800;letter-spacing:.6px;color:var(--muted);margin-bottom:8px">LAPISAN APLIKASI</div>
+              <div class="row" style="gap:8px;flex-wrap:wrap">
+                <span class="tag">API Gateway + SSO/OIDC</span><span class="tag">Layanan Dokumen</span><span class="tag">Mesin Approval (Workflow)</span>
+                <span class="tag">Layanan RBAC</span><span class="tag">Layanan Pencarian</span><span class="tag">Layanan RAG (AI)</span>
+                <span class="tag">Pemroses Berkas &amp; OCR</span><span class="tag">Notifikasi</span></div></div>
+            <div style="border:1px solid var(--line);border-radius:11px;padding:13px">
+              <div style="font-size:11px;font-weight:800;letter-spacing:.6px;color:var(--muted);margin-bottom:8px">LAPISAN DATA</div>
+              <div class="row" style="gap:8px;flex-wrap:wrap">
+                <span class="tag">PostgreSQL (metadata &amp; RBAC)</span><span class="tag">Object Storage (berkas asli)</span>
+                <span class="tag">Vector DB (embedding)</span><span class="tag">Search Index</span><span class="tag">Audit Log</span></div></div>
+            <div class="callout c-info" style="margin-bottom:0;margin-top:12px"><svg class="i" style="margin-top:2px"><use href="#ic-shield"/></svg>
+              <div><b>Opsi penempatan:</b> seluruh komponen dapat dijalankan on-premise atau private cloud. Model AI dapat menggunakan layanan terkelola maupun model lokal (self-hosted) bila dokumen berklasifikasi rahasia tidak boleh keluar dari jaringan perusahaan.</div></div>
+          </div></div>
+
+        <div class="card" style="flex:1"><div class="card-h"><svg class="i" style="color:var(--violet)"><use href="#ic-flow"/></svg><div class="h3">Alur Knowledge (End-to-End)</div></div>
+          <div class="card-b"><div class="timeline">
+            <div class="tl-i ok"><div class="t">1. Unggah berkas</div><div class="d">PDF, Word, Markdown, Excel, PPT, gambar hasil pindai</div></div>
+            <div class="tl-i ok"><div class="t">2. Ekstraksi &amp; normalisasi</div><div class="d">Parsing teks, OCR, konversi ke format web terstruktur</div></div>
+            <div class="tl-i ok"><div class="t">3. Pengayaan metadata oleh AI</div><div class="d">Usulan judul, ringkasan, kategori, label, deteksi duplikasi</div></div>
+            <div class="tl-i ok"><div class="t">4. Review &amp; approval</div><div class="d">Satu atau dua tahap sesuai klasifikasi dokumen</div></div>
+            <div class="tl-i ok"><div class="t">5. Publikasi &amp; pengindeksan</div><div class="d">Masuk ke mesin pencari dan basis pengetahuan AI</div></div>
+            <div class="tl-i ok"><div class="t">6. Konsumsi</div><div class="d">Pencarian, pembacaan, dan tanya jawab AI dengan sitasi</div></div>
+            <div class="tl-i now" style="padding-bottom:0"><div class="t">7. Pemeliharaan berkala</div><div class="d">Pengingat tinjau ulang, penandaan kedaluwarsa, analitik kesenjangan</div></div>
+          </div></div></div>
+      </div>
+
+      <div class="card mb"><div class="card-h"><svg class="i" style="color:var(--green)"><use href="#ic-cal"/></svg><div class="h3">Rencana Implementasi Bertahap</div>
+        <span class="sub" style="margin-left:auto;font-size:11.5px">Estimasi total 5–6 bulan hingga adopsi penuh</span></div>
+        <div class="grid g4" style="padding:18px;gap:13px">
+          <div style="border:1px solid var(--line);border-left:3px solid var(--blue-600);border-radius:11px;padding:14px">
+            <span class="pill p-blue">Fase 1 · Bulan 1–2</span>
+            <div style="font-size:13.4px;font-weight:750;margin:9px 0 6px">Fondasi Platform</div>
+            <div style="font-size:12.1px;color:var(--muted);line-height:1.65">Autentikasi SSO, RBAC, unggah multi-format, kategori &amp; label, pencarian kata kunci, dan tampilan baca dokumen.</div>
+            <div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap"><span class="tag">MVP internal</span><span class="tag">200 dokumen awal</span></div></div>
+          <div style="border:1px solid var(--line);border-left:3px solid var(--violet);border-radius:11px;padding:14px">
+            <span class="pill p-violet">Fase 2 · Bulan 3</span>
+            <div style="font-size:13.4px;font-weight:750;margin:9px 0 6px">Tata Kelola</div>
+            <div style="font-size:12.1px;color:var(--muted);line-height:1.65">Alur approval berjenjang, versioning, audit log, klasifikasi keamanan, dan pengingat tinjau ulang otomatis.</div>
+            <div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap"><span class="tag">Siap audit</span><span class="tag">ISO 27001</span></div></div>
+          <div style="border:1px solid var(--line);border-left:3px solid var(--green);border-radius:11px;padding:14px">
+            <span class="pill p-green">Fase 3 · Bulan 4–5</span>
+            <div style="font-size:13.4px;font-weight:750;margin:9px 0 6px">Kecerdasan</div>
+            <div style="font-size:12.1px;color:var(--muted);line-height:1.65">Pencarian semantik, AI Assistant dengan sitasi, metadata otomatis, pra-pemeriksaan dokumen, dan analitik kesenjangan.</div>
+            <div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap"><span class="tag">RAG</span><span class="tag">Vector DB</span></div></div>
+          <div style="border:1px solid var(--line);border-left:3px solid var(--amber);border-radius:11px;padding:14px">
+            <span class="pill p-amber">Fase 4 · Bulan 6</span>
+            <div style="font-size:13.4px;font-weight:750;margin:9px 0 6px">Perluasan</div>
+            <div style="font-size:12.1px;color:var(--muted);line-height:1.65">Integrasi ticketing &amp; chat internal, API publik, dasbor eksekutif, serta perluasan ke divisi non-IT.</div>
+            <div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap"><span class="tag">Integrasi</span><span class="tag">Skala organisasi</span></div></div>
+        </div></div>
+
+      <div class="row" style="gap:14px;align-items:stretch">
+        <div class="card" style="flex:1"><div class="card-h"><svg class="i" style="color:var(--amber)"><use href="#ic-zap"/></svg><div class="h3">Manfaat yang Diharapkan</div></div>
+          <div class="card-b" style="padding-top:13px">
+            <div class="row" style="gap:11px;padding-bottom:11px;border-bottom:1px solid var(--line-2)">
+              <span class="ck y"><svg class="i s" style="width:12px;height:12px"><use href="#ic-check"/></svg></span>
+              <div style="font-size:12.6px;line-height:1.55"><b>Waktu pencarian informasi turun signifikan</b> — jawaban langsung menggantikan penelusuran manual di folder bersama dan email.</div></div>
+            <div class="row" style="gap:11px;padding:11px 0;border-bottom:1px solid var(--line-2)">
+              <span class="ck y"><svg class="i s" style="width:12px;height:12px"><use href="#ic-check"/></svg></span>
+              <div style="font-size:12.6px;line-height:1.55"><b>Beban Service Desk berkurang</b> — pertanyaan berulang terjawab mandiri melalui portal dan AI Assistant.</div></div>
+            <div class="row" style="gap:11px;padding:11px 0;border-bottom:1px solid var(--line-2)">
+              <span class="ck y"><svg class="i s" style="width:12px;height:12px"><use href="#ic-check"/></svg></span>
+              <div style="font-size:12.6px;line-height:1.55"><b>Risiko kehilangan pengetahuan menurun</b> — knowledge terdokumentasi dan tidak lagi bergantung pada individu tertentu.</div></div>
+            <div class="row" style="gap:11px;padding-top:11px">
+              <span class="ck y"><svg class="i s" style="width:12px;height:12px"><use href="#ic-check"/></svg></span>
+              <div style="font-size:12.6px;line-height:1.55"><b>Kesiapan audit meningkat</b> — versioning, jejak persetujuan, dan audit log tersedia lengkap.</div></div>
+          </div></div>
+
+        <div class="card" style="flex:1"><div class="card-h"><svg class="i" style="color:var(--red)"><use href="#ic-shield"/></svg><div class="h3">Aspek Keamanan &amp; Kepatuhan</div></div>
+          <div class="card-b" style="padding-top:13px">
+            <div class="row" style="gap:11px;padding-bottom:11px;border-bottom:1px solid var(--line-2)">
+              <svg class="i" style="color:var(--muted);margin-top:2px"><use href="#ic-lock"/></svg>
+              <div style="font-size:12.6px;line-height:1.55"><b>Klasifikasi dokumen berjenjang</b> (Publik, Internal, Terbatas, Rahasia) yang menentukan visibilitas dan cakupan jawaban AI.</div></div>
+            <div class="row" style="gap:11px;padding:11px 0;border-bottom:1px solid var(--line-2)">
+              <svg class="i" style="color:var(--muted);margin-top:2px"><use href="#ic-act"/></svg>
+              <div style="font-size:12.6px;line-height:1.55"><b>Audit trail menyeluruh</b> — siapa mengunggah, menyetujui, membaca, dan mengunduh dokumen sensitif.</div></div>
+            <div class="row" style="gap:11px;padding:11px 0;border-bottom:1px solid var(--line-2)">
+              <svg class="i" style="color:var(--muted);margin-top:2px"><use href="#ic-alert"/></svg>
+              <div style="font-size:12.6px;line-height:1.55"><b>Pemindaian konten sensitif</b> saat unggah — kredensial, data pribadi, dan informasi rahasia ditandai sebelum publikasi.</div></div>
+            <div class="row" style="gap:11px;padding-top:11px">
+              <svg class="i" style="color:var(--muted);margin-top:2px"><use href="#ic-server"/></svg>
+              <div style="font-size:12.6px;line-height:1.55"><b>Data tetap di lingkungan perusahaan</b> — opsi model AI lokal untuk dokumen berklasifikasi tinggi.</div></div>
+          </div></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="note"><b>Halaman pendamping presentasi.</b> Berisi arsitektur, alur end-to-end, tahapan implementasi, manfaat, dan aspek keamanan — untuk menjawab pertanyaan manajemen mengenai kelayakan teknis, jadwal, dan risiko.</div>
+</div>
+
+</div><!-- /stage -->
+
+<script>
+const SCREENS=[
+ {id:'s1',n:'Halaman Muka',ic:'ic-home'},
+ {id:'s2',n:'Hasil Pencarian',ic:'ic-search'},
+ {id:'s3',n:'Katalog Dokumen',ic:'ic-book'},
+ {id:'s4',n:'Baca Dokumen',ic:'ic-file'},
+ {id:'s5',n:'Unggah Knowledge',ic:'ic-upload'},
+ {id:'s6',n:'Approval Admin',ic:'ic-check-c'},
+ {id:'s7',n:'Kategori & Label',ic:'ic-tag'},
+ {id:'s8',n:'Pengguna & RBAC',ic:'ic-users'},
+ {id:'s9',n:'AI Assistant',ic:'ic-spark'},
+ {id:'s10',n:'Dashboard',ic:'ic-chart'},
+ {id:'s11',n:'Arsitektur & Roadmap',ic:'ic-layers'}
+];
+const nav=document.getElementById('nav');
+nav.innerHTML=SCREENS.map((s,i)=>
+ `<button data-id="${s.id}" class="${i===0?'on':''}"><span class="num">${String(i+1).padStart(2,'0')}</span><svg class="i s"><use href="#${s.ic}"/></svg>${s.n}</button>`).join('');
+
+function go(id){
+  document.querySelectorAll('.screen').forEach(e=>e.classList.toggle('on',e.id===id));
+  nav.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.id===id));
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+nav.addEventListener('click',e=>{const b=e.target.closest('button');if(b)go(b.dataset.id);});
+
+document.addEventListener('keydown',e=>{
+  const cur=SCREENS.findIndex(s=>document.getElementById(s.id).classList.contains('on'));
+  if(e.key==='ArrowRight'&&cur<SCREENS.length-1)go(SCREENS[cur+1].id);
+  if(e.key==='ArrowLeft'&&cur>0)go(SCREENS[cur-1].id);
+});
+</script>
+</body>
+</html>

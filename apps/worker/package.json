@@ -1,0 +1,17 @@
+{
+  "name": "@intradocs/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@intradocs/core": "workspace:*",
+    "pg-boss": "12.27.0",
+    "pg": "8.23.0"
+  },
+  "devDependencies": {
+    "tsx": "4.23.13"
+  }
+}

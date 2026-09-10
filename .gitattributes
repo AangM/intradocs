@@ -1,0 +1,4 @@
+* text=auto eol=lf
+
+# Applied SQL is checksummed byte-for-byte, including the existing CRLF migration.
+packages/db/migrations/*.sql -text

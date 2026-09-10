@@ -1,0 +1,22 @@
+{
+  "name": "@intradocs/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./config": "./src/config.ts",
+    "./validation": "./src/validation.ts",
+    "./storage": "./src/storage.ts",
+    "./ports": "./src/ports.ts",
+    "./http-input": "./src/http-input.ts",
+    "./uploads": "./src/uploads.ts",
+    "./clamav": "./src/clamav.ts",
+    "./draft-ingestion": "./src/draft-ingestion.ts",
+    "./upload-request": "./src/upload-request.ts",
+    "./orphan-cleanup": "./src/orphan-cleanup.ts",
+    "./workflow": "./src/workflow.ts",
+    "./taxonomy": "./src/taxonomy.ts",
+    "./converter": "./src/converter.ts"
+  }
+}

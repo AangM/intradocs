@@ -1,0 +1,55 @@
+name: intradocs-local
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.0-pg17
+    environment:
+      POSTGRES_DB: intradocs
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run pnpm setup:local first}
+    ports:
+      - '127.0.0.1:${POSTGRES_PORT:-54329}:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d intradocs']
+      interval: 3s
+      timeout: 3s
+      retries: 25
+    restart: unless-stopped
+  clamav:
+    image: clamav/clamav:1.4.6_base
+    profiles: ['knowledge']
+    environment:
+      TZ: UTC
+      CLAMAV_NO_MILTERD: 'true'
+    ports:
+      - '127.0.0.1:${CLAMAV_PORT:-3310}:3310'
+    volumes:
+      - clamav_data:/var/lib/clamav
+    mem_limit: 4g
+    cpus: 1.0
+    restart: unless-stopped
+  converter:
+    build: ./apps/knowledge-runtime
+    profiles: ['knowledge']
+    environment:
+      KNOWLEDGE_TOKEN: ${KNOWLEDGE_TOKEN:-}
+      KNOWLEDGE_BIND: 0.0.0.0
+    ports:
+      - '127.0.0.1:${KNOWLEDGE_PORT:-8091}:8091'
+    networks: [conversion]
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777,noexec,nosuid,nodev
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    pids_limit: 32
+    mem_limit: 768m
+    cpus: 1.0
+    restart: unless-stopped
+networks:
+  conversion:
+    internal: true
+volumes:
+  clamav_data:
+  postgres_data:
