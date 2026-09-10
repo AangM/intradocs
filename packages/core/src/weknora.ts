@@ -350,6 +350,29 @@ export class WeknoraClient {
     return id;
   }
 
+  /**
+   * Tags WeKnora's auto-tagger attached to one knowledge record.
+   *
+   * These are suggestions produced by a language model reading document text, so they
+   * are returned as raw strings and nothing more. The caller decides what they mean:
+   * IntraDocs only keeps the ones that already exist in its own label vocabulary, which
+   * is what stops a sentence inside a document from inventing a label.
+   */
+  async knowledgeTags(knowledgeId: string): Promise<string[]> {
+    const data = asRecord(
+      await this.json('GET', `/api/v1/knowledge/${encodeURIComponent(knowledgeId)}`),
+    );
+    const tags = Array.isArray(data.tags) ? data.tags : [];
+    const names: string[] = [];
+    for (const tag of tags) {
+      if (!tag || typeof tag !== 'object') continue;
+      const name = str((tag as Json).name).trim();
+      // Bounded: a tag is a label, and a label that long is not a label.
+      if (name && name.length <= 60 && !names.includes(name)) names.push(name);
+    }
+    return names.slice(0, 10);
+  }
+
   async deleteKnowledge(knowledgeId: string): Promise<void> {
     try {
       await this.json('DELETE', `/api/v1/knowledge/${encodeURIComponent(knowledgeId)}`);

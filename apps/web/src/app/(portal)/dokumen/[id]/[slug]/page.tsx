@@ -7,7 +7,7 @@ import { readDocument } from '@intradocs/db/queries';
 import { readSourceMetadata } from '@intradocs/db/uploads';
 import { withActor } from '@intradocs/db';
 import { parseUuid } from '@intradocs/core/validation';
-import { formatDate, initials } from '@intradocs/core';
+import { formatDate, hasCapability, initials } from '@intradocs/core';
 import { getOutline } from '@/lib/markdown';
 import { DocumentBody } from '@/components/document-body';
 import { ClassificationBadge, Notice, StatusBadge, documentHref } from '@/components/shared';
@@ -17,6 +17,7 @@ import { documentAccessCandidates } from '@intradocs/db/workflow';
 import { AttachmentsList } from '@/components/attachments-list';
 import { WorkflowPanel } from '@/components/workflow-panel';
 import { ReaderFeedback } from '@/components/reader-feedback';
+import { LabelSuggestions } from '@/components/label-suggestions';
 import { reviewInfo, versionSummaries, readerPreferences } from '@intradocs/db/workflow';
 import { findSensitiveContent } from '@intradocs/core/workflow';
 export default async function Reader({
@@ -239,6 +240,9 @@ export default async function Reader({
                 initialFeedback={preferences.feedback}
               />
             )}
+            {/* Only people who could act on a suggestion are offered one: taking it up
+                means creating a revision, which needs documents.upload. */}
+            {hasCapability(actor, 'documents.upload') && <LabelSuggestions documentId={id} />}
             {info && (
               <WorkflowPanel
                 key={doc.versionId + info.state}

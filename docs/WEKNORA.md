@@ -269,3 +269,92 @@ WeKnora karena 54329 dan 58080 masuk rentang tersebut. Periksa dengan
 - **`WEKNORA_MAX_SCOPE_DOCUMENTS`** membatasi retrieval pada versi teraktif per actor. Cukup untuk corpus sintetis, belum untuk 1.000 dokumen pada budget Q5.
 - **Sinkronisasi otomatis** berjalan di worker tiap siklus; `pnpm weknora:sync` tetap disediakan untuk memaksa satu putaran.
 - **Cascade delete** pada FK RAG membuang `knowledge_id` sebelum exporter sempat menghapus record di WeKnora. Versi yang sudah disetujui bersifat immutable dan tidak pernah dihapus dalam operasi normal, jadi jalur ini hanya tersentuh oleh pembersihan test atau tindakan operator.
+
+## 11. Auto-tag dan rerank
+
+### Auto-tag: jalur lengkap, hasil nyata masih nol
+
+WeKnora punya auto-tagger: sebuah model bahasa membaca isi dokumen dan menempelkan tag.
+Fitur ini dinyalakan pada knowledge base IntraDocs dan **terbukti berjalan** — bukan dari
+membaca kode, melainkan dari relasi tag yang benar-benar tertulis di database WeKnora.
+
+Satu hal yang perlu dipahami sebelum menyalakannya: `AutoTagConfig` **memilih dari kosakata
+tag yang sudah ada di knowledge base**, bukan mengarang istilah baru. Selama `knowledge_tags`
+kosong, reparse selesai tanpa satu pun tag — itu bukan kegagalan, itu perilaku yang benar.
+Kolam tag di WeKnora karena itu diisi dari label IntraDocs (9 label), sehingga pertanyaan yang
+dijawab model menjadi "label kami yang mana yang cocok", bukan "istilah apa yang terpikir".
+
+Hasil pengukuran pada 8 dokumen sintetis, model `qwen2.5:1.5b-instruct`:
+
+| Dokumen | Kategori | Label IntraDocs | Tag model |
+|---|---|---|---|
+| Konfigurasi VPN | Infrastruktur & Jaringan | Runbook, Jaringan | Standar |
+| Kebijakan Backup & Retensi | Data & Integrasi | Referensi, Tata Kelola | Standar |
+| Standar Penamaan Repository | Aplikasi Internal | Standar | Standar |
+| SOP-IT-014 Manajemen Identitas | Keamanan Informasi | Identity, SOP | SOP |
+| Panduan Versi | Infrastruktur & Jaringan | — | Referensi |
+| Matriks SLA, Agent Monitoring, Lampiran Rahasia | — | — | (tidak ada) |
+
+Dibaca apa adanya: 2 dari 5 tag benar, 2 jelas salah, 3 dokumen tidak menghasilkan apa pun,
+dan model tidak pernah memberi lebih dari satu tag meski `max_tags=5`. **Saran bersih yang
+lolos ke IntraDocs saat ini: nol.** Dua tag yang benar sudah dimiliki versinya, dan dua yang
+salah dibuang oleh penyaring kategori. Angka itu dilaporkan apa adanya; fitur ini belum
+memberi nilai pada corpus ini.
+
+Yang tetap berguna adalah **penyaringnya**, dan itulah bagian yang dibangun di IntraDocs:
+
+- Tag adalah keluaran model yang membaca isi dokumen, jadi diperlakukan sebagai data. Sebuah
+  tag hanya lolos bila namanya **sudah menjadi label pada kategori dokumen itu sendiri**.
+  Kalimat di dalam dokumen tidak bisa menciptakan label — dan pada praktiknya penyaring ini
+  membuang tepat dua saran yang salah di atas.
+- Label yang sudah dimerge tidak pernah diusulkan, sama seperti ia tidak lagi ditawarkan untuk
+  dokumen baru.
+- **Tidak ada yang ditulis.** `app.protect_version()` membekukan `labels`, jadi menerima saran
+  berarti membuat revisi yang disetujui reviewer. Model mengusulkan, orang memutuskan.
+- Dokumen yang tidak boleh dibaca menjawab persis sama dengan dokumen yang belum terindeks
+  (`available:false`), sehingga endpoint ini tidak bisa dipakai untuk menebak keberadaan
+  dokumen. `tagsFor` tidak pernah dipanggil untuk dokumen yang tidak terbaca.
+
+Endpoint `POST /api/rag/label-suggestions` (butuh `documents.upload`) dan panel "Saran label"
+di halaman dokumen. Bukti: `tests/integration/label-suggestions.test.ts` (5) dan
+`tests/http/label-suggestions.test.ts` (7).
+
+Untuk menyalakan ulang dari nol:
+
+```sh
+# 1. isi kolam tag dari label IntraDocs
+curl -X POST "$WEKNORA_BASE_URL/api/v1/knowledge-bases/$KB/tags" -d '{"name":"Runbook"}' ...
+# 2. nyalakan auto-tag pada knowledge base
+curl -X PUT "$WEKNORA_BASE_URL/api/v1/knowledge-bases/$KB" \
+  -d '{"name":"intradocs-synthetic","config":{"auto_tag_config":
+       {"enabled":true,"max_tags":5,"model_id":"<KnowledgeQA>","skip_if_tagged":true}}}'
+# 3. reparse; tag muncul ~30 detik setelah parse selesai
+curl -X POST "$WEKNORA_BASE_URL/api/v1/knowledge/batch-reparse" -d '{"kb_id":"'$KB'","ids":[...]}'
+```
+
+Catatan bentuk: `auto_tag_config` **dikirim di dalam `config`** tetapi **dibaca di level atas**
+respons, dan `name` wajib disertakan pada setiap PUT — tanpa itu permintaan ditolak
+`Field validation for 'Name' failed`.
+
+### Rerank: model siap, API versi ini tidak menerimanya
+
+`xitao/bge-reranker-v2-m3` (1,16 GB) sudah ditarik dan terdaftar sebagai model `Rerank` yang
+`active` di WeKnora. Reranking tetap **tidak pernah berjalan**, dan itu dibuktikan bukan dengan
+membaca kode:
+
+- hybrid-search dengan dan tanpa `rerank_model_id` mengembalikan **urutan yang identik**;
+- proses "ber-rerank" justru **lebih cepat** (383 ms vs 877 ms) — mustahil bila sebuah model
+  1,16 GB benar-benar dijalankan di CPU;
+- log WeKnora tidak pernah mencatat pemanggilan reranker.
+
+Penyebabnya: `rerank_model_id` milik `internal_types.RetrievalConfig`, yang dipetakan ke kolom
+tabel `sessions`. `CreateSessionRequest` hanya menerima `title`/`description`, dan
+`PUT /api/v1/sessions/:id` membalas `200` dengan log "Session updated successfully" sementara
+kolom `rerank_model_id` di database tetap kosong — field-nya dibuang tanpa error.
+
+Karena itu rerank dinyatakan **terblokir sampai versi WeKnora yang mengekspos field ini**.
+Menulis langsung ke tabel `sessions` milik WeKnora akan membuat IntraDocs bergantung pada
+skema internal produk lain, dan itu tidak dilakukan.
+
+`summary_model_id` senasib: hanya bisa diatur saat knowledge base dibuat, sehingga mengubahnya
+berarti membuat ulang knowledge base dan mengindeks ulang seluruh dokumen.

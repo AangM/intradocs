@@ -14,7 +14,8 @@
     "./rag": "./src/rag.ts",
     "./versions": "./src/versions.ts",
     "./access-requests": "./src/access-requests.ts",
-    "./required-reading": "./src/required-reading.ts"
+    "./required-reading": "./src/required-reading.ts",
+    "./label-suggestions": "./src/label-suggestions.ts"
   },
   "dependencies": {
     "@intradocs/core": "workspace:*",
