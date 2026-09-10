@@ -426,3 +426,93 @@ container yang membacanya, lalu **memverifikasi ke WeKnora** bahwa `registration
 `self_serve` dan gagal keras bila masih. Setelah perbaikan, instance ini melaporkan
 `registration_mode: invite_only`, sehingga satu-satunya akun yang dapat masuk — termasuk lewat
 UI — adalah akun layanan yang filenya gitignored dan hanya ada di mesin ini.
+
+## 13. Wiki, Langfuse, unggah berkas, dan fitur WeKnora lainnya
+
+### Aturan umum yang membuat semuanya aman: rekaman tanpa versi IntraDocs tidak bisa dikutip
+
+Sebelum menimbang fitur satu per satu, satu properti menentukan seluruh jawabannya. Kutipan
+divalidasi ulang ke IntraDocs lewat `knowledge_id`. Rekaman WeKnora yang tidak punya baris di
+`app.rag_index_entries` tidak menghasilkan apa pun — apa pun isinya, dan sebagus apa pun ia
+cocok dengan pertanyaan.
+
+Ini diuji, bukan disimpulkan (`tests/http/weknora-side-content.test.ts`). Sebuah rekaman ditanam
+langsung di WeKnora berisi kata yang tidak ada di seluruh korpus, lalu:
+
+1. dibuktikan **benar-benar terindeks dan tercari** di WeKnora — tanpa langkah ini tiga tes
+   berikutnya akan lulus karena alasan yang salah;
+2. dipastikan tidak punya baris di `app.rag_index_entries`;
+3. ditanya lewat `/api/rag/search` — tidak pernah muncul sebagai kutipan;
+4. ditanya lewat `/api/rag/chat` — katanya tidak muncul di **mana pun** dalam respons.
+
+Arah sebaliknya juga aman: orphan sweep hanya menghapus rekaman yang membawa penanda judul
+milik exporter IntraDocs. Halaman wiki, entri FAQ, atau berkas yang diunggah operator dibiarkan
+utuh. Keduanya bisa hidup berdampingan tanpa saling merusak.
+
+Konsekuensinya untuk setiap fitur di bawah: **tidak satu pun bisa membocorkan sesuatu ke
+pengguna IntraDocs** — dan justru karena itu, tidak satu pun bisa menambah nilai pada retrieval.
+Nilai hanya masuk lewat dokumen yang diekspor IntraDocs.
+
+### Wiki: mati, dan bukan karena hemat CPU saja
+
+Pipeline wiki adalah Map/Reduce berbasis LLM: per dokumen ia mengekstrak entitas, menulis
+ringkasan, dan mengutip chunk (`ingest_map_parallel`, default 10 paralel), lalu menulis halaman
+per slug (`ingest_reduce_parallel`). Keluarannya adalah prosa yang **disintesis lintas dokumen**.
+
+Di mesin yang butuh 35–42 detik untuk satu jawaban 1.5B, biaya itu saja sudah menutup pintu.
+Tetapi alasan yang lebih penting: halaman wiki tidak punya versi IntraDocs di belakangnya,
+sehingga menurut aturan di atas ia **tidak akan pernah bisa dikutip**. Jadi wiki akan membakar
+CPU untuk menghasilkan teks yang tidak pernah sampai ke siapa pun — sambil menggabungkan isi
+dokumen terbatas dan publik ke dalam satu halaman. Gerbang IntraDocs menahannya, tetapi
+membuat bahan yang harus ditahan bukan desain yang baik.
+
+Tetap mati: `indexing_strategy.wiki_enabled=false` (dan `graph_enabled=false`), sebagaimana
+diatur `pnpm weknora:setup`.
+
+### Langfuse: didukung WeKnora, dan justru karena itu berbahaya secara default
+
+WeKnora punya dukungan Langfuse bawaan — `LANGFUSE_ENABLED`, `LANGFUSE_HOST`,
+`LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_SAMPLE_RATE`, dan seterusnya. Yang
+dikirimkannya bukan metrik agregat: nama-nama internalnya menyebut `LangfuseMessages`,
+`LangfuseGenerationOutput`, `LangfuseToolCalls` — yaitu **prompt, potongan dokumen, dan keluaran
+model**.
+
+Kegunaannya nyata dan tidak dilebih-lebihkan: pertanyaan "apakah reranker benar-benar
+dipanggil" yang butuh pengukuran waktu dan pembacaan log akan terjawab dalam hitungan detik
+oleh trace. Tetapi mengarahkan `LANGFUSE_HOST` ke layanan cloud berarti mengirim pertanyaan
+pengguna dan isi dokumen ke luar mesin — persis yang dilarang brief. Karena itu:
+
+- **tidak dinyalakan secara default**, dan tidak disediakan jalan pintas untuk menyalakannya;
+- kalau dipakai, hanya Langfuse **self-hosted** di jaringan yang sama;
+- di mesin ini itu tidak mungkin: Langfuse v3 membawa Postgres, ClickHouse, Redis, dan MinIO
+  sendiri, sementara profil WeKnora sudah memakai ~5 GB dari 7,7 GB.
+
+Sampai ada mesin yang muat, observability M4 tetap bersandar pada `pnpm weknora:status`, tabel
+`app.rag_audit`, dan log WeKnora — semuanya tinggal di mesin ini.
+
+### Unggah berkas ke WeKnora: bisa, bahkan PDF — tetapi bukan jalur ingest yang benar
+
+Diuji langsung: `POST /knowledge-bases/{id}/knowledge/file` menerima berkas dan
+menyelesaikannya. `.txt` terurai, dan **PDF pun terurai dengan benar** menjadi chunk berisi
+teksnya — padahal `DOCREADER_ADDR` tidak diset sama sekali, jadi parser in-process WeKnora
+sudah cukup untuk kasus ini. (Format lain — PPTX, DOC lama, gambar ber-OCR — belum diuji di
+sini dan kemungkinan besar memang memerlukan layanan `docreader` terpisah.)
+
+Meski begitu, mengirim berkas asli ke WeKnora **tidak** diadopsi sebagai jalur ingest, karena
+satu alasan yang tidak bisa ditawar: yang disetujui reviewer adalah Markdown kanonik IntraDocs.
+Kalau WeKnora mengurai berkas aslinya sendiri, teks yang terindeks adalah teks yang **tidak
+pernah dilihat siapa pun saat approval**, dan retrieval akan mengutip kalimat yang tidak pernah
+disetujui. Tambahan lagi, salinan kedua byte asli akan mengendap di volume WeKnora — di luar
+gerbang kebijakan, di luar retensi dan penghapusan IntraDocs.
+
+Yang justru berguna dari temuan ini adalah petunjuk untuk S05 (PPTX/OCR/DOC lama/ZIP yang masih
+tertunda): parser WeKnora bisa dipakai untuk **menghasilkan Markdown kanonik**, yang lalu masuk
+alur unggah–scan–review IntraDocs seperti berkas lain. Dengan begitu kemampuan parsingnya
+terpakai tanpa merusak invarian "yang terindeks adalah yang disetujui".
+
+### FAQ dan sisanya
+
+`faq_config`, `question_generation_config`, ASR, dan VLM masuk kelas yang sama: keluarannya
+lahir di sisi WeKnora, tidak punya versi IntraDocs, karena itu tidak bisa dikutip. Semuanya
+tetap mati, dan menyalakannya hanya masuk akal bila hasilnya dibawa kembali ke IntraDocs
+sebagai **saran yang diadopsi lewat revisi** — pola yang sama seperti saran label pada §11.
