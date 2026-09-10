@@ -3,6 +3,7 @@ import { requireActor } from '@/lib/session';
 import { dashboardData } from '@intradocs/db/discovery';
 import { PageHeading, Notice, Empty, documentHref } from '@/components/shared';
 import { Icon } from '@/components/icon';
+import { formatDate, formatNumber } from '@intradocs/core';
 export default async function Dashboard({
   searchParams,
 }: {
@@ -123,6 +124,54 @@ export default async function Dashboard({
           </div>
         </section>
       </div>
+      <section className="card mb">
+        <div className="card-h">
+          <h2 className="h3">Yang dicari tetapi tidak ditemukan</h2>
+        </div>
+        <div className="card-b">
+          {data.gaps.length ? (
+            <>
+              <div
+                className="table-scroll"
+                tabIndex={0}
+                role="region"
+                aria-label="Tabel knowledge gap"
+              >
+                <table className="tbl">
+                  <thead>
+                    <tr>
+                      <th scope="col">Istilah</th>
+                      <th scope="col">Pencarian</th>
+                      <th scope="col">Orang</th>
+                      <th scope="col">Terakhir</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.gaps.map((g) => (
+                      <tr key={g.term}>
+                        <td>{g.term}</td>
+                        <td>{formatNumber(g.searches)}</td>
+                        <td>{formatNumber(g.people)}</td>
+                        <td>{formatDate(g.lastSeen)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="sub tiny">
+                Hanya istilah yang dicari minimal tiga orang berbeda yang muncul, dalam bentuk
+                ternormalisasi. Pertanyaan satu orang tidak pernah ditampilkan, dan teksnya dihapus
+                setelah 30 hari.
+              </p>
+            </>
+          ) : (
+            <p className="sub">
+              Belum ada istilah yang memenuhi ambang. Gap baru muncul setelah minimal tiga orang
+              berbeda mencari hal yang sama tanpa hasil.
+            </p>
+          )}
+        </div>
+      </section>
       <section className="card mb">
         <div className="card-h">
           <h2 className="h3">Aktivitas baca harian</h2>

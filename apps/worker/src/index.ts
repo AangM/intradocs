@@ -42,6 +42,9 @@ async function start() {
   await boss.createQueue('review-reminders');
   await boss.work('review-reminders', async () => {
     await pool.query('SELECT app.enqueue_review_reminders()');
+    // Search wording expires after 30 days while the counts stay, so the KPI tiles keep
+    // working without the phrasing accumulating indefinitely.
+    await pool.query('SELECT app.prune_search_queries()');
   });
   await boss.schedule('review-reminders', '0 * * * *');
   await boss.send('review-reminders', {}, { singletonKey: 'hourly-reminders' });

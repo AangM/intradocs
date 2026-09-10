@@ -32,8 +32,10 @@ export async function searchDocuments(
     const durationMs = Math.round(performance.now() - started);
     if (q.q && q.page === 1)
       await client.query(
-        'INSERT INTO app.search_events(actor_id,result_count,duration_ms) VALUES(app.actor_id(),$1,$2)',
-        [total, durationMs],
+        // The query is stored only in its normalised form, and app.normalise_query drops
+        // anything that looks identifying before it is ever written.
+        'INSERT INTO app.search_events(actor_id,result_count,duration_ms,query_norm) VALUES(app.actor_id(),$1,$2,app.normalise_query($3))',
+        [total, durationMs, q.q],
       );
     return {
       items: rows.map((r) => ({
@@ -120,6 +122,19 @@ export async function dashboardData(actorId: string, days = 30, unit: string | n
         [days, unit],
       )
     ).rows;
+    // Terms people searched for and did not find. The threshold lives in SQL, so no
+    // caller can lower it: a term one person searched never reaches this array.
+    const gaps = (
+      await client.query<{ term: string; searches: string; people: string; last_seen: Date }>(
+        'SELECT term,searches,people,last_seen FROM app.knowledge_gaps($1,$2)',
+        [days, unit],
+      )
+    ).rows.map((r) => ({
+      term: r.term,
+      searches: Number(r.searches),
+      people: Number(r.people),
+      lastSeen: r.last_seen.toISOString(),
+    }));
     return {
       summary: {
         active: Number(summary.active),
@@ -133,6 +148,7 @@ export async function dashboardData(actorId: string, days = 30, unit: string | n
       contributors,
       units,
       latest,
+      gaps,
     };
   });
 }
