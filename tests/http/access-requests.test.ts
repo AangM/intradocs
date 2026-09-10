@@ -163,6 +163,15 @@ test('nobody without taxonomy authority can decide a request', async () => {
 test('a decision requires a note, and approving grants nothing by itself', async () => {
   const id = (await db.query<{ id: string }>('SELECT id FROM app.access_requests LIMIT 1')).rows[0]!
     .id;
+  // audit_events is append-only across runs, so count the delta rather than the total.
+  const auditBefore = Number(
+    (
+      await db.query<{ n: string }>(
+        "SELECT count(*)::text AS n FROM app.audit_events WHERE action='access.decided' AND subject_user_id=$1",
+        [IDS.viewer],
+      )
+    ).rows[0]!.n,
+  );
   const bare = await api(IDS.super, `/api/access-requests/${id}`, { approve: true, note: 'ok' });
   assert.equal(bare.status, 400, 'catatan terlalu pendek harus ditolak');
 
@@ -190,7 +199,11 @@ test('a decision requires a note, and approving grants nothing by itself', async
     "SELECT count(*)::text AS n FROM app.audit_events WHERE action='access.decided' AND subject_user_id=$1",
     [IDS.viewer],
   );
-  assert.equal(audit.rows[0]!.n, '1');
+  assert.equal(
+    Number(audit.rows[0]!.n) - auditBefore,
+    1,
+    'satu keputusan tercatat oleh pemanggilan ini',
+  );
 });
 
 test('a decided request cannot be decided again', async () => {
