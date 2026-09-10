@@ -223,7 +223,35 @@ Baris kedua adalah intinya: dokumen yang dicabut berhenti dikutip pada request b
 
 `tests/rag/weknora-stub.ts` tetap dipakai untuk kasus yang tidak bisa diminta dari server sehat (crash di tengah, lease kedaluwarsa). Lulusnya suite stub bukan bukti WeKnora asli berperilaku sama — itulah sebabnya suite HTTP dan E2E dijalankan terhadap WeKnora sungguhan.
 
-## 9. Batas yang belum selesai
+## 9. Kenyataan resource pada mesin 8 GB
+
+Diukur pada laptop 7,7 GB RAM saat sesi ini. Profil penuh **tidak muat**: enam
+container memakai sekitar 5 GB, dan `pnpm dev` mati dengan exit code 4 (OOM) ketika
+semuanya hidup bersamaan.
+
+| Yang dijalankan                    | Container                                            | Perkiraan RAM |
+| ---------------------------------- | ---------------------------------------------------- | ------------- |
+| Portal + reader + katalog + search | `postgres`                                           | ~0,3 GB       |
+| Ditambah asisten AI                | `+ weknora-app`, `weknora-postgres`, `weknora-redis` | ~3,5 GB       |
+| Ditambah unggah dokumen            | `+ clamav`, `converter`                              | ~5,3 GB       |
+
+Pilih dua dari tiga baris itu pada mesin 8 GB. Untuk menguji unggahan:
+
+```sh
+docker compose --env-file .env.local --profile weknora stop
+docker compose --env-file .env.local --profile knowledge up -d clamav converter
+```
+
+Untuk kembali menguji asisten AI, kebalikannya. Menjalankan ketiganya sekaligus
+membutuhkan sekitar 12 GB agar nyaman.
+
+Port juga perlu perhatian di Windows: rentang yang dipesan WinNAT membuat bind
+gagal dengan "An attempt was made to access a socket in a way forbidden by its
+access permissions". Instalasi ini memakai 55432 untuk PostgreSQL dan 47080 untuk
+WeKnora karena 54329 dan 58080 masuk rentang tersebut. Periksa dengan
+`netsh interface ipv4 show excludedportrange protocol=tcp` sebelum memilih port.
+
+## 10. Batas yang belum selesai
 
 - **Q4 belum dikerjakan.** Tidak ada 40 pertanyaan berlabel, tidak ada angka recall@5, tidak ada review grounding oleh pemilik domain. Tanpa itu kualitas jawaban belum terukur.
 - **Ambang relevansi tidak bisa dipasang dengan mesin ini, dan itu terukur.** Q4 menunjukkan 0/10 abstain pada pertanyaan tanpa bukti: sumber yang cocok lemah tetap dikembalikan. Penyebabnya bukan pilihan angka yang belum dibuat, melainkan tidak adanya sinyal: `score` pada hybrid-search WeKnora selalu bernilai 0,016 — konstanta RRF 1/61 — sehingga tidak membedakan relevansi sama sekali, dan parameter `vector_threshold` berperilaku tidak monotonik saat diukur (ambang 0,0–0,7 menghasilkan 14/14/14/12/15/15/15 hit). Memasang angka di atas sinyal yang tidak ada akan menyembunyikan masalah, bukan menyelesaikannya. Yang tidak pernah terjadi: mengarang jawaban. Perbaikan yang mungkin — menghitung kemiripan sendiri memakai model embedding, lalu mengkalibrasinya terhadap 40 pertanyaan Q4 yang kini tersedia.
