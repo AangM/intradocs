@@ -1,14 +1,15 @@
-# IntraDocs · M1–M3 lokal
+# IntraDocs · M1–M4 lokal
 
-Portal knowledge base **local-dev, corpus sintetis, AI off**. Melanjutkan `intradocs-m3-work-checkpoint.zip`, bukan prototipe pengganti. Desain mentor, stack pinned, dan migrasi 001–006 dipertahankan.
+Portal knowledge base **local-dev, corpus sintetis, AI opt-in dan off secara default**. Melanjutkan `intradocs-m3-work-checkpoint.zip`, bukan prototipe pengganti. Desain mentor, stack pinned, dan migrasi 001–017 dipertahankan.
 
 ## Hasil implementasi
 
 - **M1:** Better Auth/session lokal, lima role, category scope, RLS PostgreSQL, proteksi URL/file, audit, shell responsif, penugasan role/scope dan aktivasi akun.
 - **M2:** MD/TXT/PDF berteks/DOCX/XLSX, original + maksimal empat lampiran, scan ClamAV wajib, converter non-AI, canonical gabungan dan provenance/locator, preview, private draft, duplicate/idempotency, retry, revisi immutable, taksonomi.
+- **M4:** WeKnora lokal sebagai mesin RAG di belakang policy gate IntraDocs — ekspor idempoten versi final-approved, retrieval ber-scope, sitasi yang divalidasi ulang ke database pada setiap request, dan abstain bila tidak ada bukti sah. Aktif hanya bila `AI_PROVIDER=weknora-local` diisi sendiri. Rinciannya di [docs/WEKNORA.md](docs/WEKNORA.md).
 - **M3:** satu/dua reviewer berbeda, larangan self-approval, justifikasi temuan, minta revisi/tolak, outbox ber-lease/retry, publikasi dan indeks atomik, lexical search ber-RLS, favorit, feedback pemilik, histori, notifikasi, pengingat/expiry, dokumen terkait, dan KPI aktual berfilter periode/unit.
 
-**Bukti dan batas acceptance hanya pada [docs/PLAN.md §0](docs/PLAN.md).** Implementasi lokal bukan izin pilot/go-live. SSO, AI/RAG, OCR, format V1, diff/rollback, backup/restore produksi, dan persetujuan mentor/security/ops tetap di luar rilis ini.
+**Bukti dan batas acceptance hanya pada [docs/PLAN.md §0](docs/PLAN.md) dan [docs/WEKNORA.md §8](docs/WEKNORA.md).** Implementasi lokal bukan izin pilot/go-live. SSO, OCR, format V1, diff/rollback, backup/restore produksi, dan persetujuan mentor/security/ops tetap di luar rilis ini. Kualitas jawaban AI **belum terukur**: evaluasi Q4 (40 pertanyaan berlabel, recall@5, review grounding) belum dikerjakan, jadi jangan memakai jawabannya sebagai rujukan kebijakan.
 
 ## Jalankan di laptop
 
