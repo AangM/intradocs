@@ -358,3 +358,71 @@ skema internal produk lain, dan itu tidak dilakukan.
 
 `summary_model_id` senasib: hanya bisa diatur saat knowledge base dibuat, sehingga mengubahnya
 berarti membuat ulang knowledge base dan mengindeks ulang seluruh dokumen.
+
+## 12. Summary dan UI WeKnora
+
+### Summary: tidak dinyalakan, dan alasannya bukan teknis
+
+`summary_model_id` **tidak ada** di `KnowledgeBaseConfig` — schema `UpdateKnowledgeBaseRequest`
+hanya menerima `auto_tag_config`, `chunking_config`, `faq_config`, `image_processing_config`,
+`indexing_strategy`, dan `wiki_config`. Field itu hanya bisa diisi saat knowledge base dibuat,
+jadi mengubahnya berarti membuat KB baru dan mengindeks ulang seluruh dokumen.
+
+Efek sampingnya terlihat di database WeKnora: setiap dokumen berstatus
+`summary_status = failed`, karena summary tetap diantrikan pada setiap parse lalu berhenti di
+`no_summary_model`. Biayanya kecil (gagal seketika, bukan inferensi), tetapi statusnya memang
+begitu dan tidak perlu dibaca sebagai kerusakan.
+
+Meski begitu, alasan utama summary **tidak** dinyalakan bukan kesulitan teknis di atas,
+melainkan tidak adanya permukaan validasi:
+
+- Saran label bisa diamankan karena sebuah tag dapat **dicocokkan** dengan kosakata label
+  IntraDocs; tag yang salah dibuang secara mekanis, dan itu terbukti membuang dua saran salah.
+- Summary adalah teks bebas. Tidak ada daftar yang bisa dipakai untuk menolaknya. Summary yang
+  lancar tetapi keliru akan lolos setiap pemeriksaan yang bisa ditulis, dan ia berdiri persis
+  di sebelah dokumen yang sudah disetujui reviewer — tempat pembaca paling mudah mengira itu
+  kalimat dokumen itu sendiri.
+- Model yang tersedia di mesin ini, `qwen2.5:1.5b-instruct`, baru saja terukur 2 dari 5 benar
+  pada tugas **pilihan ganda** yang jauh lebih mudah. Keluaran teks bebasnya bukan sesuatu yang
+  layak ditempelkan pada dokumen kebijakan.
+
+Kalau nanti dinyalakan, syaratnya: model yang lebih mampu, dan summary ditampilkan sebagai
+draf yang harus diadopsi lewat revisi — persis pola saran label, bukan teks yang langsung
+tampil sebagai milik dokumen.
+
+### UI WeKnora: alat operator, bukan pintu kedua ke korpus
+
+WeKnora punya frontend sendiri (`wechatopenai/weknora-ui`). Ia **tidak** dijalankan oleh profil
+`weknora`, melainkan profil terpisah `weknora-ui` yang harus diminta secara sadar:
+
+```sh
+docker compose --env-file .env.local --profile weknora --profile weknora-ui up -d weknora-ui
+# http://127.0.0.1:47081  (loopback saja, seperti API)
+```
+
+Dua profil diperlukan karena UI bergantung pada backend; menyebut satu profil saja membuat
+dependensinya tidak terdefinisi. Image UI membawa nginx dengan upstream `app` yang di-hardcode,
+jadi `weknora-app` diberi alias jaringan `app` — bukan dengan mengubah image orang lain.
+
+Alasan ia tidak boleh jadi permukaan pengguna sudah diuji, bukan diperkirakan. Dengan akun
+layanan dari `var/weknora-service.json`, login ke UI lalu `switch-tenant` ke workspace IntraDocs
+mengembalikan **"Lampiran Simulasi Keamanan — Rahasia"** secara utuh — dokumen yang di IntraDocs
+memerlukan grant eksplisit. WeKnora menegakkan batas tenant miliknya sendiri dan tidak tahu apa
+itu klasifikasi, status persetujuan, scope kategori, atau grant. Itulah tepatnya mengapa
+IntraDocs berdiri di depan sebagai gerbang kebijakan, dan mengapa UI ini hanya berguna untuk
+satu pekerjaan: melihat apa yang sebenarnya terindeks ketika retrieval berperilaku aneh.
+
+Yang membatasi siapa yang bisa masuk adalah pendaftaran yang kini tertutup — lihat di bawah.
+
+### Registrasi WeKnora ditutup oleh setup, bukan oleh checklist
+
+`pnpm weknora:setup` sebelumnya hanya **mencetak** langkah "set WEKNORA_DISABLE_REGISTRATION=true
+lalu restart profil". Pada mesin ini langkah itu tidak pernah dijalankan, dan WeKnora melaporkan
+`registration_mode: self_serve` — siapa pun yang menjangkau port loopback bisa membuat tenant
+sendiri beserta API key-nya, yaitu pintu kedua ke index yang tidak dikendalikan IntraDocs.
+
+Checklist bukan penjaga. Sekarang setup menutup pintu itu sendiri: menulis flag, membuat ulang
+container yang membacanya, lalu **memverifikasi ke WeKnora** bahwa `registration_mode` bukan lagi
+`self_serve` dan gagal keras bila masih. Setelah perbaikan, instance ini melaporkan
+`registration_mode: invite_only`, sehingga satu-satunya akun yang dapat masuk — termasuk lewat
+UI — adalah akun layanan yang filenya gitignored dan hanya ada di mesin ini.

@@ -265,6 +265,26 @@ async function setup(): Promise<void> {
   }
   await ensureEnv({ WEKNORA_BASE_URL: baseUrl });
 
+  // Registration exists for exactly one moment: creating the service account above. Left
+  // open afterwards, anyone who reaches the loopback port can mint their own tenant and
+  // API key, which is a second door into the index that IntraDocs does not control. This
+  // used to be step 4 of a printed checklist; a printed checklist is not a guard, so the
+  // setup closes the door itself and restarts the container that reads the flag.
+  await ensureEnv({ WEKNORA_DISABLE_REGISTRATION: 'true' });
+  command('docker', [
+    'compose',
+    '--env-file',
+    '.env.local',
+    '--profile',
+    'weknora',
+    'up',
+    '-d',
+    '--force-recreate',
+    'weknora-app',
+  ]);
+  await waitForHealth(baseUrl, 180);
+  await assertRegistrationClosed(baseUrl);
+
   console.log('');
   console.log('WeKnora lokal siap. AI IntraDocs masih OFF sampai Anda mengaktifkannya sendiri:');
   console.log('  1. Ubah AI_PROVIDER=weknora-local di .env.local (retrieval).');
@@ -272,7 +292,25 @@ async function setup(): Promise<void> {
     '  2. Opsional AI_GENERATION=weknora-local setelah model KnowledgeQA lokal terdaftar.',
   );
   console.log('  3. Jalankan pnpm weknora:sync untuk mengindeks dokumen final-approved.');
-  console.log('  4. Setelah bootstrap, set WEKNORA_DISABLE_REGISTRATION=true lalu restart profil.');
+  console.log('  4. Registrasi WeKnora sudah ditutup otomatis; hanya akun layanan yang ada.');
+}
+
+/**
+ * Proves the door is shut rather than assuming the environment variable took effect.
+ * WeKnora reports its own mode, so this asks it instead of trusting our own compose file.
+ */
+async function assertRegistrationClosed(baseUrl: string): Promise<void> {
+  const response = await fetch(`${baseUrl}/api/v1/auth/config`, {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(15_000),
+    redirect: 'error',
+  });
+  const mode = pick((await response.json()) as Record<string, unknown>).registration_mode;
+  if (mode === 'self_serve')
+    throw new Error(
+      'WeKnora masih menerima registrasi terbuka setelah bootstrap. Periksa WEKNORA_DISABLE_REGISTRATION di .env.local lalu ulangi pnpm weknora:setup.',
+    );
+  console.log(`Registrasi WeKnora ditutup (registration_mode=${String(mode)}).`);
 }
 
 async function withWorkerDb<T>(run: (pool: Pool) => Promise<T>): Promise<T> {
@@ -340,6 +378,23 @@ async function status(): Promise<void> {
   console.log(
     `Knowledge base terjangkau dengan key ini: ${(await client.knowledgeBaseReachable()) ? 'ya' : 'tidak'}`,
   );
+  // Registration drifting back open is silent otherwise: nothing fails, there is simply a
+  // second way to mint an API key for this index. Reported every time status is asked.
+  try {
+    const response = await fetch(`${ai.weknora.baseUrl}/api/v1/auth/config`, {
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(15_000),
+      redirect: 'error',
+    });
+    const mode = pick((await response.json()) as Record<string, unknown>).registration_mode;
+    console.log(
+      mode === 'self_serve'
+        ? 'Registrasi WeKnora: TERBUKA. Set WEKNORA_DISABLE_REGISTRATION=true lalu recreate weknora-app.'
+        : `Registrasi WeKnora: tertutup (${String(mode)}).`,
+    );
+  } catch {
+    console.log('Registrasi WeKnora: tidak dapat diperiksa.');
+  }
   await withWorkerDb(async (pool) => {
     const { rows } = await pool.query<{ state: string; total: string }>(
       'SELECT state,total FROM app.rag_export_status()',

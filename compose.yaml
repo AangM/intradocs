@@ -152,6 +152,12 @@ services:
       CONCURRENCY_POOL_SIZE: ${WEKNORA_CONCURRENCY:-2}
     extra_hosts:
       - 'host.docker.internal:host-gateway'
+    networks:
+      default:
+        # The optional weknora-ui image ships an nginx that proxies to the hardcoded
+        # upstream `app`. An alias satisfies it without editing someone else's image or
+        # renaming this service, and costs nothing when the UI is not running.
+        aliases: ['app']
     volumes:
       - weknora_files:/data/files
     healthcheck:
@@ -165,6 +171,47 @@ services:
         limits:
           memory: ${WEKNORA_MEMORY_LIMIT:-2g}
           cpus: '${WEKNORA_CPU_LIMIT:-2}'
+    restart: unless-stopped
+
+  # WeKnora's own web interface. Deliberately NOT part of the 'weknora' profile: it is an
+  # operator tool, not a second way into the corpus.
+  #
+  # What it is honest about: signing in here is signing in to WeKnora, not to IntraDocs.
+  # WeKnora has no idea what a classification, an approval state, a category scope or a
+  # grant is, so anyone who reaches this UI sees every indexed chunk of every document --
+  # including the restricted ones -- regardless of what IntraDocs would allow them. That
+  # is why it can never be the portal users log into, and why the whole M4 design puts
+  # IntraDocs in front as the policy gate.
+  #
+  # It stays useful for exactly one job: looking at what was actually indexed when
+  # retrieval behaves oddly -- chunks, tags, parse status. Start it only when doing that:
+  #
+  #   docker compose --env-file .env.local --profile weknora --profile weknora-ui \n  #     up -d weknora-ui
+  #
+  # Both profiles are needed: the UI is useless without the backend it depends on, and
+  # naming only this profile leaves that dependency undefined.
+  #
+  # Since registration is closed after bootstrap, the only account that can sign in is the
+  # service account in var/weknora-service.json, which is gitignored and local to this
+  # machine. Reaching the UI therefore already means having that file.
+  weknora-ui:
+    profiles: ['weknora-ui']
+    image: wechatopenai/weknora-ui:${WEKNORA_VERSION:-latest}
+    depends_on:
+      weknora-app:
+        condition: service_healthy
+    ports:
+      # Loopback only, like the API. Nothing on the LAN reaches the corpus.
+      - '127.0.0.1:${WEKNORA_UI_PORT:-47081}:80'
+    environment:
+      TZ: ${WEKNORA_TZ:-Asia/Jakarta}
+      # The SPA reaches the backend over the compose network via the `app` alias that
+      # weknora-app carries, so the API port never has to be reachable from the browser.
+    deploy:
+      resources:
+        limits:
+          memory: ${WEKNORA_UI_MEMORY_LIMIT:-256m}
+          cpus: '0.5'
     restart: unless-stopped
 
 networks:
