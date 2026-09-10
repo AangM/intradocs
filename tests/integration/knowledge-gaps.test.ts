@@ -109,3 +109,31 @@ test('retention clears the wording but keeps the counted event', async () => {
   );
   assert.equal(wording.rows[0]!.n, '0', 'teksnya harus hilang setelah 30 hari');
 });
+
+test('a starter topic needs five distinct people, not three', async () => {
+  await db.query("DELETE FROM app.search_events WHERE query_norm='istilah uji populer'");
+  const actors = [IDS.viewer, IDS.other, IDS.contributor, IDS.reviewer, IDS.admin];
+  for (const actor of actors.slice(0, 4)) await record(actor, 'istilah uji populer', 3);
+  let rows = await db.query<{ term: string }>('SELECT term FROM app.popular_searches($1)', [30]);
+  assert(
+    !rows.rows.some((r) => r.term === 'istilah uji populer'),
+    'empat orang belum cukup untuk halaman muka',
+  );
+  await record(actors[4]!, 'istilah uji populer', 3);
+  rows = await db.query<{ term: string }>('SELECT term FROM app.popular_searches($1)', [30]);
+  assert(
+    rows.rows.some((r) => r.term === 'istilah uji populer'),
+    'lima orang berbeda harus melewati ambang',
+  );
+});
+
+test('a term nobody could resolve never becomes a starter topic', async () => {
+  await db.query("DELETE FROM app.search_events WHERE query_norm='istilah uji buntu'");
+  for (const actor of [IDS.viewer, IDS.other, IDS.contributor, IDS.reviewer, IDS.admin])
+    await record(actor, 'istilah uji buntu', 0);
+  const rows = await db.query<{ term: string }>('SELECT term FROM app.popular_searches($1)', [30]);
+  assert(
+    !rows.rows.some((r) => r.term === 'istilah uji buntu'),
+    'pencarian tanpa hasil adalah gap, bukan topik awal',
+  );
+});

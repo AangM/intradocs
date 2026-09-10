@@ -4,10 +4,10 @@ import { listCategories, listDocuments } from '@intradocs/db/queries';
 import { formatDate, formatNumber } from '@intradocs/core';
 import { Icon } from '@/components/icon';
 import { Footer, Empty, documentHref } from '@/components/shared';
-import { mostRead } from '@intradocs/db/discovery';
+import { mostRead, popularSearches } from '@intradocs/db/discovery';
 export default async function HelpCenter() {
   const actor = await requireActor();
-  const [categories, docs, popular] = await Promise.all([
+  const [categories, docs, popular, measuredTopics] = await Promise.all([
     listCategories(actor.id),
     listDocuments(actor.id, {
       q: '',
@@ -17,6 +17,7 @@ export default async function HelpCenter() {
       sort: 'updated',
     }),
     mostRead(actor.id),
+    popularSearches(actor.id),
   ]);
   return (
     <>
@@ -45,8 +46,16 @@ export default async function HelpCenter() {
             </button>
           </form>
           <div className="sugg">
-            <div className="sugg-t">Mulai dari topik ini</div>
-            {['VPN', 'Backup', 'Monitoring', 'Repository', 'Onboarding', 'SOP'].map((q) => (
+            {/* Measured topics once enough distinct people have searched them and found
+                something; the curated list stands in while the log is too small to be
+                anonymous, so a quiet installation never surfaces one person's search. */}
+            <div className="sugg-t">
+              {measuredTopics.length ? 'Paling sering dicari' : 'Mulai dari topik ini'}
+            </div>
+            {(measuredTopics.length
+              ? measuredTopics
+              : ['VPN', 'Backup', 'Monitoring', 'Repository', 'Onboarding', 'SOP']
+            ).map((q) => (
               <Link
                 className="chip"
                 key={q}

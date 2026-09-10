@@ -164,6 +164,21 @@ export async function relatedDocuments(actorId: string, documentId: string, cate
       ).rows,
   );
 }
+/**
+ * Starter topics measured from what people actually searched and found, not curated by
+ * hand. Empty until the threshold is met, so a small or new installation falls back to
+ * the curated list rather than showing one person's search to everyone.
+ */
+export async function popularSearches(actorId: string, days = 30): Promise<string[]> {
+  return withActor(actorId, async ({ client }) => {
+    const { rows } = await client.query<{ term: string }>(
+      'SELECT term FROM app.popular_searches($1)',
+      [days],
+    );
+    return rows.map((r) => r.term);
+  });
+}
+
 export async function mostRead(actorId: string) {
   return withActor(actorId, async ({ client }) => {
     // A fixed function aggregates only documents currently visible to the caller.
