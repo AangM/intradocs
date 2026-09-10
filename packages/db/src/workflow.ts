@@ -345,3 +345,25 @@ export async function setDocumentAccess(
 ) {
   await mutate(actorId, 'SELECT app.set_document_access($1,$2,$3)', [documentId, member, grant]);
 }
+
+/**
+ * Withdraws a batch in one transaction. Returns how many were withdrawn so the caller can
+ * report a number rather than a bare success.
+ */
+export async function withdrawDocuments(
+  actorId: string,
+  documentIds: readonly string[],
+  reason: string,
+): Promise<{ withdrawn: number }> {
+  try {
+    return await withActor(actorId, async ({ client }) => {
+      const { rows } = await client.query<{ withdrawn: number }>(
+        'SELECT withdrawn FROM app.withdraw_documents($1::uuid[],$2)',
+        [documentIds, reason],
+      );
+      return { withdrawn: Number(rows[0]!.withdrawn) };
+    });
+  } catch (e) {
+    translateWorkflowError(e);
+  }
+}
