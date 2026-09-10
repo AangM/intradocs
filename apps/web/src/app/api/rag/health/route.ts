@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { hasCapability } from '@intradocs/core';
 import { requireApiActor } from '@/lib/session';
 import { apiError, PRIVATE_HEADERS } from '@/lib/http';
 import { getAiConfig, aiStatus } from '@/lib/rag';
@@ -7,15 +8,19 @@ import { WeknoraClient } from '@intradocs/core/weknora';
 export const dynamic = 'force-dynamic';
 
 /**
- * Readiness for the RAG path. Reports whether the engine answers, never how to reach it:
- * no base URL, no key, no knowledge base ID and no upstream error body appear here.
- * Requires a session, so an unauthenticated probe cannot map the deployment.
+ * Readiness for the RAG path. The API key never appears, and no upstream error body is
+ * echoed -- only a status. Endpoint origin and knowledge base ID are operational details,
+ * so they go to operators with analytics.view and not to every signed-in viewer.
  */
 export async function GET() {
   try {
-    await requireApiActor();
+    const actor = await requireApiActor();
     const config = getAiConfig();
-    const status = aiStatus();
+    const full = aiStatus();
+    // Viewers learn whether the assistant works; operators also learn what it is bound to.
+    const status = hasCapability(actor, 'analytics.view')
+      ? full
+      : { retrieval: full.retrieval, generation: full.generation };
     if (config.retrieval !== 'weknora-local' || !config.weknora)
       return NextResponse.json({ ...status, engine: 'disabled' }, { headers: PRIVATE_HEADERS });
     const client = new WeknoraClient(config.weknora);

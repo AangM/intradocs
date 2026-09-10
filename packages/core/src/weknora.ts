@@ -277,6 +277,18 @@ export class WeknoraClient {
     });
   }
 
+  /**
+   * Manual knowledge is created as a draft with parsing disabled, so it is stored but
+   * never chunked, embedded or searchable until this runs. Without it an export looks
+   * successful while retrieval silently returns nothing.
+   */
+  async reparseKnowledge(knowledgeIds: readonly string[]): Promise<void> {
+    if (knowledgeIds.length === 0) return;
+    await this.json('POST', '/api/v1/knowledge/batch-reparse', {
+      body: { ids: [...knowledgeIds], kb_id: this.config.knowledgeBaseId },
+    });
+  }
+
   async deleteKnowledge(knowledgeId: string): Promise<void> {
     try {
       await this.json('DELETE', `/api/v1/knowledge/${encodeURIComponent(knowledgeId)}`);

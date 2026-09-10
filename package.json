@@ -35,7 +35,12 @@
     "verify:local": "node scripts/verify-local.ts",
     "test:python": "python -m unittest discover -s tests/python -v",
     "knowledge:check": "tsx scripts/knowledge.ts converter-check",
-    "test:workflow-http": "tsx --test --test-concurrency=1 tests/http/workflow.test.ts"
+    "test:workflow-http": "tsx --test --test-concurrency=1 tests/http/workflow.test.ts",
+    "weknora:setup": "tsx scripts/weknora.ts setup",
+    "weknora:sync": "tsx scripts/weknora.ts sync",
+    "weknora:status": "tsx scripts/weknora.ts status",
+    "weknora:stop": "tsx scripts/weknora.ts stop",
+    "test:rag": "tsx --test --test-concurrency=1 tests/rag/*.test.ts"
   },
   "devDependencies": {
     "@playwright/test": "1.56.1",

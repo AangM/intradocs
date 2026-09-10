@@ -1,11 +1,20 @@
 import { NextResponse } from 'next/server';
 import { getPool } from '@intradocs/db';
+import { readAiConfig } from '@intradocs/core/ai-config';
 export const dynamic = 'force-dynamic';
 export async function GET() {
   try {
     await getPool().query('SELECT 1 FROM app.documents LIMIT 0');
     return NextResponse.json(
-      { status: 'ok', profile: 'local-dev', ai: 'off', release: '0.3.0' },
+      // Mode names only. This route needs no session, so the endpoint, the key and the
+      // knowledge base ID must not appear here -- describeAiConfig() carries all three
+      // and belongs behind /api/rag/health instead.
+      {
+        status: 'ok',
+        profile: 'local-dev',
+        ai: readAiConfig(process.env).retrieval,
+        release: '0.3.0',
+      },
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch {

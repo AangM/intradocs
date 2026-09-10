@@ -47,9 +47,136 @@ services:
     mem_limit: 768m
     cpus: 1.0
     restart: unless-stopped
+  weknora-postgres:
+    profiles: ['weknora']
+    image: paradedb/paradedb:v0.22.2-pg17
+    environment:
+      POSTGRES_DB: weknora
+      POSTGRES_USER: weknora
+      POSTGRES_PASSWORD: ${WEKNORA_DB_PASSWORD:?Run pnpm weknora:setup first}
+    # No published port: only the WeKnora container needs to reach it.
+    volumes:
+      - weknora_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U weknora -d weknora']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    deploy:
+      resources:
+        limits:
+          memory: ${WEKNORA_DB_MEMORY_LIMIT:-1g}
+          cpus: '1'
+    restart: unless-stopped
+
+  weknora-redis:
+    profiles: ['weknora']
+    image: redis:7-alpine
+    command:
+      [
+        'redis-server',
+        '--requirepass',
+        '${WEKNORA_REDIS_PASSWORD:?Run pnpm weknora:setup first}',
+        '--save',
+        '',
+        '--appendonly',
+        'no',
+        '--maxmemory',
+        '128mb',
+        '--maxmemory-policy',
+        'allkeys-lru',
+      ]
+    healthcheck:
+      test: ['CMD', 'redis-cli', '-a', '${WEKNORA_REDIS_PASSWORD:?}', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    # Cache and stream buffer only; nothing here is a system of record, so no volume.
+    deploy:
+      resources:
+        limits:
+          memory: 192M
+          cpus: '0.5'
+    restart: unless-stopped
+
+  weknora-app:
+    profiles: ['weknora']
+    image: wechatopenai/weknora-app:${WEKNORA_VERSION:-latest}
+    depends_on:
+      weknora-postgres:
+        condition: service_healthy
+      weknora-redis:
+        condition: service_healthy
+    ports:
+      # Loopback only. The API key is a server-side credential; nothing on the LAN
+      # should be able to reach this port.
+      - '127.0.0.1:${WEKNORA_PORT:-58080}:8080'
+    environment:
+      GIN_MODE: release
+      LOG_LEVEL: ${WEKNORA_LOG_LEVEL:-info}
+      TZ: ${WEKNORA_TZ:-Asia/Jakarta}
+      AUTO_MIGRATE: 'true'
+      DB_DRIVER: postgres
+      DB_HOST: weknora-postgres
+      DB_PORT: '5432'
+      DB_USER: weknora
+      DB_PASSWORD: ${WEKNORA_DB_PASSWORD:?Run pnpm weknora:setup first}
+      DB_NAME: weknora
+      REDIS_ADDR: weknora-redis:6379
+      REDIS_PASSWORD: ${WEKNORA_REDIS_PASSWORD:?Run pnpm weknora:setup first}
+      REDIS_DB: '0'
+      STREAM_MANAGER_TYPE: redis
+      STORAGE_TYPE: local
+      LOCAL_STORAGE_BASE_DIR: /data/files
+      RETRIEVE_DRIVER: postgres
+      JWT_SECRET: ${WEKNORA_JWT_SECRET:?Run pnpm weknora:setup first}
+      SYSTEM_AES_KEY: ${WEKNORA_AES_KEY:?Run pnpm weknora:setup first}
+      # One workspace, created once by pnpm weknora:setup, which is the only moment
+      # registration is needed. Turn registration off afterwards.
+      DISABLE_REGISTRATION: ${WEKNORA_DISABLE_REGISTRATION:-false}
+      WEKNORA_TENANT_AUTO_CREATE_API_KEY: 'true'
+      WEKNORA_TENANT_SELF_SERVICE_CREATION_ENABLED: 'true'
+      WEKNORA_TENANT_ENABLE_RBAC: 'true'
+      WEKNORA_TENANT_ENABLE_CROSS_TENANT_ACCESS: 'false'
+      # Risky subsystems stay off explicitly rather than by relying on defaults.
+      WEKNORA_SANDBOX_DOCKER_ENABLED: 'false'
+      OIDC_AUTH_ENABLE: 'false'
+      # WeKnora blocks host.docker.internal as an SSRF target by default. The embedding
+      # model runs as Ollama on the host, so exactly that one name is allowed back in --
+      # not a wildcard, not a CIDR. Everything else stays blocked.
+      SSRF_WHITELIST_EXTRA: ${WEKNORA_SSRF_WHITELIST_EXTRA:-host.docker.internal}
+      OLLAMA_OPTIONAL: 'true'
+      OLLAMA_BASE_URL: ${WEKNORA_OLLAMA_URL:-http://host.docker.internal:11434}
+      CONCURRENCY_POOL_SIZE: ${WEKNORA_CONCURRENCY:-2}
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    volumes:
+      - weknora_files:/data/files
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', 'http://localhost:8080/health']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: ${WEKNORA_MEMORY_LIMIT:-2g}
+          cpus: '${WEKNORA_CPU_LIMIT:-2}'
+    restart: unless-stopped
+
 networks:
   conversion:
-    internal: true
+    # NOT internal. Docker cannot publish a port from an internal-only network, so with
+    # internal:true the converter's 127.0.0.1:8091 binding was silently inert and every
+    # upload failed with converter_unavailable -- the worker runs on the host, not in
+    # Docker. Egress prevention now rests on the other controls the service already has:
+    # read_only root, cap_drop ALL, no-new-privileges, pids/memory limits, no credentials
+    # and no host mounts. Re-enable internal:true only when the worker also runs in
+    # Compose, where it can reach the converter without a published port.
+    internal: false
 volumes:
   clamav_data:
   postgres_data:
+  weknora_pgdata:
+  weknora_files:

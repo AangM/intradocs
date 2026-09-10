@@ -74,10 +74,14 @@ export class PostgresRagExportRepository implements RagExportRepository {
 export class WeknoraIndexTarget implements RagIndexTarget {
   constructor(private readonly client: WeknoraClient) {}
   async create(input: { title: string; content: string }): Promise<string> {
-    return this.client.createManualKnowledge(input);
+    const id = await this.client.createManualKnowledge(input);
+    // Parsing is a separate step in WeKnora; skipping it leaves the record unsearchable.
+    await this.client.reparseKnowledge([id]);
+    return id;
   }
   async update(knowledgeId: string, input: { title: string; content: string }): Promise<void> {
     await this.client.updateManualKnowledge(knowledgeId, input);
+    await this.client.reparseKnowledge([knowledgeId]);
   }
   async remove(knowledgeId: string): Promise<void> {
     await this.client.deleteKnowledge(knowledgeId);

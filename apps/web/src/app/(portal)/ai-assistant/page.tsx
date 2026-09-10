@@ -1,9 +1,26 @@
 import { requireActor } from '@/lib/session';
+import { aiStatus, getAiConfig } from '@/lib/rag';
+import { AssistantChat } from '@/components/assistant-chat';
 import { PageHeading, Pending } from '@/components/shared';
 import { Icon } from '@/components/icon';
 import Link from 'next/link';
 export default async function Assistant() {
   await requireActor();
+  const status = aiStatus();
+  const config = getAiConfig();
+  // With AI off the page keeps the original placeholder, so the portal stays usable
+  // exactly as before rather than showing a broken chat box.
+  if (config.retrieval === 'weknora-local' && config.weknora)
+    return (
+      <div className="pad">
+        <PageHeading
+          title="AI Assistant"
+          subtitle="Jawaban bersumber dokumen resmi sesuai akses Anda."
+          actions={<span className="pill p-green">Retrieval: {status.retrieval}</span>}
+        />
+        <AssistantChat maxQuestionChars={config.weknora.maxQuestionChars} />
+      </div>
+    );
   return (
     <div className="pad">
       <PageHeading
