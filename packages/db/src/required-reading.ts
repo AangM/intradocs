@@ -17,6 +17,8 @@ export interface ReadingRequirement {
   categoryName: string;
   note: string;
   dueAt: string | null;
+  /** Decided by the database clock, so pages can render it without reading the time. */
+  overdue: boolean;
   acknowledgedAt: string | null;
   versionId: string;
 }
@@ -32,10 +34,12 @@ export async function myRequiredReading(actorId: string): Promise<ReadingRequire
       category_name: string;
       note: string;
       due_at: Date | null;
+      overdue: boolean;
       acknowledged_at: Date | null;
       version_id: string;
     }>(
       `SELECT r.id,r.document_id,d.slug,v.title,c.name AS category_name,r.note,r.due_at,
+        (r.due_at IS NOT NULL AND r.due_at<now() AND a.acknowledged_at IS NULL) AS overdue,
         a.acknowledged_at,d.current_version_id AS version_id
        FROM app.reading_requirements r
        JOIN app.documents d ON d.id=r.document_id
@@ -52,6 +56,7 @@ export async function myRequiredReading(actorId: string): Promise<ReadingRequire
       categoryName: r.category_name,
       note: r.note,
       dueAt: r.due_at?.toISOString() ?? null,
+      overdue: r.overdue,
       acknowledgedAt: r.acknowledged_at?.toISOString() ?? null,
       versionId: r.version_id,
     }));

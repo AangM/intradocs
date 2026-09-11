@@ -5,9 +5,12 @@ import { formatDate, formatNumber } from '@intradocs/core';
 import { Icon } from '@/components/icon';
 import { Footer, Empty, documentHref } from '@/components/shared';
 import { mostRead, popularSearches } from '@intradocs/db/discovery';
+import { myRequiredReading } from '@intradocs/db/required-reading';
+import { RequiredReadingList } from '@/components/required-reading-list';
+import { aiStatus } from '@/lib/rag';
 export default async function HelpCenter() {
   const actor = await requireActor();
-  const [categories, docs, popular, measuredTopics] = await Promise.all([
+  const [categories, docs, popular, measuredTopics, required] = await Promise.all([
     listCategories(actor.id),
     listDocuments(actor.id, {
       q: '',
@@ -18,7 +21,12 @@ export default async function HelpCenter() {
     }),
     mostRead(actor.id),
     popularSearches(actor.id),
+    myRequiredReading(actor.id),
   ]);
+  const pendingReading = required.filter((r) => !r.acknowledgedAt).length;
+  const ai = aiStatus();
+  const aiOn = ai.retrieval !== 'off';
+  const aiGenerates = aiOn && ai.generation !== 'off';
   return (
     <>
       <section className="hero">
@@ -87,6 +95,38 @@ export default async function HelpCenter() {
           </div>
         </div>
       </section>
+      {required.length > 0 && (
+        <section className="sec">
+          <div className="sec-h">
+            <div>
+              <h2 className="t">
+                <Icon name="check-c" size={21} />
+                Bacaan wajib
+                {pendingReading > 0 ? ` (${pendingReading} belum dikonfirmasi)` : ''}
+              </h2>
+              <p className="d">
+                Ditetapkan admin untuk kategori dalam scope Anda; konfirmasi mencatat versi yang
+                Anda baca
+              </p>
+            </div>
+          </div>
+          <div className="card">
+            <RequiredReadingList
+              items={required.map((r) => ({
+                id: r.id,
+                href: documentHref({ id: r.documentId, slug: r.documentSlug }),
+                documentTitle: r.documentTitle,
+                categoryName: r.categoryName,
+                note: r.note,
+                overdue: r.overdue,
+                dueLabel: r.dueAt ? formatDate(r.dueAt) : null,
+                acknowledgedLabel: r.acknowledgedAt ? formatDate(r.acknowledgedAt) : null,
+                versionId: r.versionId,
+              }))}
+            />
+          </div>
+        </section>
+      )}
       <section className="sec">
         <div className="sec-h">
           <div>
@@ -159,26 +199,41 @@ export default async function HelpCenter() {
       <section className="sec no-top-pad">
         <div className="ai-banner">
           <div className="z" style={{ flex: 1 }}>
-            <span className="pill ai-status">AI ASSISTANT · BELUM AKTIF</span>
+            <span className="pill ai-status">
+              {aiOn
+                ? aiGenerates
+                  ? ai.generationLocation === 'external'
+                    ? 'AI ASSISTANT · AKTIF · PROVIDER EKSTERNAL'
+                    : 'AI ASSISTANT · AKTIF · LOKAL'
+                  : 'AI ASSISTANT · AKTIF · HANYA SUMBER'
+                : 'AI ASSISTANT · BELUM AKTIF'}
+            </span>
             <h3 style={{ marginTop: 11 }}>Tanya dengan mudah. Tetap dekat dengan sumber.</h3>
             <p>
-              Jawaban berbasis sumber, kutipan yang dapat dibuka, dan akses yang mengikuti akun Anda
-              adalah target tahap M4. Belum ada model, biaya AI, atau pertanyaan yang dikirim dari
-              build ini.
+              {aiOn
+                ? aiGenerates
+                  ? 'Jawaban disusun hanya dari dokumen final-approved yang boleh Anda baca, dengan kutipan yang bisa dibuka. Setiap sumber divalidasi ulang ke IntraDocs pada setiap permintaan; tanpa sumber sah, asisten menyatakan tidak tahu.'
+                  : 'Asisten mengembalikan sumber yang relevan dan boleh Anda baca, dengan kutipan yang bisa dibuka — tanpa menyusun jawaban bebas. Tanpa sumber sah, asisten menyatakan tidak tahu.'
+                : 'Jawaban berbasis sumber, kutipan yang dapat dibuka, dan akses yang mengikuti akun Anda tersedia setelah operator mengaktifkan AI lokal. Belum ada model, biaya AI, atau pertanyaan yang dikirim dari build ini.'}
             </p>
             <Link className="btn-w" href="/ai-assistant">
-              Lihat status AI <Icon name="arrow-r" size={14} />
+              {aiOn ? 'Buka AI Assistant' : 'Lihat status AI'} <Icon name="arrow-r" size={14} />
             </Link>
           </div>
           <div className="ai-mini z">
             <div className="q">Bagaimana konfigurasi VPN?</div>
             <div className="a">
-              AI belum aktif. Untuk saat ini, temukan panduan melalui pencarian dan baca sumbernya
-              langsung.
+              {aiOn
+                ? 'Sumber yang boleh Anda baca dikutip dengan tautan ke bagian yang tepat; pertanyaan di luar cakupan dokumen dijawab "tidak tahu".'
+                : 'AI belum aktif. Untuk saat ini, temukan panduan melalui pencarian dan baca sumbernya langsung.'}
             </div>
             <div className="src">
-              <span>Tanpa jawaban simulasi</span>
-              <span>Tanpa request cloud</span>
+              <span>Tanpa jawaban tanpa sumber</span>
+              <span>
+                {aiOn && ai.generationLocation === 'external'
+                  ? 'Provider eksternal (diakui operator)'
+                  : 'Tanpa request cloud'}
+              </span>
             </div>
           </div>
         </div>

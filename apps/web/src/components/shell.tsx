@@ -24,6 +24,7 @@ const navigation: Array<{
     group: 'knowledge',
   },
   { href: '/notifikasi', label: 'Notifikasi', icon: 'bell', group: 'knowledge' },
+  { href: '/akses', label: 'Permintaan Akses', icon: 'lock', group: 'knowledge' },
   {
     href: '/feedback',
     label: 'Masukan dokumen',

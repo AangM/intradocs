@@ -122,6 +122,27 @@ export async function dashboardData(actorId: string, days = 30, unit: string | n
         [days, unit],
       )
     ).rows;
+    // AI assistant activity from the audit trail: counts only, never a question. An
+    // abstention is a knowledge signal of its own -- someone asked and the corpus had
+    // nothing they were allowed to see -- so it is reported next to retrievals.
+    const ai = (
+      await client.query<{
+        retrievals: number;
+        answers: number;
+        abstained: number;
+        rejected: number;
+        people: number;
+      }>(
+        `SELECT count(*) FILTER(WHERE action='rag.retrieval')::int AS retrievals,
+                count(*) FILTER(WHERE action='rag.chat')::int AS answers,
+                count(*) FILTER(WHERE action='rag.abstained')::int AS abstained,
+                count(*) FILTER(WHERE action='rag.citation_rejected')::int AS rejected,
+                count(DISTINCT actor_id) FILTER(WHERE action IN ('rag.retrieval','rag.chat','rag.abstained'))::int AS people
+         FROM app.audit_events a WHERE a.created_at>=now()-make_interval(days=>$1)
+           AND ($2::text IS NULL OR EXISTS(SELECT 1 FROM app.profiles p WHERE p.id=a.actor_id AND p.unit=$2))`,
+        [days, unit],
+      )
+    ).rows[0]!;
     // Terms people searched for and did not find. The threshold lives in SQL, so no
     // caller can lower it: a term one person searched never reaches this array.
     const gaps = (
@@ -149,6 +170,7 @@ export async function dashboardData(actorId: string, days = 30, unit: string | n
       units,
       latest,
       gaps,
+      ai,
     };
   });
 }

@@ -18,6 +18,7 @@ import { AttachmentsList } from '@/components/attachments-list';
 import { WorkflowPanel } from '@/components/workflow-panel';
 import { ReaderFeedback } from '@/components/reader-feedback';
 import { LabelSuggestions } from '@/components/label-suggestions';
+import { RequiredReadingMark } from '@/components/required-reading-mark';
 import { reviewInfo, versionSummaries, readerPreferences } from '@intradocs/db/workflow';
 import { findSensitiveContent } from '@intradocs/core/workflow';
 export default async function Reader({
@@ -243,6 +244,15 @@ export default async function Reader({
             {/* Only people who could act on a suggestion are offered one: taking it up
                 means creating a revision, which needs documents.upload. */}
             {hasCapability(actor, 'documents.upload') && <LabelSuggestions documentId={id} />}
+            {/* Only a taxonomy admin may require reading, and only of a published version:
+                the insert policy checks role, scope and readability again in SQL. */}
+            {hasCapability(actor, 'taxonomy.view') && doc.status === 'published' && (
+              <RequiredReadingMark
+                documentId={id}
+                categoryId={doc.categoryId}
+                categoryName={doc.categoryName}
+              />
+            )}
             {info && (
               <WorkflowPanel
                 key={doc.versionId + info.state}

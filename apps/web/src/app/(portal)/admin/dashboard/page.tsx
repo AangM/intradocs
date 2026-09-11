@@ -4,6 +4,7 @@ import { dashboardData } from '@intradocs/db/discovery';
 import { PageHeading, Notice, Empty, documentHref } from '@/components/shared';
 import { Icon } from '@/components/icon';
 import { formatDate, formatNumber } from '@intradocs/core';
+import { aiStatus } from '@/lib/rag';
 export default async function Dashboard({
   searchParams,
 }: {
@@ -18,6 +19,8 @@ export default async function Dashboard({
         .trim()
         .slice(0, 80) || null;
   const data = await dashboardData(actor.id, days, unit);
+  const aiOn = aiStatus().retrieval !== 'off';
+  const aiAsked = data.ai.retrievals + data.ai.answers + data.ai.abstained;
   const reads = data.activity.reduce((n, r) => n + r.reads, 0);
   return (
     <div className="pad">
@@ -76,6 +79,14 @@ export default async function Dashboard({
               : '—',
             note: `${data.search.zero} dari ${data.search.total} pencarian`,
             icon: 'search',
+          },
+          {
+            label: 'AI Assistant',
+            value: aiOn ? formatNumber(aiAsked) : 'Mati',
+            note: aiOn
+              ? `${data.ai.abstained} tidak dijawab (tanpa sumber sah) · ${data.ai.rejected} kutipan ditolak validasi · ${data.ai.people} pengguna`
+              : 'Retrieval belum diaktifkan operator',
+            icon: 'spark',
           },
         ].map((m) => (
           <section className="card card-b" key={m.label}>
@@ -208,8 +219,8 @@ export default async function Dashboard({
       </section>
       <Notice>
         Unit berdasarkan pemilik dokumen; metrik pencarian berdasarkan unit pencari. Status adalah
-        snapshot kini, aktivitas mengikuti periode. AI/chat dan knowledge-gap semantik belum aktif;
-        tidak ada metrik buatan atau pertanyaan mentah pada dashboard.
+        snapshot kini, aktivitas mengikuti periode. Metrik AI dihitung dari jejak audit — jumlah
+        saja, tidak pernah pertanyaannya; tidak ada metrik buatan pada dashboard.
       </Notice>
       <section className="card">
         <div className="card-h">
