@@ -535,28 +535,45 @@ async function autotag(): Promise<void> {
   }
   if (docs.length === 0) throw new Error('Belum ada dokumen terindeks; jalankan pnpm weknora:sync dulu.');
 
-  const existing = await client.listTags();
-  for (const name of labelNames) if (!existing.includes(name)) await client.createTag(name);
-  console.log(`Kolam tag WeKnora: ${labelNames.length} label IntraDocs.`);
+  // Tags accumulate across runs in WeKnora, which would blur one model's verdict into the
+  // next. Deleting a tag drops its attachments too, so the pool is rebuilt from scratch:
+  // the table below is this model's answer and nobody else's. Label suggestions in the
+  // portal are empty for the few minutes this takes.
+  for (const tag of await client.listTags()) await client.deleteTag(tag.id);
+  for (const name of labelNames) await client.createTag(name);
+  console.log(`Kolam tag WeKnora dibangun ulang: ${labelNames.length} label IntraDocs.`);
 
   // skip_if_tagged=false so a rerun with a different model replaces the previous verdict.
   await client.setAutoTag({ enabled: true, modelId: model.id, maxTags: 5, skipIfTagged: false });
+  const triggeredAt = Date.now() - 5_000; // clock skew between host and container
   await client.reparseKnowledge(docs.map((d) => d.knowledgeId));
-  console.log(`Reparse ${docs.length} dokumen dengan ${modelName}; menunggu tag (maks 10 menit)...`);
+  console.log(`Reparse ${docs.length} dokumen dengan ${modelName}; menunggu parse lalu tag (maks 10 menit)...`);
 
-  const before = new Map<string, string>();
-  for (const d of docs) before.set(d.knowledgeId, (await client.knowledgeTags(d.knowledgeId)).join('|'));
+  // Two phases. Parsing is observable: updated_at moves past the trigger and the status
+  // returns to completed. Tagging is a separate queued task with no status of its own,
+  // so after every parse has landed the tags are given a fixed window to appear and a
+  // short quiet period to settle; the table reports whatever exists at the end.
   const deadline = Date.now() + 10 * 60_000;
-  const result = new Map<string, string[]>();
-  while (Date.now() < deadline && result.size < docs.length) {
-    await new Promise((r) => setTimeout(r, 15_000));
+  const parsed = new Set<string>();
+  while (Date.now() < deadline && parsed.size < docs.length) {
+    await new Promise((r) => setTimeout(r, 10_000));
     for (const d of docs) {
-      if (result.has(d.knowledgeId)) continue;
-      const now = await client.knowledgeTags(d.knowledgeId);
-      // A changed set, or any set at all when there was none, counts as this run's answer.
-      if (now.join('|') !== before.get(d.knowledgeId) || (now.length > 0 && before.get(d.knowledgeId) === ''))
-        result.set(d.knowledgeId, now);
+      if (parsed.has(d.knowledgeId)) continue;
+      const state = await client.knowledgeState(d.knowledgeId);
+      if (state.parseStatus === 'completed' && state.updatedAt >= triggeredAt) parsed.add(d.knowledgeId);
     }
+  }
+  if (parsed.size < docs.length)
+    console.log(`Catatan: ${docs.length - parsed.size} dokumen belum selesai parse dalam batas waktu.`);
+  const result = new Map<string, string[]>();
+  let quiet = 0;
+  let last = '';
+  while (Date.now() < deadline && quiet < 4) {
+    await new Promise((r) => setTimeout(r, 15_000));
+    for (const d of docs) result.set(d.knowledgeId, (await client.knowledgeState(d.knowledgeId)).tags);
+    const snapshot = [...result.values()].map((t) => t.join('|')).join('/');
+    quiet = snapshot === last ? quiet + 1 : 0;
+    last = snapshot;
   }
 
   let correct = 0, wrong = 0, none = 0, accepted = 0;
@@ -582,8 +599,6 @@ async function autotag(): Promise<void> {
     `${modelName}: ${correct} tag cocok label yang ada, ${wrong} tidak cocok, ${none} dokumen tanpa tag, ` +
       `${accepted} saran baru yang akan lolos ke IntraDocs.`,
   );
-  if (result.size < docs.length)
-    console.log(`Catatan: ${docs.length - result.size} dokumen belum memberi jawaban dalam 10 menit.`);
 }
 
 async function main(): Promise<void> {

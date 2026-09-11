@@ -334,6 +334,11 @@ putusan model sebelumnya, reparse semua dokumen terindeks, lalu mencetak per dok
 IntraDocs, tag pilihan model, dan mana yang akan lolos penyaring kategori. Ia tidak menulis apa
 pun ke IntraDocs — tabelnya untuk menilai model sebelum ada yang mengandalkan sarannya.
 
+Baseline `qwen2.5:1.5b-instruct` lewat perintah itu (7 dokumen terindeks, `skip_if_tagged=false`):
+3 tag cocok label yang ada, 4 tidak cocok (semuanya `Standar`/`Tata Kelola` di kategori yang
+tidak memilikinya), 2 dokumen tanpa tag, **0 saran baru lolos**. Angka pembanding untuk model
+berikutnya.
+
 **Model lebih besar belum terukur.** Percobaan `qwen2.5:3b-instruct` (1,9 GB, muat di sisa RAM
 bila dev server dimatikan) gagal pada tahap unduh: registry Ollama putus dengan `i/o timeout`,
 dan blob parsial 1,93 GB yang sudah terkumpul dibuang saat pull terputus, lalu percobaan ulang

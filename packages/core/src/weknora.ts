@@ -359,9 +359,17 @@ export class WeknoraClient {
    * is what stops a sentence inside a document from inventing a label.
    */
   async knowledgeTags(knowledgeId: string): Promise<string[]> {
+    return (await this.knowledgeState(knowledgeId)).tags;
+  }
+
+  /** Parse state and tags of one record; what an operator polls after a reparse. */
+  async knowledgeState(
+    knowledgeId: string,
+  ): Promise<{ parseStatus: string; updatedAt: number; tags: string[] }> {
     const data = asRecord(
       await this.json('GET', `/api/v1/knowledge/${encodeURIComponent(knowledgeId)}`),
     );
+    const updated = Date.parse(str(data.updated_at));
     const tags = Array.isArray(data.tags) ? data.tags : [];
     const names: string[] = [];
     for (const tag of tags) {
@@ -370,7 +378,11 @@ export class WeknoraClient {
       // Bounded: a tag is a label, and a label that long is not a label.
       if (name && name.length <= 60 && !names.includes(name)) names.push(name);
     }
-    return names.slice(0, 10);
+    return {
+      parseStatus: str(data.parse_status),
+      updatedAt: Number.isFinite(updated) ? updated : 0,
+      tags: names.slice(0, 10),
+    };
   }
 
   /** Registered models, without their parameters: a provider key lives there. */
@@ -388,7 +400,7 @@ export class WeknoraClient {
   }
 
   /** Tag vocabulary of the knowledge base; the pool the auto-tagger may choose from. */
-  async listTags(): Promise<string[]> {
+  async listTags(): Promise<Array<{ id: string; name: string }>> {
     const data = asRecord(
       await this.json(
         'GET',
@@ -396,12 +408,22 @@ export class WeknoraClient {
       ),
     );
     const items = Array.isArray(data.data) ? data.data : [];
-    const names: string[] = [];
+    const tags: Array<{ id: string; name: string }> = [];
     for (const item of items) {
-      const name = item && typeof item === 'object' ? str((item as Json).name).trim() : '';
-      if (name && !names.includes(name)) names.push(name);
+      if (!item || typeof item !== 'object') continue;
+      const id = str((item as Json).id);
+      const name = str((item as Json).name).trim();
+      if (id && name) tags.push({ id, name });
     }
-    return names;
+    return tags;
+  }
+
+  /** Removing a tag also removes every knowledge it was attached to -- the clean slate. */
+  async deleteTag(tagId: string): Promise<void> {
+    await this.json(
+      'DELETE',
+      `/api/v1/knowledge-bases/${encodeURIComponent(this.config.knowledgeBaseId)}/tags/${encodeURIComponent(tagId)}`,
+    );
   }
 
   async createTag(name: string): Promise<void> {
