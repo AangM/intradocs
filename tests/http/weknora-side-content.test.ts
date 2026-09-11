@@ -107,7 +107,10 @@ test('the planted record really is searchable inside WeKnora', async (t) => {
   // Without this the rest of the suite would pass for the wrong reason: a record that was
   // never indexed is trivially uncitable.
   assert(hits.length > 0, 'record harus benar-benar terindeks agar pengujian bermakna');
-  assert(hits.some((h) => h.content.includes(token)), 'isi umpan harus benar-benar ada');
+  assert(
+    hits.some((h) => h.content.includes(token)),
+    'isi umpan harus benar-benar ada',
+  );
 });
 
 test('IntraDocs has no row for it, so it is outside every actor scope', async (t) => {

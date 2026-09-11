@@ -163,7 +163,9 @@ function readRelevance(env: Record<string, string | undefined>): number {
   const raw = env.WEKNORA_MIN_RELEVANCE;
   if (raw === undefined || raw === '') return DEFAULT_LIMITS.minRelevance;
   if (!/^(0(\.\d{1,3})?|1(\.0{1,3})?)$/.test(raw))
-    throw new ConfigurationError('WEKNORA_MIN_RELEVANCE harus angka antara 0 dan 1 (0 mematikan gerbang).');
+    throw new ConfigurationError(
+      'WEKNORA_MIN_RELEVANCE harus angka antara 0 dan 1 (0 mematikan gerbang).',
+    );
   return Number(raw);
 }
 

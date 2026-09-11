@@ -415,7 +415,10 @@ test('fused candidates are judged by the similarity of the vector pass, not by t
 test('an exact keyword match survives without a similarity; nothing else does', () => {
   const hybrid = [hit('k1', 'c1', 0.016, 'keyword'), hit('k2', 'c2', 0.016, 'other')];
   const gated = gateByRelevance(hybrid, [], 0.45);
-  assert.deepEqual(gated.kept.map((h) => h.chunkId), ['c1']);
+  assert.deepEqual(
+    gated.kept.map((h) => h.chunkId),
+    ['c1'],
+  );
   assert.equal(gated.dropped, 1);
   assert.equal(gated.topRelevance, null, 'a keyword hit is evidence but carries no similarity');
 });
@@ -423,10 +426,18 @@ test('an exact keyword match survives without a similarity; nothing else does', 
 test('vector hits the fused ranking missed are added when they clear the bar', () => {
   const gated = gateByRelevance(
     [hit('k1', 'c1', 0.016, 'other')],
-    [hit('k1', 'c1', 0.5, 'vector'), hit('k3', 'c3', 0.7, 'vector'), hit('k4', 'c4', 0.2, 'vector')],
+    [
+      hit('k1', 'c1', 0.5, 'vector'),
+      hit('k3', 'c3', 0.7, 'vector'),
+      hit('k4', 'c4', 0.2, 'vector'),
+    ],
     0.45,
   );
-  assert.deepEqual(gated.kept.map((h) => h.chunkId), ['c3', 'c1'], 'ordered by similarity');
+  assert.deepEqual(
+    gated.kept.map((h) => h.chunkId),
+    ['c3', 'c1'],
+    'ordered by similarity',
+  );
 });
 
 test('context chunks are never evidence, whichever pass returned them', () => {

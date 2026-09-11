@@ -155,7 +155,8 @@ export async function answerQuestion(actor: Actor, question: string): Promise<Ch
   const config = getAiConfig();
   const weknora = requireEnabled(config);
   const retrieval = await retrieve(actor, question);
-  const mode: ChatResult['mode'] = config.generation === 'weknora-local' ? 'generated' : 'evidence-only';
+  const mode: ChatResult['mode'] =
+    config.generation === 'weknora-local' ? 'generated' : 'evidence-only';
   const shape = { mode, scopeSize: retrieval.scopeSize, rejectedCount: retrieval.rejectedCount };
   if (retrieval.citations.length === 0)
     return { ...shape, answer: ABSTAIN_MESSAGE, citations: [], abstained: true };

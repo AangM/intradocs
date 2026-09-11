@@ -190,25 +190,25 @@ Log yang aman dibagikan: `pnpm weknora:status` dan baris audit `rag.*` di `app.a
 
 Dijalankan pada RC M1–M3 dengan profil `weknora` hidup, PostgreSQL lokal, dan Ollama `bge-m3` di host.
 
-| Gate                                        | Hasil                                                         |
-| ------------------------------------------- | ------------------------------------------------------------- |
-| Unit                                        | **266 lulus**, 0 gagal, 3 skip                                |
-| Konten (render Markdown)                    | **3 lulus** — sebelumnya gagal impor `react`, kini diperbaiki |
-| Integrasi PostgreSQL/RLS                    | **52 lulus**, 0 gagal                                         |
-| HTTP (RAG, saran label, akses, bacaan wajib, cabut massal) | **47 lulus**, 0 gagal; suite unggah butuh profil `knowledge` yang tidak muat bersama WeKnora di 8 GB |
-| E2E browser desktop + mobile                | **14 lulus** (satu uji portal sempat timeout saat run penuh 12 menit berjalan bersamaan dengan generasi LLM di CPU; lulus 3,9 s saat diulang sendiri) |
-| Lint, typecheck, format, build produksi     | **Lulus**                                                     |
-| WeKnora sungguhan end-to-end                | **Lulus** — 7 dokumen terindeks, sync diulang 3× tetap 7      |
-| Q4 (40 gold questions, recall@5, grounding) | **Dijalankan pada corpus sintetis** (tabel di bawah); review grounding oleh pemilik domain masih terbuka |
+| Gate                                                       | Hasil                                                                                                                                                 |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit                                                       | **266 lulus**, 0 gagal, 3 skip                                                                                                                        |
+| Konten (render Markdown)                                   | **3 lulus** — sebelumnya gagal impor `react`, kini diperbaiki                                                                                         |
+| Integrasi PostgreSQL/RLS                                   | **52 lulus**, 0 gagal                                                                                                                                 |
+| HTTP (RAG, saran label, akses, bacaan wajib, cabut massal) | **47 lulus**, 0 gagal; suite unggah butuh profil `knowledge` yang tidak muat bersama WeKnora di 8 GB                                                  |
+| E2E browser desktop + mobile                               | **14 lulus** (satu uji portal sempat timeout saat run penuh 12 menit berjalan bersamaan dengan generasi LLM di CPU; lulus 3,9 s saat diulang sendiri) |
+| Lint, typecheck, format, build produksi                    | **Lulus**                                                                                                                                             |
+| WeKnora sungguhan end-to-end                               | **Lulus** — 7 dokumen terindeks, sync diulang 3× tetap 7                                                                                              |
+| Q4 (40 gold questions, recall@5, grounding)                | **Dijalankan pada corpus sintetis** (tabel di bawah); review grounding oleh pemilik domain masih terbuka                                              |
 
 **Q4 pada corpus sintetis** (`pnpm rag:eval`, 40 pertanyaan di `tests/rag/gold-questions.ts`):
 
-| Kelompok                          | Hasil                                      |
-| --------------------------------- | ------------------------------------------ |
-| 20 answerable (2 multi-sumber)    | recall@5 **100%** — usulan PLAN ≥90%       |
-| 10 lintas izin (termasuk injeksi) | **10/10 tanpa kebocoran**                  |
+| Kelompok                          | Hasil                                                                  |
+| --------------------------------- | ---------------------------------------------------------------------- |
+| 20 answerable (2 multi-sumber)    | recall@5 **100%** — usulan PLAN ≥90%                                   |
+| 10 lintas izin (termasuk injeksi) | **10/10 tanpa kebocoran**                                              |
 | 10 tanpa bukti                    | **8/10 abstain penuh** dengan gerbang relevansi (§14); sebelumnya 0/10 |
-| Latensi retrieval                 | p50 569 ms · p95 720 ms · maks 853 ms (dua panggilan paralel) |
+| Latensi retrieval                 | p50 569 ms · p95 720 ms · maks 853 ms (dua panggilan paralel)          |
 
 Recall dilaporkan, bukan dijadikan gerbang: angkanya berlaku untuk fixture ini. Kebocoran nol adalah syarat mutlak, dan `pnpm rag:eval` keluar non-nol bila ada.
 
@@ -288,14 +288,14 @@ dijawab model menjadi "label kami yang mana yang cocok", bukan "istilah apa yang
 
 Hasil pengukuran pada 8 dokumen sintetis, model `qwen2.5:1.5b-instruct`:
 
-| Dokumen | Kategori | Label IntraDocs | Tag model |
-|---|---|---|---|
-| Konfigurasi VPN | Infrastruktur & Jaringan | Runbook, Jaringan | Standar |
-| Kebijakan Backup & Retensi | Data & Integrasi | Referensi, Tata Kelola | Standar |
-| Standar Penamaan Repository | Aplikasi Internal | Standar | Standar |
-| SOP-IT-014 Manajemen Identitas | Keamanan Informasi | Identity, SOP | SOP |
-| Panduan Versi | Infrastruktur & Jaringan | — | Referensi |
-| Matriks SLA, Agent Monitoring, Lampiran Rahasia | — | — | (tidak ada) |
+| Dokumen                                         | Kategori                 | Label IntraDocs        | Tag model   |
+| ----------------------------------------------- | ------------------------ | ---------------------- | ----------- |
+| Konfigurasi VPN                                 | Infrastruktur & Jaringan | Runbook, Jaringan      | Standar     |
+| Kebijakan Backup & Retensi                      | Data & Integrasi         | Referensi, Tata Kelola | Standar     |
+| Standar Penamaan Repository                     | Aplikasi Internal        | Standar                | Standar     |
+| SOP-IT-014 Manajemen Identitas                  | Keamanan Informasi       | Identity, SOP          | SOP         |
+| Panduan Versi                                   | Infrastruktur & Jaringan | —                      | Referensi   |
+| Matriks SLA, Agent Monitoring, Lampiran Rahasia | —                        | —                      | (tidak ada) |
 
 Dibaca apa adanya: 2 dari 5 tag benar, 2 jelas salah, 3 dokumen tidak menghasilkan apa pun,
 dan model tidak pernah memberi lebih dari satu tag meski `max_tags=5`. **Saran bersih yang
@@ -418,7 +418,7 @@ draf yang harus diadopsi lewat revisi — persis pola saran label, bukan teks ya
 tampil sebagai milik dokumen.
 
 Satu hal yang **memang** dipakai dari field ini: pada permintaan chat, `summary_model_id`
-berarti *model penyusun jawaban* dan bisa dipin per permintaan. Sebelumnya IntraDocs membiarkan
+berarti _model penyusun jawaban_ dan bisa dipin per permintaan. Sebelumnya IntraDocs membiarkan
 WeKnora memakai default tenant, sehingga model apa pun yang belakangan didaftarkan sebagai
 default — termasuk model eksternal — akan diam-diam menjadi penjawab. Kini
 `WEKNORA_GENERATION_MODEL_ID` memin model itu dari sisi server IntraDocs, dan untuk
@@ -586,12 +586,12 @@ panggil hybrid-search kedua kalinya dengan `disable_keywords_match=true`, dalam 
 
 ### Kalibrasi pada Q4 (`pnpm rag:eval`, server di-restart per titik)
 
-| Ambang | recall@5 (20 answerable) | abstain (10 tanpa bukti) | Catatan |
-|---|---|---|---|
-| 0 (mati) | 20/20 | 0/10 | keadaan sebelumnya |
-| **0,45 (default)** | **20/20** | **8/10** | n06 (0,458 → VPN), n10 (0,522 → kebijakan backup aktif) masih lolos |
-| 0,48 | 19/20 | 9/10 | a20 (dua sumber) kehilangan sumber keduanya |
-| 0,52 | 15/20 | 9/10 | a10, a13, a16 abstain padahal terjawab |
+| Ambang             | recall@5 (20 answerable) | abstain (10 tanpa bukti) | Catatan                                                             |
+| ------------------ | ------------------------ | ------------------------ | ------------------------------------------------------------------- |
+| 0 (mati)           | 20/20                    | 0/10                     | keadaan sebelumnya                                                  |
+| **0,45 (default)** | **20/20**                | **8/10**                 | n06 (0,458 → VPN), n10 (0,522 → kebijakan backup aktif) masih lolos |
+| 0,48               | 19/20                    | 9/10                     | a20 (dua sumber) kehilangan sumber keduanya                         |
+| 0,52               | 15/20                    | 9/10                     | a10, a13, a16 abstain padahal terjawab                              |
 
 Distribusi mentahnya: pertanyaan terjawab memiliki skor terbaik 0,491–0,766 (median ≈0,59);
 pertanyaan tanpa bukti 0,314–0,522 (7 dari 10 di bawah 0,40). Kedua kelompok **bertumpang

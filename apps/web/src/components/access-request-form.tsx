@@ -7,17 +7,11 @@ import { useRouter } from 'next/navigation';
  * lets this person see; naming anything else fails at the RLS insert policy rather than
  * confirming the category exists.
  */
-export function AccessRequestForm({
-  categories,
-}: {
-  categories: { id: string; name: string }[];
-}) {
+export function AccessRequestForm({ categories }: { categories: { id: string; name: string }[] }) {
   const router = useRouter();
   const id = useId();
   const [categoryId, setCategoryId] = useState(categories[0]?.id ?? '');
-  const [classification, setClassification] = useState<'restricted' | 'confidential'>(
-    'restricted',
-  );
+  const [classification, setClassification] = useState<'restricted' | 'confidential'>('restricted');
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');

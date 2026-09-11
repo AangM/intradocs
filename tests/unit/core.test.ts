@@ -309,7 +309,10 @@ test('external generation is refused until it is acknowledged in words', () => {
   assert.equal(readAiConfig({ ...base, WEKNORA_MIN_RELEVANCE: '0' }).weknora?.minRelevance, 0);
   assert.equal(readAiConfig({ ...base, WEKNORA_MIN_RELEVANCE: '0.6' }).weknora?.minRelevance, 0.6);
   for (const bad of ['1.5', '-0.1', 'abc', '.5'])
-    assert.throws(() => readAiConfig({ ...base, WEKNORA_MIN_RELEVANCE: bad }), /WEKNORA_MIN_RELEVANCE/);
+    assert.throws(
+      () => readAiConfig({ ...base, WEKNORA_MIN_RELEVANCE: bad }),
+      /WEKNORA_MIN_RELEVANCE/,
+    );
   assert.equal(external.generationLocation, 'external');
   assert.equal(describeAiConfig(external).generationLocation, 'external');
   // A typo is a hard error, never a silent fallback to local.

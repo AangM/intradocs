@@ -128,7 +128,10 @@ test('retrieval is scoped per actor and never cites a document out of scope', as
   const ids = (x: { citations?: Array<{ documentId: string }> }) =>
     new Set((x.citations ?? []).map((c) => c.documentId));
   assert(ids(a).has(docId(1)), 'siti can read the VPN runbook and should be shown it');
-  assert(!ids(b).has(docId(1)), 'fajar has no scope over Infrastruktur; the runbook must not appear');
+  assert(
+    !ids(b).has(docId(1)),
+    'fajar has no scope over Infrastruktur; the runbook must not appear',
+  );
 });
 
 test('a confidential document never reaches a viewer without an explicit grant', async () => {

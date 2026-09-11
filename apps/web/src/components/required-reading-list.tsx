@@ -96,9 +96,7 @@ export function RequiredReadingList({ items }: { items: RequiredReadingItem[] })
                 <Link href={i.href} prefetch={false} className="document-title">
                   {i.documentTitle}
                 </Link>{' '}
-                <span className="sub tiny">
-                  · dikonfirmasi {i.acknowledgedLabel}
-                </span>
+                <span className="sub tiny">· dikonfirmasi {i.acknowledgedLabel}</span>
               </li>
             ))}
           </ul>

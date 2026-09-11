@@ -468,18 +468,24 @@ async function autotag(): Promise<void> {
   if (!ai.weknora) throw new Error('AI_PROVIDER masih off. Aktifkan weknora-local dulu.');
   const modelName = process.argv[3] ?? '';
   if (!/^[a-z0-9][a-z0-9._\/-]*(:[a-z0-9._-]+)?$/i.test(modelName))
-    throw new Error('Gunakan: pnpm weknora:autotag <nama-model-ollama>, misal qwen2.5:3b-instruct.');
+    throw new Error(
+      'Gunakan: pnpm weknora:autotag <nama-model-ollama>, misal qwen2.5:3b-instruct.',
+    );
 
   // The model has to exist locally first; WeKnora would otherwise try to pull it itself.
   const ollamaHost = assertLoopbackHttpOrigin(
     process.env.OLLAMA_HOST_URL ?? 'http://127.0.0.1:11434',
     'OLLAMA_HOST_URL',
   );
-  const tags = (await (await fetch(`${ollamaHost}/api/tags`, { signal: AbortSignal.timeout(10_000) })).json()) as {
+  const tags = (await (
+    await fetch(`${ollamaHost}/api/tags`, { signal: AbortSignal.timeout(10_000) })
+  ).json()) as {
     models?: Array<{ name?: string }>;
   };
   if (!(tags.models ?? []).some((m) => m.name === modelName))
-    throw new Error(`Model ${modelName} belum ada di Ollama lokal. Jalankan: ollama pull ${modelName}`);
+    throw new Error(
+      `Model ${modelName} belum ada di Ollama lokal. Jalankan: ollama pull ${modelName}`,
+    );
 
   const client = new WeknoraClient(ai.weknora);
   let model = (await client.listModels()).find(
@@ -491,7 +497,9 @@ async function autotag(): Promise<void> {
       displayName: `ollama ${modelName}`,
       type: 'KnowledgeQA',
       source: 'local',
-      parameters: { base_url: process.env.WEKNORA_OLLAMA_URL ?? 'http://host.docker.internal:11434' },
+      parameters: {
+        base_url: process.env.WEKNORA_OLLAMA_URL ?? 'http://host.docker.internal:11434',
+      },
     });
     model = { id, name: modelName, type: 'KnowledgeQA', source: 'local' };
     console.log(`Model ${modelName} terdaftar di WeKnora (id ${id}).`);
@@ -499,7 +507,13 @@ async function autotag(): Promise<void> {
 
   // Vocabulary and index mapping come from IntraDocs; labels are per category there.
   const admin = new Pool({ connectionString: localAdminUrl(), max: 1 });
-  let docs: Array<{ knowledgeId: string; title: string; category: string; labels: string[]; vocabulary: string[] }>;
+  let docs: Array<{
+    knowledgeId: string;
+    title: string;
+    category: string;
+    labels: string[];
+    vocabulary: string[];
+  }>;
   let labelNames: string[];
   try {
     labelNames = (
@@ -533,7 +547,8 @@ async function autotag(): Promise<void> {
   } finally {
     await admin.end();
   }
-  if (docs.length === 0) throw new Error('Belum ada dokumen terindeks; jalankan pnpm weknora:sync dulu.');
+  if (docs.length === 0)
+    throw new Error('Belum ada dokumen terindeks; jalankan pnpm weknora:sync dulu.');
 
   // Tags accumulate across runs in WeKnora, which would blur one model's verdict into the
   // next. Deleting a tag drops its attachments too, so the pool is rebuilt from scratch:
@@ -547,7 +562,9 @@ async function autotag(): Promise<void> {
   await client.setAutoTag({ enabled: true, modelId: model.id, maxTags: 5, skipIfTagged: false });
   const triggeredAt = Date.now() - 5_000; // clock skew between host and container
   await client.reparseKnowledge(docs.map((d) => d.knowledgeId));
-  console.log(`Reparse ${docs.length} dokumen dengan ${modelName}; menunggu parse lalu tag (maks 10 menit)...`);
+  console.log(
+    `Reparse ${docs.length} dokumen dengan ${modelName}; menunggu parse lalu tag (maks 10 menit)...`,
+  );
 
   // Two phases. Parsing is observable: updated_at moves past the trigger and the status
   // returns to completed. Tagging is a separate queued task with no status of its own,
@@ -560,30 +577,39 @@ async function autotag(): Promise<void> {
     for (const d of docs) {
       if (parsed.has(d.knowledgeId)) continue;
       const state = await client.knowledgeState(d.knowledgeId);
-      if (state.parseStatus === 'completed' && state.updatedAt >= triggeredAt) parsed.add(d.knowledgeId);
+      if (state.parseStatus === 'completed' && state.updatedAt >= triggeredAt)
+        parsed.add(d.knowledgeId);
     }
   }
   if (parsed.size < docs.length)
-    console.log(`Catatan: ${docs.length - parsed.size} dokumen belum selesai parse dalam batas waktu.`);
+    console.log(
+      `Catatan: ${docs.length - parsed.size} dokumen belum selesai parse dalam batas waktu.`,
+    );
   const result = new Map<string, string[]>();
   let quiet = 0;
   let last = '';
   while (Date.now() < deadline && quiet < 4) {
     await new Promise((r) => setTimeout(r, 15_000));
-    for (const d of docs) result.set(d.knowledgeId, (await client.knowledgeState(d.knowledgeId)).tags);
+    for (const d of docs)
+      result.set(d.knowledgeId, (await client.knowledgeState(d.knowledgeId)).tags);
     const snapshot = [...result.values()].map((t) => t.join('|')).join('/');
     quiet = snapshot === last ? quiet + 1 : 0;
     last = snapshot;
   }
 
-  let correct = 0, wrong = 0, none = 0, accepted = 0;
+  let correct = 0,
+    wrong = 0,
+    none = 0,
+    accepted = 0;
   console.log('');
   console.log('Dokumen | Kategori | Label IntraDocs | Tag model | Lolos penyaring');
   for (const d of docs) {
     const chosen = result.get(d.knowledgeId) ?? [];
     const lower = (x: string) => x.toLowerCase();
     const passes = chosen.filter(
-      (t) => d.vocabulary.some((v) => lower(v) === lower(t)) && !d.labels.some((l) => lower(l) === lower(t)),
+      (t) =>
+        d.vocabulary.some((v) => lower(v) === lower(t)) &&
+        !d.labels.some((l) => lower(l) === lower(t)),
     );
     const hits = chosen.filter((t) => d.labels.some((l) => lower(l) === lower(t)));
     if (chosen.length === 0) none += 1;
