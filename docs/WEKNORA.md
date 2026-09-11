@@ -378,25 +378,28 @@ Catatan bentuk: `auto_tag_config` **dikirim di dalam `config`** tetapi **dibaca 
 respons, dan `name` wajib disertakan pada setiap PUT — tanpa itu permintaan ditolak
 `Field validation for 'Name' failed`.
 
-### Rerank: model siap, API versi ini tidak menerimanya
+### Rerank: knob-nya ada di agen; yang tidak ada adalah server reranker-nya
 
-`xitao/bge-reranker-v2-m3` (1,16 GB) sudah ditarik dan terdaftar sebagai model `Rerank` yang
-`active` di WeKnora. Reranking tetap **tidak pernah berjalan**, dan itu dibuktikan bukan dengan
-membaca kode:
+Diagnosis sebelumnya ("API versi ini membuang `rerank_model_id`") benar untuk `sessions` dan
+tenant, tetapi tidak lengkap. Field itu **diterima dan disimpan pada agen** (`POST/PUT
+/api/v1/agents`), dan `pnpm weknora:agent` kini memin agen `intradocs-portal` dengan semua
+kemampuan opsional mati — web search, query rewrite, tools, MCP, skills, FAQ boosting, saran —
+model penjawab dipin, fallback tetap ("tidak tahu"), dan `WEKNORA_RERANK_MODEL_ID` bila diisi.
+Skrip membaca ulang konfigurasi tersimpan dan gagal keras bila WeKnora menyimpan sesuatu yang
+seharusnya mati atau membuang `rerank_model_id`.
 
-- hybrid-search dengan dan tanpa `rerank_model_id` mengembalikan **urutan yang identik**;
-- proses "ber-rerank" justru **lebih cepat** (383 ms vs 877 ms) — mustahil bila sebuah model
-  1,16 GB benar-benar dijalankan di CPU;
-- log WeKnora tidak pernah mencatat pemanggilan reranker.
+Yang menghentikan rerank adalah lapisan di bawahnya, dan itu diuji lewat
+`POST /api/v1/initialization/rerank/check`: WeKnora memanggil `{baseUrl}/rerank` (gaya
+TEI/Jina), dan **Ollama menjawab 404** untuk `/rerank`, `/api/rerank`, maupun `/v1/rerank`
+(Ollama 0.34.0 tidak menyediakan API rerank). Jadi model `xitao/bge-reranker-v2-m3` yang
+terdaftar sebelumnya tidak pernah bisa dipanggil — bukan karena konfigurasi, melainkan karena
+tidak ada server yang melayaninya. Percobaan "dengan vs tanpa rerank" yang urutannya identik dan
+justru lebih cepat kini punya penjelasan lengkap.
 
-Penyebabnya: `rerank_model_id` milik `internal_types.RetrievalConfig`, yang dipetakan ke kolom
-tabel `sessions`. `CreateSessionRequest` hanya menerima `title`/`description`, dan
-`PUT /api/v1/sessions/:id` membalas `200` dengan log "Session updated successfully" sementara
-kolom `rerank_model_id` di database tetap kosong — field-nya dibuang tanpa error.
-
-Karena itu rerank dinyatakan **terblokir sampai versi WeKnora yang mengekspos field ini**.
-Menulis langsung ke tabel `sessions` milik WeKnora akan membuat IntraDocs bergantung pada
-skema internal produk lain, dan itu tidak dilakukan.
+Untuk menyalakannya nanti dibutuhkan server reranker terpisah (mis. `text-embeddings-inference`
+dengan `BAAI/bge-reranker-v2-m3`, ±1,2 GB RAM), didaftarkan sebagai model `Rerank` dengan
+`base_url` server itu, lalu `WEKNORA_RERANK_MODEL_ID=<id>` dan `pnpm weknora:agent`. Pada mesin
+7,7 GB ini ia tidak muat bersama portal dan model penjawab, jadi tidak dijalankan.
 
 `summary_model_id` senasib: hanya bisa diatur saat knowledge base dibuat, sehingga mengubahnya
 berarti membuat ulang knowledge base dan mengindeks ulang seluruh dokumen.

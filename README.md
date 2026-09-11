@@ -72,7 +72,7 @@ Akun demo ada di `var/demo-accounts.json` (siti = viewer Infrastruktur+Data; faj
 6. **Bacaan wajib**: budi menandai dokumen VPN dari halaman dokumen; siti melihatnya di Help Center dan mengonfirmasi (versi tercatat); fajar tidak melihat apa pun.
 7. **Dashboard admin** (budi): ubin AI Assistant — jumlah pertanyaan, abstain, kutipan ditolak validasi, pengguna — dari jejak audit, tanpa satu pun teks pertanyaan.
 
-Yang sengaja **tidak** ada dan alasannya ada di [docs/WEKNORA.md](docs/WEKNORA.md): rerank (API versi ini membuang field-nya), summary (teks bebas tanpa permukaan validasi), wiki/Langfuse/unggah ke WeKnora (rekaman tanpa versi IntraDocs tidak bisa dikutip), UI WeKnora sebagai permukaan pengguna (tidak mengenal klasifikasi, scope, grant).
+Yang sengaja **tidak** ada dan alasannya ada di [docs/WEKNORA.md](docs/WEKNORA.md): rerank (Ollama tidak punya endpoint `/rerank`; WeKnora mendapat 404 — knob-nya sudah terpasang di agen `intradocs-portal` dan aktif begitu ada server reranker), summary (teks bebas tanpa permukaan validasi), wiki/Langfuse/unggah ke WeKnora (rekaman tanpa versi IntraDocs tidak bisa dikutip), UI WeKnora sebagai permukaan pengguna (tidak mengenal klasifikasi, scope, grant).
 
 ## Konversi yang jujur
 
