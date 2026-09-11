@@ -373,6 +373,74 @@ export class WeknoraClient {
     return names.slice(0, 10);
   }
 
+  /** Registered models, without their parameters: a provider key lives there. */
+  async listModels(): Promise<Array<{ id: string; name: string; type: string; source: string }>> {
+    const data = await this.json('GET', '/api/v1/models');
+    const items = Array.isArray(data) ? data : [];
+    const out: Array<{ id: string; name: string; type: string; source: string }> = [];
+    for (const item of items) {
+      if (!item || typeof item !== 'object') continue;
+      const r = item as Json;
+      const id = str(r.id);
+      if (id) out.push({ id, name: str(r.name), type: str(r.type), source: str(r.source) });
+    }
+    return out;
+  }
+
+  /** Tag vocabulary of the knowledge base; the pool the auto-tagger may choose from. */
+  async listTags(): Promise<string[]> {
+    const data = asRecord(
+      await this.json(
+        'GET',
+        `/api/v1/knowledge-bases/${encodeURIComponent(this.config.knowledgeBaseId)}/tags?page_size=200`,
+      ),
+    );
+    const items = Array.isArray(data.data) ? data.data : [];
+    const names: string[] = [];
+    for (const item of items) {
+      const name = item && typeof item === 'object' ? str((item as Json).name).trim() : '';
+      if (name && !names.includes(name)) names.push(name);
+    }
+    return names;
+  }
+
+  async createTag(name: string): Promise<void> {
+    await this.json(
+      'POST',
+      `/api/v1/knowledge-bases/${encodeURIComponent(this.config.knowledgeBaseId)}/tags`,
+      { body: { name } },
+    );
+  }
+
+  /**
+   * Turns the auto-tagger on or off for the knowledge base. WeKnora requires the base's
+   * name on every update and reads the tagging block from `config`, so the current name
+   * is fetched first rather than guessed.
+   */
+  async setAutoTag(config: {
+    enabled: boolean;
+    modelId: string;
+    maxTags: number;
+    skipIfTagged: boolean;
+  }): Promise<void> {
+    const kbRoute = `/api/v1/knowledge-bases/${encodeURIComponent(this.config.knowledgeBaseId)}`;
+    const current = asRecord(await this.json('GET', kbRoute));
+    await this.json('PUT', kbRoute, {
+      body: {
+        name: str(current.name),
+        description: str(current.description),
+        config: {
+          auto_tag_config: {
+            enabled: config.enabled,
+            model_id: config.modelId,
+            max_tags: config.maxTags,
+            skip_if_tagged: config.skipIfTagged,
+          },
+        },
+      },
+    });
+  }
+
   async deleteKnowledge(knowledgeId: string): Promise<void> {
     try {
       await this.json('DELETE', `/api/v1/knowledge/${encodeURIComponent(knowledgeId)}`);
@@ -452,6 +520,11 @@ export class WeknoraClient {
           web_search_enabled: false,
           disable_title: true,
           channel: 'api',
+          // WeKnora calls the answering model the "summary model". Pinned here so the
+          // tenant default cannot decide which model -- or which network -- answers.
+          ...(this.config.generationModelId
+            ? { summary_model_id: this.config.generationModelId }
+            : {}),
         },
       },
     );

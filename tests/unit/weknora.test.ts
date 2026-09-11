@@ -89,6 +89,32 @@ test('chat pins agent mode, web search and the knowledge scope off the client', 
   assert.equal(body.skill_names, undefined);
 });
 
+test('the answering model is pinned in the chat body when configured, absent otherwise', async () => {
+  const stream = () =>
+    new Response('data: {"response_type":"complete","done":true}\n\n', { status: 200 });
+  const unpinned = recorder(stream);
+  await new WeknoraClient(config, unpinned.fetchImpl).knowledgeChat('s-1', {
+    query: 'q',
+    knowledgeIds: ['k-1'],
+  });
+  assert.equal(
+    (JSON.parse(String(unpinned.calls[0]!.init.body)) as Record<string, unknown>).summary_model_id,
+    undefined,
+    'without a pin nothing is invented; WeKnora keeps its default',
+  );
+
+  const pinned = recorder(stream);
+  await new WeknoraClient(
+    { ...config, generationModelId: 'model-lokal-0001' },
+    pinned.fetchImpl,
+  ).knowledgeChat('s-1', { query: 'q', knowledgeIds: ['k-1'] });
+  assert.equal(
+    (JSON.parse(String(pinned.calls[0]!.init.body)) as Record<string, unknown>).summary_model_id,
+    'model-lokal-0001',
+    'WeKnora calls the answering model the summary model',
+  );
+});
+
 test('malformed hits are dropped rather than passed on as citations', async () => {
   const { fetchImpl } = recorder(() =>
     json({

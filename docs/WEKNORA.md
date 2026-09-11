@@ -103,6 +103,7 @@ Semua server-side. `scripts/runtime-env.ts` memilih variabel mana yang sampai ke
 | `WEKNORA_BASE_URL`            | —       | Wajib origin http loopback, tanpa path/credential             |
 | `WEKNORA_API_KEY`             | —       | 16–512 karakter tercetak; tidak pernah diserialisasi          |
 | `WEKNORA_KNOWLEDGE_BASE_ID`   | —       | Satu KB, dipilih server. Client tidak bisa mengubahnya        |
+| `WEKNORA_GENERATION_MODEL_ID` | —       | Pin model penjawab. Wajib bila lokasi generasi `external`     |
 | `WEKNORA_MAX_CANDIDATES`      | 6       | Ceiling 20                                                    |
 | `WEKNORA_MAX_SCOPE_DOCUMENTS` | 200     | Ceiling 500. Batas versi yang boleh disebut dalam satu filter |
 | `WEKNORA_SEARCH_TIMEOUT_MS`   | 15000   | Ceiling 60000                                                 |
@@ -319,7 +320,27 @@ Endpoint `POST /api/rag/label-suggestions` (butuh `documents.upload`) dan panel 
 di halaman dokumen. Bukti: `tests/integration/label-suggestions.test.ts` (5) dan
 `tests/http/label-suggestions.test.ts` (7).
 
-Untuk menyalakan ulang dari nol:
+Semua langkah di bawah kini satu perintah, dan perintah itu juga mencetak tabel pengukuran
+di atas untuk model apa pun yang sudah ada di Ollama lokal:
+
+```sh
+ollama pull qwen2.5:3b-instruct          # atau model lain yang muat di RAM
+pnpm weknora:autotag qwen2.5:3b-instruct
+```
+
+Perintah itu mendaftarkan model ke WeKnora bila belum ada, mengisi kolam tag dari label
+IntraDocs, menyalakan auto-tag dengan `skip_if_tagged=false` agar putaran baru menggantikan
+putusan model sebelumnya, reparse semua dokumen terindeks, lalu mencetak per dokumen: label
+IntraDocs, tag pilihan model, dan mana yang akan lolos penyaring kategori. Ia tidak menulis apa
+pun ke IntraDocs — tabelnya untuk menilai model sebelum ada yang mengandalkan sarannya.
+
+**Model lebih besar belum terukur.** Percobaan `qwen2.5:3b-instruct` (1,9 GB, muat di sisa RAM
+bila dev server dimatikan) gagal pada tahap unduh: registry Ollama putus dengan `i/o timeout`,
+dan blob parsial 1,93 GB yang sudah terkumpul dibuang saat pull terputus, lalu percobaan ulang
+diam di 0 KB/s. Itu kendala jaringan pada saat itu, bukan keputusan; perintah di atas dibuat
+justru supaya percobaan itu tinggal dijalankan ulang tanpa mengulang langkah manual.
+
+Langkah manualnya, bila ingin melakukannya lewat API langsung:
 
 ```sh
 # 1. isi kolam tag dari label IntraDocs
@@ -389,6 +410,16 @@ melainkan tidak adanya permukaan validasi:
 Kalau nanti dinyalakan, syaratnya: model yang lebih mampu, dan summary ditampilkan sebagai
 draf yang harus diadopsi lewat revisi — persis pola saran label, bukan teks yang langsung
 tampil sebagai milik dokumen.
+
+Satu hal yang **memang** dipakai dari field ini: pada permintaan chat, `summary_model_id`
+berarti *model penyusun jawaban* dan bisa dipin per permintaan. Sebelumnya IntraDocs membiarkan
+WeKnora memakai default tenant, sehingga model apa pun yang belakangan didaftarkan sebagai
+default — termasuk model eksternal — akan diam-diam menjadi penjawab. Kini
+`WEKNORA_GENERATION_MODEL_ID` memin model itu dari sisi server IntraDocs, dan untuk
+`AI_GENERATION_LOCATION=external` pin ini **wajib**: default tenant WeKnora tidak boleh
+menentukan ke jaringan mana sebuah pertanyaan dikirim. Generasi lokal boleh tanpa pin.
+Bukti: `tests/unit/weknora.test.ts` ("the answering model is pinned…") dan
+`tests/unit/core.test.ts` ("external generation is refused…").
 
 ### UI WeKnora: alat operator, bukan pintu kedua ke korpus
 

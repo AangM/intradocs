@@ -253,12 +253,32 @@ test('external generation is refused until it is acknowledged in words', () => {
     () => readAiConfig({ ...base, AI_GENERATION_LOCATION: 'external' }),
     /AI_EXTERNAL_ACKNOWLEDGED/,
   );
-  // With the acknowledgement it is allowed, and the status reports it rather than hiding it.
+  // Acknowledged but unpinned is still refused: WeKnora's tenant default must never be
+  // what decides which network a question is sent to.
+  assert.throws(
+    () =>
+      readAiConfig({
+        ...base,
+        AI_GENERATION_LOCATION: 'external',
+        AI_EXTERNAL_ACKNOWLEDGED: 'synthetic-corpus-only',
+      }),
+    /WEKNORA_GENERATION_MODEL_ID/,
+  );
+  // With the acknowledgement and a pinned model it is allowed, and the status reports it.
   const external = readAiConfig({
     ...base,
     AI_GENERATION_LOCATION: 'external',
     AI_EXTERNAL_ACKNOWLEDGED: 'synthetic-corpus-only',
+    WEKNORA_GENERATION_MODEL_ID: 'model-eksternal-0001',
   });
+  assert.equal(external.weknora?.generationModelId, 'model-eksternal-0001');
+  // A pin that is not a plausible model id is refused rather than sent along.
+  assert.throws(
+    () => readAiConfig({ ...base, WEKNORA_GENERATION_MODEL_ID: 'x y' }),
+    /WEKNORA_GENERATION_MODEL_ID/,
+  );
+  // Local generation may stay unpinned; the default is then WeKnora's local model.
+  assert.equal(readAiConfig(base).weknora?.generationModelId, null);
   assert.equal(external.generationLocation, 'external');
   assert.equal(describeAiConfig(external).generationLocation, 'external');
   // A typo is a hard error, never a silent fallback to local.

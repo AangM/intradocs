@@ -454,12 +454,145 @@ async function registerExternalModel(): Promise<void> {
   console.log('Jalankan pnpm weknora:status untuk memastikan, lalu restart pnpm dev.');
 }
 
+/**
+ * Auto-tag experiment, repeatable: `pnpm weknora:autotag <ollama-model>`.
+ *
+ * Seeds WeKnora's tag pool from IntraDocs labels, points the auto-tagger at a local
+ * Ollama model, reparses every indexed document, then prints what the model chose next
+ * to what IntraDocs would accept. Nothing is written to IntraDocs: the point of the table
+ * is to judge a model before anyone relies on its suggestions.
+ */
+async function autotag(): Promise<void> {
+  loadLocalEnv();
+  const ai = readAiConfig(process.env);
+  if (!ai.weknora) throw new Error('AI_PROVIDER masih off. Aktifkan weknora-local dulu.');
+  const modelName = process.argv[3] ?? '';
+  if (!/^[a-z0-9][a-z0-9._\/-]*(:[a-z0-9._-]+)?$/i.test(modelName))
+    throw new Error('Gunakan: pnpm weknora:autotag <nama-model-ollama>, misal qwen2.5:3b-instruct.');
+
+  // The model has to exist locally first; WeKnora would otherwise try to pull it itself.
+  const ollamaHost = assertLoopbackHttpOrigin(
+    process.env.OLLAMA_HOST_URL ?? 'http://127.0.0.1:11434',
+    'OLLAMA_HOST_URL',
+  );
+  const tags = (await (await fetch(`${ollamaHost}/api/tags`, { signal: AbortSignal.timeout(10_000) })).json()) as {
+    models?: Array<{ name?: string }>;
+  };
+  if (!(tags.models ?? []).some((m) => m.name === modelName))
+    throw new Error(`Model ${modelName} belum ada di Ollama lokal. Jalankan: ollama pull ${modelName}`);
+
+  const client = new WeknoraClient(ai.weknora);
+  let model = (await client.listModels()).find(
+    (m) => m.type === 'KnowledgeQA' && m.source === 'local' && m.name === modelName,
+  );
+  if (!model) {
+    const id = await client.registerModel({
+      name: modelName,
+      displayName: `ollama ${modelName}`,
+      type: 'KnowledgeQA',
+      source: 'local',
+      parameters: { base_url: process.env.WEKNORA_OLLAMA_URL ?? 'http://host.docker.internal:11434' },
+    });
+    model = { id, name: modelName, type: 'KnowledgeQA', source: 'local' };
+    console.log(`Model ${modelName} terdaftar di WeKnora (id ${id}).`);
+  }
+
+  // Vocabulary and index mapping come from IntraDocs; labels are per category there.
+  const admin = new Pool({ connectionString: localAdminUrl(), max: 1 });
+  let docs: Array<{ knowledgeId: string; title: string; category: string; labels: string[]; vocabulary: string[] }>;
+  let labelNames: string[];
+  try {
+    labelNames = (
+      await admin.query<{ name: string }>(
+        'SELECT DISTINCT name FROM app.labels WHERE merged_into IS NULL ORDER BY name',
+      )
+    ).rows.map((r) => r.name);
+    docs = (
+      await admin.query<{
+        knowledge_id: string;
+        title: string;
+        category: string;
+        labels: string[];
+        vocabulary: string[] | null;
+      }>(
+        `SELECT e.knowledge_id, v.title, c.name AS category, v.labels,
+           (SELECT array_agg(l.name ORDER BY l.name) FROM app.labels l
+             WHERE l.category_id=v.category_id AND l.merged_into IS NULL) AS vocabulary
+         FROM app.rag_index_entries e
+         JOIN app.document_versions v ON v.id=e.version_id
+         JOIN app.categories c ON c.id=v.category_id
+         ORDER BY v.title`,
+      )
+    ).rows.map((r) => ({
+      knowledgeId: r.knowledge_id,
+      title: r.title,
+      category: r.category,
+      labels: r.labels,
+      vocabulary: r.vocabulary ?? [],
+    }));
+  } finally {
+    await admin.end();
+  }
+  if (docs.length === 0) throw new Error('Belum ada dokumen terindeks; jalankan pnpm weknora:sync dulu.');
+
+  const existing = await client.listTags();
+  for (const name of labelNames) if (!existing.includes(name)) await client.createTag(name);
+  console.log(`Kolam tag WeKnora: ${labelNames.length} label IntraDocs.`);
+
+  // skip_if_tagged=false so a rerun with a different model replaces the previous verdict.
+  await client.setAutoTag({ enabled: true, modelId: model.id, maxTags: 5, skipIfTagged: false });
+  await client.reparseKnowledge(docs.map((d) => d.knowledgeId));
+  console.log(`Reparse ${docs.length} dokumen dengan ${modelName}; menunggu tag (maks 10 menit)...`);
+
+  const before = new Map<string, string>();
+  for (const d of docs) before.set(d.knowledgeId, (await client.knowledgeTags(d.knowledgeId)).join('|'));
+  const deadline = Date.now() + 10 * 60_000;
+  const result = new Map<string, string[]>();
+  while (Date.now() < deadline && result.size < docs.length) {
+    await new Promise((r) => setTimeout(r, 15_000));
+    for (const d of docs) {
+      if (result.has(d.knowledgeId)) continue;
+      const now = await client.knowledgeTags(d.knowledgeId);
+      // A changed set, or any set at all when there was none, counts as this run's answer.
+      if (now.join('|') !== before.get(d.knowledgeId) || (now.length > 0 && before.get(d.knowledgeId) === ''))
+        result.set(d.knowledgeId, now);
+    }
+  }
+
+  let correct = 0, wrong = 0, none = 0, accepted = 0;
+  console.log('');
+  console.log('Dokumen | Kategori | Label IntraDocs | Tag model | Lolos penyaring');
+  for (const d of docs) {
+    const chosen = result.get(d.knowledgeId) ?? [];
+    const lower = (x: string) => x.toLowerCase();
+    const passes = chosen.filter(
+      (t) => d.vocabulary.some((v) => lower(v) === lower(t)) && !d.labels.some((l) => lower(l) === lower(t)),
+    );
+    const hits = chosen.filter((t) => d.labels.some((l) => lower(l) === lower(t)));
+    if (chosen.length === 0) none += 1;
+    correct += hits.length;
+    wrong += chosen.length - hits.length;
+    accepted += passes.length;
+    console.log(
+      `${d.title.slice(0, 40)} | ${d.category} | ${d.labels.join(', ') || '—'} | ${chosen.join(', ') || '(tidak ada)'} | ${passes.join(', ') || '—'}`,
+    );
+  }
+  console.log('');
+  console.log(
+    `${modelName}: ${correct} tag cocok label yang ada, ${wrong} tidak cocok, ${none} dokumen tanpa tag, ` +
+      `${accepted} saran baru yang akan lolos ke IntraDocs.`,
+  );
+  if (result.size < docs.length)
+    console.log(`Catatan: ${docs.length - result.size} dokumen belum memberi jawaban dalam 10 menit.`);
+}
+
 async function main(): Promise<void> {
   const action = process.argv[2];
   if (action === 'setup') return setup();
   if (action === 'sync') return sync();
   if (action === 'status') return status();
   if (action === 'model') return registerExternalModel();
+  if (action === 'autotag') return autotag();
   if (action === 'stop') {
     loadLocalEnv();
     command('docker', ['compose', '--env-file', '.env.local', '--profile', 'weknora', 'stop']);
@@ -467,7 +600,7 @@ async function main(): Promise<void> {
     return;
   }
   throw new Error(
-    'Gunakan: pnpm weknora:setup | weknora:sync | weknora:status | weknora:model | weknora:stop.',
+    'Gunakan: pnpm weknora:setup | weknora:sync | weknora:status | weknora:model | weknora:autotag | weknora:stop.',
   );
 }
 
