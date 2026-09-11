@@ -440,12 +440,19 @@ export class WeknoraClient {
     return tags;
   }
 
-  /** Removing a tag also removes every knowledge it was attached to -- the clean slate. */
-  async deleteTag(tagId: string): Promise<void> {
-    await this.json(
-      'DELETE',
-      `/api/v1/knowledge-bases/${encodeURIComponent(this.config.knowledgeBaseId)}/tags/${encodeURIComponent(tagId)}`,
-    );
+  /**
+   * Detaches every tag from the given records, leaving the tag pool itself alone. WeKnora
+   * refuses to delete a tag that is still referenced, so this is how a run starts clean:
+   * `updates` is a map of knowledge id to the exact tag ids it should carry.
+   */
+  async clearKnowledgeTags(knowledgeIds: readonly string[]): Promise<void> {
+    if (knowledgeIds.length === 0) return;
+    await this.json('PUT', '/api/v1/knowledge/tags', {
+      body: {
+        kb_id: this.config.knowledgeBaseId,
+        updates: Object.fromEntries(knowledgeIds.map((id) => [id, []])),
+      },
+    });
   }
 
   async createTag(name: string): Promise<void> {

@@ -340,11 +340,26 @@ Baseline `qwen2.5:1.5b-instruct` lewat perintah itu (7 dokumen terindeks, `skip_
 tidak memilikinya), 2 dokumen tanpa tag, **0 saran baru lolos**. Angka pembanding untuk model
 berikutnya.
 
-**Model lebih besar belum terukur.** Percobaan `qwen2.5:3b-instruct` (1,9 GB, muat di sisa RAM
-bila dev server dimatikan) gagal pada tahap unduh: registry Ollama putus dengan `i/o timeout`,
-dan blob parsial 1,93 GB yang sudah terkumpul dibuang saat pull terputus, lalu percobaan ulang
-diam di 0 KB/s. Itu kendala jaringan pada saat itu, bukan keputusan; perintah di atas dibuat
-justru supaya percobaan itu tinggal dijalankan ulang tanpa mengulang langkah manual.
+**Model lebih besar, terukur** (`qwen2.5:3b-instruct`, 1,9 GB, dijalankan dengan dev server
+dimatikan agar muat di RAM; kolam tag sama, semua keterikatan lama dilepas dulu):
+
+|                                     | 1.5B | 3B    |
+| ----------------------------------- | ---- | ----- |
+| tag cocok label yang ada            | 3    | **5** |
+| tag tidak cocok                     | 4    | 10    |
+| dokumen tanpa tag                   | 2    | **0** |
+| saran baru lolos penyaring kategori | 0    | **2** |
+
+3B menangkap label yang benar lebih sering — SOP-IT-014 → _Identity, SOP_ persis; Lampiran
+Rahasia → _Kritikal_ persis; VPN → _Runbook_ — tetapi menebak jauh lebih banyak (Standar
+Penamaan diberi lima tag, tak satu pun benar). Dua saran yang lolos, keduanya untuk Kebijakan
+Backup: _Kritikal_ (masuk akal) dan _Runbook_ (bukan). Penyaring kategori membuang 8 tebakan
+lainnya. Kesimpulan desain tidak berubah: saran, bukan keputusan; dan 3B adalah model yang
+layak dipakai untuk fitur ini bila RAM mengizinkan, 1.5B tidak.
+
+Catatan implementasi: WeKnora **menolak menghapus tag yang masih terikat** (`400 标签仍有知识…`),
+jadi perintah ini tidak membangun ulang kolam; ia melepas semua keterikatan lewat
+`PUT /api/v1/knowledge/tags` dengan `updates` berbentuk peta `knowledge_id → [tag_id]`.
 
 Langkah manualnya, bila ingin melakukannya lewat API langsung:
 

@@ -551,12 +551,15 @@ async function autotag(): Promise<void> {
     throw new Error('Belum ada dokumen terindeks; jalankan pnpm weknora:sync dulu.');
 
   // Tags accumulate across runs in WeKnora, which would blur one model's verdict into the
-  // next. Deleting a tag drops its attachments too, so the pool is rebuilt from scratch:
-  // the table below is this model's answer and nobody else's. Label suggestions in the
-  // portal are empty for the few minutes this takes.
-  for (const tag of await client.listTags()) await client.deleteTag(tag.id);
-  for (const name of labelNames) await client.createTag(name);
-  console.log(`Kolam tag WeKnora dibangun ulang: ${labelNames.length} label IntraDocs.`);
+  // next. The pool itself stays (WeKnora refuses to delete a tag that is still attached);
+  // what is cleared is every attachment, so the table below is this model's answer and
+  // nobody else's. Label suggestions in the portal are empty for the few minutes this takes.
+  const existing = (await client.listTags()).map((t) => t.name);
+  for (const name of labelNames) if (!existing.includes(name)) await client.createTag(name);
+  await client.clearKnowledgeTags(docs.map((d) => d.knowledgeId));
+  console.log(
+    `Kolam tag WeKnora: ${labelNames.length} label IntraDocs; tag lama dilepas dari ${docs.length} dokumen.`,
+  );
 
   // skip_if_tagged=false so a rerun with a different model replaces the previous verdict.
   await client.setAutoTag({ enabled: true, modelId: model.id, maxTags: 5, skipIfTagged: false });
