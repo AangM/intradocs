@@ -1,4 +1,4 @@
-# IntraDocs · M1–M4 lokal
+# IntraDocs · M1–M5 lokal
 
 Portal knowledge base **local-dev, corpus sintetis, AI opt-in dan off secara default**. Melanjutkan `intradocs-m3-work-checkpoint.zip`, bukan prototipe pengganti. Desain mentor, stack pinned, dan migrasi 001–017 dipertahankan.
 
@@ -7,9 +7,10 @@ Portal knowledge base **local-dev, corpus sintetis, AI opt-in dan off secara def
 - **M1:** Better Auth/session lokal, lima role, category scope, RLS PostgreSQL, proteksi URL/file, audit, shell responsif, penugasan role/scope dan aktivasi akun.
 - **M2:** MD/TXT/PDF berteks/DOCX/XLSX, original + maksimal empat lampiran, scan ClamAV wajib, converter non-AI, canonical gabungan dan provenance/locator, preview, private draft, duplicate/idempotency, retry, revisi immutable, taksonomi.
 - **M4:** WeKnora lokal sebagai mesin RAG di belakang policy gate IntraDocs — ekspor idempoten versi final-approved, retrieval ber-scope, sitasi yang divalidasi ulang ke database pada setiap request, dan abstain bila tidak ada bukti sah. Aktif hanya bila `AI_PROVIDER=weknora-local` diisi sendiri. Rinciannya di [docs/WEKNORA.md](docs/WEKNORA.md).
+- **M5 (V1):** saran label dari auto-tag WeKnora yang disaring kosakata kategori (tidak pernah diterapkan otomatis), permintaan akses dengan keputusan tercatat, bacaan wajib per kategori dengan konfirmasi versi, aksi cabut massal yang atomik, rollback versi via draft, merge label sebagai alias, gerbang relevansi yang membuat asisten menjawab "tidak tahu" pada pertanyaan tanpa bukti, dan metrik AI dari jejak audit di dashboard.
 - **M3:** satu/dua reviewer berbeda, larangan self-approval, justifikasi temuan, minta revisi/tolak, outbox ber-lease/retry, publikasi dan indeks atomik, lexical search ber-RLS, favorit, feedback pemilik, histori, notifikasi, pengingat/expiry, dokumen terkait, dan KPI aktual berfilter periode/unit.
 
-**Bukti dan batas acceptance hanya pada [docs/PLAN.md §0](docs/PLAN.md) dan [docs/WEKNORA.md §8](docs/WEKNORA.md).** Implementasi lokal bukan izin pilot/go-live. SSO, OCR, format V1, diff/rollback, backup/restore produksi, dan persetujuan mentor/security/ops tetap di luar rilis ini. Kualitas retrieval **sudah diukur** pada corpus sintetis lewat `pnpm rag:eval`: recall@5 100% pada 20 pertanyaan answerable dan nol kebocoran pada 10 percobaan lintas izin. Angka itu berlaku untuk fixture ini, bukan untuk dokumen nyata, dan review grounding oleh pemilik domain belum dilakukan — jadi jangan memakai jawabannya sebagai rujukan kebijakan.
+**Bukti dan batas acceptance hanya pada [docs/PLAN.md §0](docs/PLAN.md) dan [docs/WEKNORA.md §8](docs/WEKNORA.md).** Implementasi lokal bukan izin pilot/go-live. SSO, OCR, format V1, diff/rollback, backup/restore produksi, dan persetujuan mentor/security/ops tetap di luar rilis ini. Kualitas retrieval **sudah diukur** pada corpus sintetis lewat `pnpm rag:eval`: recall@5 100% pada 20 pertanyaan answerable, abstain penuh 8/10 pada pertanyaan tanpa bukti, dan nol kebocoran pada 10 percobaan lintas izin. Angka itu berlaku untuk fixture ini, bukan untuk dokumen nyata, dan review grounding oleh pemilik domain belum dilakukan — jadi jangan memakai jawabannya sebagai rujukan kebijakan.
 
 ## Jalankan di laptop
 
@@ -56,6 +57,22 @@ Migrasi bersifat additive. SQL yang sudah diterapkan tidak ditulis ulang. Jangan
 4. Reviewer pertama dan kedua meninjau versi yang sama. Minta revisi/tolak wajib beralasan. Credential palsu/pola PII memerlukan justifikasi; private key harus dihapus lewat versi baru.
 5. Sesudah persetujuan final, worker membangun indeks. Pembaca baru melihat versi setelah `ready/published`; versi aktif lama tetap tersedia bila revisi sedang diproses atau gagal.
 6. Cari kata di dalam isi; filter metadata, simpan favorit, beri feedback. Revisi, pencabutan, expiry, dan perubahan scope/grant berlaku pada query berikutnya termasuk download.
+
+## Demo AI Assistant dan fitur V1 (butuh profil `weknora`)
+
+Jalankan `pnpm weknora:setup` sekali, isi `AI_PROVIDER=weknora-local` (dan `AI_GENERATION=weknora-local` bila ingin jawaban tersusun, bukan hanya sumber), lalu restart `pnpm dev`. Pada laptop 8 GB matikan profil `knowledge` (ClamAV/converter) selama demo AI; keduanya tidak muat bersamaan — unggah akan ditolak `scanner_unavailable`, bukan bypass.
+
+Akun demo ada di `var/demo-accounts.json` (siti = viewer Infrastruktur+Data; fajar = viewer SOP saja; rizky = contributor; budi = super admin).
+
+1. **AI Assistant** sebagai siti: klik pertanyaan pemantik. "MFA pada VPN" → jawaban dengan kutipan yang bisa dibuka ke bagian dokumen; "harga saham" → "tidak tahu" dalam ~1 detik tanpa memanggil model; injeksi "abaikan aturan akses" → tetap "tidak tahu". Jawaban tersusun memakan **30–80 detik** di CPU laptop; sumber saja di bawah 1 detik.
+2. Ulangi pertanyaan VPN sebagai **fajar**: cakupan 1 versi, abstain — scope kategori berlaku pada retrieval, bukan hanya pada halaman.
+3. **Cabut** dokumen VPN sebagai pemiliknya, lalu tanya lagi sebagai siti: hilang dari kutipan pada permintaan berikutnya meski record-nya masih di WeKnora.
+4. **Saran label** (rizky, halaman dokumen): "Lihat saran" menunjukkan tag model yang dibuang penyaring kategori dan tidak ada yang ditulis — model mengusulkan, orang memutuskan.
+5. **Permintaan akses** (`/akses`): siti mengajukan Terbatas untuk Infrastruktur; budi melihat antrean dan memutuskan dengan catatan; memutuskan permintaan sendiri ditolak database.
+6. **Bacaan wajib**: budi menandai dokumen VPN dari halaman dokumen; siti melihatnya di Help Center dan mengonfirmasi (versi tercatat); fajar tidak melihat apa pun.
+7. **Dashboard admin** (budi): ubin AI Assistant — jumlah pertanyaan, abstain, kutipan ditolak validasi, pengguna — dari jejak audit, tanpa satu pun teks pertanyaan.
+
+Yang sengaja **tidak** ada dan alasannya ada di [docs/WEKNORA.md](docs/WEKNORA.md): rerank (API versi ini membuang field-nya), summary (teks bebas tanpa permukaan validasi), wiki/Langfuse/unggah ke WeKnora (rekaman tanpa versi IntraDocs tidak bisa dikutip), UI WeKnora sebagai permukaan pengguna (tidak mengenal klasifikasi, scope, grant).
 
 ## Konversi yang jujur
 

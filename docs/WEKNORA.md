@@ -194,9 +194,9 @@ Dijalankan pada RC M1–M3 dengan profil `weknora` hidup, PostgreSQL lokal, dan 
 | ------------------------------------------- | ------------------------------------------------------------- |
 | Unit                                        | **266 lulus**, 0 gagal, 3 skip                                |
 | Konten (render Markdown)                    | **3 lulus** — sebelumnya gagal impor `react`, kini diperbaiki |
-| Integrasi PostgreSQL/RLS                    | **37 lulus**, 0 gagal                                         |
-| HTTP (termasuk 11 uji RAG)                  | **32 lulus**, 0 gagal                                         |
-| E2E browser desktop + mobile                | **14 lulus**, 0 gagal                                         |
+| Integrasi PostgreSQL/RLS                    | **52 lulus**, 0 gagal                                         |
+| HTTP (RAG, saran label, akses, bacaan wajib, cabut massal) | **47 lulus**, 0 gagal; suite unggah butuh profil `knowledge` yang tidak muat bersama WeKnora di 8 GB |
+| E2E browser desktop + mobile                | **14 lulus** (satu uji portal sempat timeout saat run penuh 12 menit berjalan bersamaan dengan generasi LLM di CPU; lulus 3,9 s saat diulang sendiri) |
 | Lint, typecheck, format, build produksi     | **Lulus**                                                     |
 | WeKnora sungguhan end-to-end                | **Lulus** — 7 dokumen terindeks, sync diulang 3× tetap 7      |
 | Q4 (40 gold questions, recall@5, grounding) | **Dijalankan pada corpus sintetis** (tabel di bawah); review grounding oleh pemilik domain masih terbuka |

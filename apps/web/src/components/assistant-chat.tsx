@@ -36,11 +36,14 @@ export function AssistantChat({
   maxQuestionChars,
   generating = false,
   external = false,
+  starters = [],
 }: {
   maxQuestionChars: number;
   generating?: boolean;
   /** Answers are composed by a provider on the internet, not on this machine. */
   external?: boolean;
+  /** Example questions; a click asks them as-is. What they return still depends on scope. */
+  starters?: readonly string[];
 }) {
   const fieldId = useId();
   const [question, setQuestion] = useState('');
@@ -143,6 +146,24 @@ export function AssistantChat({
           </button>
         </footer>
       </form>
+
+      {starters.length > 0 && !result && !pending && (
+        <div className="reader-actions" aria-label="Contoh pertanyaan">
+          {starters.map((text) => (
+            <button
+              key={text}
+              type="button"
+              className="btn btn-sm"
+              onClick={() => {
+                setQuestion(text);
+                void ask(text);
+              }}
+            >
+              {text}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="rag-result" aria-live="polite" aria-busy={pending}>
         {pending && (

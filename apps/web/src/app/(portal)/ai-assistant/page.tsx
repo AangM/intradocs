@@ -25,6 +25,12 @@ export default async function Assistant() {
           maxQuestionChars={config.weknora.maxQuestionChars}
           generating={config.generation === 'weknora-local'}
           external={config.generationLocation === 'external'}
+          starters={[
+            'Apakah MFA dibutuhkan saat masuk ke profil VPN laboratorium?',
+            'Kapan sebuah backup baru boleh dianggap berhasil?',
+            'Apa prasyarat memasang agent monitoring di server laboratorium?',
+            'Berapa harga saham perusahaan hari ini?',
+          ]}
         />
       </div>
     );
