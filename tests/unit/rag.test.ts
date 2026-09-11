@@ -22,6 +22,7 @@ import {
   type AllowedSource,
   type IndexEntry,
   type DesiredVersion,
+  gateByRelevance,
 } from '../../packages/core/src/rag.ts';
 import { InputError } from '../../packages/core/src/validation.ts';
 
@@ -379,4 +380,67 @@ test('questions are bounded and free of control characters', () => {
 test('the abstain message promises nothing it cannot show a source for', () => {
   assert(ABSTAIN_MESSAGE.includes('tanpa bukti'));
   assert(!/mungkin|kemungkinan|biasanya/i.test(ABSTAIN_MESSAGE));
+});
+
+// ---- relevance gate -----------------------------------------------------------------
+
+const hit = (
+  knowledgeId: string,
+  chunkId: string,
+  score: number,
+  matchType?: 'vector' | 'keyword' | 'context' | 'other',
+) => ({ knowledgeId, chunkId, content: `isi ${chunkId}`, score, matchType });
+
+test('a zero threshold leaves the fused ranking exactly as it came', () => {
+  const hybrid = [hit('k1', 'c1', 0.016), hit('k2', 'c2', 0.016)];
+  const gated = gateByRelevance(hybrid, [hit('k1', 'c1', 0.9)], 0);
+  assert.deepEqual(gated.kept, hybrid);
+  assert.equal(gated.dropped, 0);
+  assert.equal(gated.topRelevance, null);
+});
+
+test('fused candidates are judged by the similarity of the vector pass, not by the RRF constant', () => {
+  const hybrid = [hit('k1', 'c1', 0.016, 'other'), hit('k2', 'c2', 0.016, 'other')];
+  const vector = [hit('k2', 'c2', 0.61, 'vector'), hit('k1', 'c1', 0.31, 'vector')];
+  const gated = gateByRelevance(hybrid, vector, 0.45);
+  assert.deepEqual(
+    gated.kept.map((h) => h.chunkId),
+    ['c2'],
+    'the weak one is dropped even though it ranked first',
+  );
+  assert.equal(gated.dropped, 1);
+  assert.equal(gated.topRelevance, 0.61);
+});
+
+test('an exact keyword match survives without a similarity; nothing else does', () => {
+  const hybrid = [hit('k1', 'c1', 0.016, 'keyword'), hit('k2', 'c2', 0.016, 'other')];
+  const gated = gateByRelevance(hybrid, [], 0.45);
+  assert.deepEqual(gated.kept.map((h) => h.chunkId), ['c1']);
+  assert.equal(gated.dropped, 1);
+  assert.equal(gated.topRelevance, null, 'a keyword hit is evidence but carries no similarity');
+});
+
+test('vector hits the fused ranking missed are added when they clear the bar', () => {
+  const gated = gateByRelevance(
+    [hit('k1', 'c1', 0.016, 'other')],
+    [hit('k1', 'c1', 0.5, 'vector'), hit('k3', 'c3', 0.7, 'vector'), hit('k4', 'c4', 0.2, 'vector')],
+    0.45,
+  );
+  assert.deepEqual(gated.kept.map((h) => h.chunkId), ['c3', 'c1'], 'ordered by similarity');
+});
+
+test('context chunks are never evidence, whichever pass returned them', () => {
+  const gated = gateByRelevance(
+    [hit('k1', 'c1', 0.9, 'context')],
+    [hit('k1', 'c1', 0.9, 'context'), hit('k1', 'c9', 0.9, 'context')],
+    0.45,
+  );
+  assert.deepEqual(gated.kept, []);
+  assert.equal(gated.dropped, 1);
+});
+
+test('an empty result abstains: no candidate, no citation, whatever the threshold', () => {
+  const gated = gateByRelevance([], [], 0.45);
+  assert.deepEqual(gated.kept, []);
+  assert.equal(gated.topRelevance, null);
 });

@@ -28,11 +28,15 @@ export interface WeknoraKnowledge {
   parseStatus: string;
 }
 
+export type WeknoraMatchType = 'vector' | 'keyword' | 'context' | 'other';
+
 export interface WeknoraSearchHit {
   knowledgeId: string;
   chunkId: string;
   content: string;
   score: number;
+  /** How WeKnora found this chunk; context chunks are neighbours, not matches. */
+  matchType: WeknoraMatchType;
   seq: number;
   chunkIndex: number;
   startAt: number;
@@ -51,6 +55,7 @@ export interface WeknoraSearchRequest {
   matchCount: number;
   /** Keyword-only retrieval keeps a deployment without an embedding model usable. */
   disableVectorMatch?: boolean;
+  disableKeywordsMatch?: boolean;
 }
 
 type Json = Record<string, unknown>;
@@ -82,6 +87,22 @@ function num(value: unknown, fallback = 0): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
 
+/** WeKnora's MatchType enum: 0 embedding, 1 keywords, 2/4/5 context enrichment. */
+function matchType(value: unknown): WeknoraMatchType {
+  switch (value) {
+    case 0:
+      return 'vector';
+    case 1:
+      return 'keyword';
+    case 2:
+    case 4:
+    case 5:
+      return 'context';
+    default:
+      return 'other';
+  }
+}
+
 function toHit(value: unknown): WeknoraSearchHit | null {
   if (!value || typeof value !== 'object') return null;
   const r = value as Json;
@@ -93,6 +114,7 @@ function toHit(value: unknown): WeknoraSearchHit | null {
     chunkId: str(r.id),
     content,
     score: num(r.score),
+    matchType: matchType(r.match_type),
     seq: num(r.seq),
     chunkIndex: num(r.chunk_index),
     startAt: num(r.start_at),
@@ -491,6 +513,7 @@ export class WeknoraClient {
           knowledge_ids: [...request.knowledgeIds],
           match_count: request.matchCount,
           ...(request.disableVectorMatch ? { disable_vector_match: true } : {}),
+          ...(request.disableKeywordsMatch ? { disable_keywords_match: true } : {}),
         },
       },
     );

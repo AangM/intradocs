@@ -236,6 +236,31 @@ test('app and worker never inherit migration/auth secrets they do not need', () 
   assert.equal(worker.BETTER_AUTH_SECRET, undefined);
   assert.equal(worker.WORKER_DATABASE_URL, 'worker-secret');
 });
+test('every AI setting the config reader understands reaches the web process', () => {
+  // A setting that readAiConfig honours but childEnvironment drops is silently ignored
+  // at runtime: an operator tightens a threshold or declares generation external and
+  // the server keeps its defaults. So the allowlist has to cover them all.
+  const env = {
+    ...baseline,
+    AI_PROVIDER: 'weknora-local',
+    AI_GENERATION: 'weknora-local',
+    AI_GENERATION_LOCATION: 'external',
+    AI_EXTERNAL_ACKNOWLEDGED: 'synthetic-corpus-only',
+    WEKNORA_BASE_URL: 'http://127.0.0.1:47080',
+    WEKNORA_API_KEY: 'sk-local-abcdefghijklmnop',
+    WEKNORA_KNOWLEDGE_BASE_ID: 'kb-uji-1234',
+    WEKNORA_GENERATION_MODEL_ID: 'model-eksternal-0001',
+    WEKNORA_MIN_RELEVANCE: '0.6',
+    EXTERNAL_MODEL_API_KEY: 'never-forwarded',
+  };
+  const web = childEnvironment(env, 'web');
+  const seen = readAiConfig(web);
+  assert.equal(seen.generationLocation, 'external');
+  assert.equal(seen.weknora?.generationModelId, 'model-eksternal-0001');
+  assert.equal(seen.weknora?.minRelevance, 0.6);
+  // The provider key is for the one-off registration script, never for the portal.
+  assert.equal(web.EXTERNAL_MODEL_API_KEY, undefined);
+});
 
 test('external generation is refused until it is acknowledged in words', () => {
   const base = {
@@ -279,6 +304,12 @@ test('external generation is refused until it is acknowledged in words', () => {
   );
   // Local generation may stay unpinned; the default is then WeKnora's local model.
   assert.equal(readAiConfig(base).weknora?.generationModelId, null);
+  // The relevance gate has a calibrated default, accepts 0 to switch off, refuses nonsense.
+  assert.equal(readAiConfig(base).weknora?.minRelevance, 0.45);
+  assert.equal(readAiConfig({ ...base, WEKNORA_MIN_RELEVANCE: '0' }).weknora?.minRelevance, 0);
+  assert.equal(readAiConfig({ ...base, WEKNORA_MIN_RELEVANCE: '0.6' }).weknora?.minRelevance, 0.6);
+  for (const bad of ['1.5', '-0.1', 'abc', '.5'])
+    assert.throws(() => readAiConfig({ ...base, WEKNORA_MIN_RELEVANCE: bad }), /WEKNORA_MIN_RELEVANCE/);
   assert.equal(external.generationLocation, 'external');
   assert.equal(describeAiConfig(external).generationLocation, 'external');
   // A typo is a hard error, never a silent fallback to local.

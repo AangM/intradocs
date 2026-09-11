@@ -36,6 +36,12 @@ export interface WeknoraLimits {
   maxSnippetChars: number;
   /** Longest generated answer accepted from WeKnora. */
   maxAnswerChars: number;
+  /**
+   * Cosine similarity a candidate must reach to be cited; 0 disables the gate. Calibrated
+   * on the Q4 gold set (docs/WEKNORA.md): answerable questions score >= 0.49, most
+   * unanswerable ones < 0.40.
+   */
+  minRelevance: number;
 }
 
 export interface WeknoraConfig extends WeknoraLimits {
@@ -84,6 +90,7 @@ const DEFAULT_LIMITS: WeknoraLimits = {
   maxQuestionChars: 2000,
   maxSnippetChars: 700,
   maxAnswerChars: 4000,
+  minRelevance: 0.45,
 };
 
 // Ceilings, not suggestions: an operator may tune a budget down but may not raise
@@ -100,6 +107,7 @@ const CEILINGS: WeknoraLimits = {
   maxQuestionChars: 4000,
   maxSnippetChars: 2000,
   maxAnswerChars: 8000,
+  minRelevance: 1,
 };
 
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
@@ -148,6 +156,15 @@ function readLimit(
   if (value > CEILINGS[field])
     throw new ConfigurationError(`${key} melewati batas resource M4 (${CEILINGS[field]}).`);
   return value;
+}
+
+/** A similarity in [0, 1]; 0 switches the gate off. Not an integer budget, so not readLimit. */
+function readRelevance(env: Record<string, string | undefined>): number {
+  const raw = env.WEKNORA_MIN_RELEVANCE;
+  if (raw === undefined || raw === '') return DEFAULT_LIMITS.minRelevance;
+  if (!/^(0(\.\d{1,3})?|1(\.0{1,3})?)$/.test(raw))
+    throw new ConfigurationError('WEKNORA_MIN_RELEVANCE harus angka antara 0 dan 1 (0 mematikan gerbang).');
+  return Number(raw);
 }
 
 export function assertLoopbackHttpOrigin(value: string, label: string): string {
@@ -226,6 +243,7 @@ export function readAiConfig(env: Record<string, string | undefined>): AiConfig 
       maxQuestionChars: readLimit(env, 'WEKNORA_MAX_QUESTION_CHARS', 'maxQuestionChars'),
       maxSnippetChars: readLimit(env, 'WEKNORA_MAX_SNIPPET_CHARS', 'maxSnippetChars'),
       maxAnswerChars: readLimit(env, 'WEKNORA_MAX_ANSWER_CHARS', 'maxAnswerChars'),
+      minRelevance: readRelevance(env),
     },
   };
 }

@@ -179,6 +179,66 @@ export interface RawHit {
   chunkId: string;
   content: string;
   score: number;
+  /** Optional: how the engine found the chunk. Absent means unknown. */
+  matchType?: 'vector' | 'keyword' | 'context' | 'other';
+}
+
+export interface GatedRetrieval {
+  kept: RawHit[];
+  /** Candidates that neither a similarity score nor an exact keyword match supported. */
+  dropped: number;
+  /** Best similarity among kept hits, or null when nothing carried a score. */
+  topRelevance: number | null;
+}
+
+/**
+ * Relevance gate.
+ *
+ * WeKnora's fused hybrid score is a rank constant (RRF, 1/61) whenever keyword and vector
+ * results are merged, so it says nothing about how well a chunk matches. A vector-only
+ * pass over the same scope returns the raw similarity instead. The two are joined here:
+ * a hybrid candidate keeps its place if its similarity clears `minRelevance` or if it
+ * was an exact keyword match; vector-only hits the fused ranking missed are added when
+ * they clear the bar; neighbour chunks fetched for context never count as evidence.
+ *
+ * `minRelevance` 0 disables the gate and returns the hybrid list untouched. Nothing here
+ * decides authorisation -- that happens in validateRetrieval, after this.
+ */
+export function gateByRelevance(
+  hybrid: readonly RawHit[],
+  vectorOnly: readonly RawHit[],
+  minRelevance: number,
+): GatedRetrieval {
+  if (!(minRelevance > 0)) return { kept: [...hybrid], dropped: 0, topRelevance: null };
+  const key = (h: RawHit) => `${h.knowledgeId}:${h.chunkId}`;
+  const similarity = new Map<string, number>();
+  for (const h of vectorOnly) if (h.matchType !== 'context') similarity.set(key(h), h.score);
+
+  const scored: Array<{ hit: RawHit; relevance: number }> = [];
+  const keywordOnly: RawHit[] = [];
+  const seen = new Set<string>();
+  let dropped = 0;
+  for (const h of hybrid) {
+    const k = key(h);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    const sim = similarity.get(k) ?? (h.matchType === 'vector' ? h.score : undefined);
+    if (sim !== undefined && sim >= minRelevance) scored.push({ hit: h, relevance: sim });
+    else if (h.matchType === 'keyword') keywordOnly.push(h);
+    else dropped += 1;
+  }
+  for (const h of vectorOnly) {
+    const k = key(h);
+    if (seen.has(k) || h.matchType === 'context') continue;
+    seen.add(k);
+    if (h.score >= minRelevance) scored.push({ hit: h, relevance: h.score });
+  }
+  scored.sort((a, b) => b.relevance - a.relevance);
+  return {
+    kept: [...scored.map((s) => s.hit), ...keywordOnly],
+    dropped,
+    topRelevance: scored.length ? scored[0]!.relevance : null,
+  };
 }
 
 export interface Citation {

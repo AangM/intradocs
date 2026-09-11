@@ -26,6 +26,8 @@ export function childEnvironment(
   // server-side credential and reaches neither the browser bundle nor any response.
   const weknora = [
     'AI_GENERATION',
+    'AI_GENERATION_LOCATION',
+    'AI_EXTERNAL_ACKNOWLEDGED',
     'WEKNORA_BASE_URL',
     'WEKNORA_API_KEY',
     'WEKNORA_KNOWLEDGE_BASE_ID',
@@ -41,6 +43,8 @@ export function childEnvironment(
     'WEKNORA_MAX_QUESTION_CHARS',
     'WEKNORA_MAX_SNIPPET_CHARS',
     'WEKNORA_MAX_ANSWER_CHARS',
+    'WEKNORA_MIN_RELEVANCE',
+    'WEKNORA_GENERATION_MODEL_ID',
   ];
   const keys =
     target === 'web'

@@ -114,15 +114,21 @@ test('with AI off the endpoint fails closed instead of reaching a provider', asy
 
 test('retrieval is scoped per actor and never cites a document out of scope', async () => {
   if (!aiOn) return;
+  // siti has Infrastruktur & Data; fajar has SOP & Proses Bisnis. The same real question
+  // must be answered from each viewer's own categories: the VPN runbook can reach siti
+  // and never fajar, whatever WeKnora ranks. A vague one-word query is not used here
+  // because the relevance gate rightly abstains on it for everyone.
   const siti = await login(IDS.viewer);
   const fajar = await login(IDS.other);
-  const a = JSON.parse((await search(siti, { question: 'panduan' })).text);
-  const b = JSON.parse((await search(fajar, { question: 'panduan' })).text);
+  const question = 'Bagaimana langkah konfigurasi VPN pada perangkat uji?';
+  const a = JSON.parse((await search(siti, { question })).text);
+  const b = JSON.parse((await search(fajar, { question })).text);
   assert(typeof a.scope === 'number' && typeof b.scope === 'number');
+  assert.notEqual(a.scope, b.scope, 'different grants must yield different scopes');
   const ids = (x: { citations?: Array<{ documentId: string }> }) =>
     new Set((x.citations ?? []).map((c) => c.documentId));
-  // Two viewers with different category grants must not converge on one corpus.
-  assert.notDeepEqual([...ids(a)].sort(), [...ids(b)].sort());
+  assert(ids(a).has(docId(1)), 'siti can read the VPN runbook and should be shown it');
+  assert(!ids(b).has(docId(1)), 'fajar has no scope over Infrastruktur; the runbook must not appear');
 });
 
 test('a confidential document never reaches a viewer without an explicit grant', async () => {

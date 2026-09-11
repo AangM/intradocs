@@ -9,6 +9,7 @@ import {
 } from '@intradocs/core/ai-config';
 import { WeknoraClient } from '@intradocs/core/weknora';
 import {
+  gateByRelevance,
   validateRetrieval,
   ABSTAIN_MESSAGE,
   type Citation,
@@ -65,11 +66,21 @@ export async function retrieve(actor: Actor, question: string): Promise<Retrieva
     return { citations: [], knowledgeIds: [], rejectedCount: 0, scopeSize: 0 };
   }
   const client = new WeknoraClient(weknora);
-  const hits: RawHit[] = await client.hybridSearch({
+  const request = {
     knowledgeIds: scope.map((s) => s.knowledgeId),
     queryText: question,
     matchCount: weknora.maxCandidates,
-  });
+  };
+  // Two passes over the same scope: the fused ranking for recall, a vector-only pass for
+  // a similarity the fused score does not carry. The gate joins them; see gateByRelevance.
+  const [hybrid, vectorOnly] = await Promise.all([
+    client.hybridSearch(request),
+    weknora.minRelevance > 0
+      ? client.hybridSearch({ ...request, disableKeywordsMatch: true })
+      : Promise.resolve([]),
+  ]);
+  const gated = gateByRelevance(hybrid, vectorOnly, weknora.minRelevance);
+  const hits: RawHit[] = gated.kept;
   const allowed = await resolveAuthorizedSources(
     actor.id,
     hits.map((h) => h.knowledgeId),

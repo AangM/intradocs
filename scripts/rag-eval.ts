@@ -121,6 +121,14 @@ async function main(): Promise<void> {
     for (const m of misses)
       console.log(`    ${m.q.id}  ${m.q.question.slice(0, 62)}  (dikutip: ${m.citedDocs.length})`);
   }
+  const weak = noEvidence.filter((o) => !o.abstained);
+  if (weak.length) {
+    console.log('\n  Tanpa bukti tetapi mengembalikan sumber:');
+    for (const w of weak)
+      console.log(
+        `    ${w.q.id}  ${w.q.question.slice(0, 62)}  (dikutip: ${w.citedDocs.map((d) => d.slice(-4)).join(', ')})`,
+      );
+  }
   if (leaks.length) {
     console.log('\n  KEBOCORAN:');
     for (const l of leaks)

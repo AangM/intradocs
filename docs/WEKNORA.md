@@ -104,6 +104,7 @@ Semua server-side. `scripts/runtime-env.ts` memilih variabel mana yang sampai ke
 | `WEKNORA_API_KEY`             | —       | 16–512 karakter tercetak; tidak pernah diserialisasi          |
 | `WEKNORA_KNOWLEDGE_BASE_ID`   | —       | Satu KB, dipilih server. Client tidak bisa mengubahnya        |
 | `WEKNORA_GENERATION_MODEL_ID` | —       | Pin model penjawab. Wajib bila lokasi generasi `external`     |
+| `WEKNORA_MIN_RELEVANCE`       | 0.45    | Kemiripan minimum agar dikutip; 0 mematikan gerbang (§14)     |
 | `WEKNORA_MAX_CANDIDATES`      | 6       | Ceiling 20                                                    |
 | `WEKNORA_MAX_SCOPE_DOCUMENTS` | 200     | Ceiling 500. Batas versi yang boleh disebut dalam satu filter |
 | `WEKNORA_SEARCH_TIMEOUT_MS`   | 15000   | Ceiling 60000                                                 |
@@ -198,7 +199,7 @@ Dijalankan pada RC M1–M3 dengan profil `weknora` hidup, PostgreSQL lokal, dan 
 | E2E browser desktop + mobile                | **14 lulus**, 0 gagal                                         |
 | Lint, typecheck, format, build produksi     | **Lulus**                                                     |
 | WeKnora sungguhan end-to-end                | **Lulus** — 7 dokumen terindeks, sync diulang 3× tetap 7      |
-| Q4 (40 gold questions, recall@5, grounding) | **BELUM DIKERJAKAN** — butuh corpus dan reviewer domain       |
+| Q4 (40 gold questions, recall@5, grounding) | **Dijalankan pada corpus sintetis** (tabel di bawah); review grounding oleh pemilik domain masih terbuka |
 
 **Q4 pada corpus sintetis** (`pnpm rag:eval`, 40 pertanyaan di `tests/rag/gold-questions.ts`):
 
@@ -206,8 +207,8 @@ Dijalankan pada RC M1–M3 dengan profil `weknora` hidup, PostgreSQL lokal, dan 
 | --------------------------------- | ------------------------------------------ |
 | 20 answerable (2 multi-sumber)    | recall@5 **100%** — usulan PLAN ≥90%       |
 | 10 lintas izin (termasuk injeksi) | **10/10 tanpa kebocoran**                  |
-| 10 tanpa bukti                    | **0/10 abstain penuh** — lihat batas di §9 |
-| Latensi retrieval                 | p50 479 ms · p95 580 ms · maks 1,1 s       |
+| 10 tanpa bukti                    | **8/10 abstain penuh** dengan gerbang relevansi (§14); sebelumnya 0/10 |
+| Latensi retrieval                 | p50 569 ms · p95 720 ms · maks 853 ms (dua panggilan paralel) |
 
 Recall dilaporkan, bukan dijadikan gerbang: angkanya berlaku untuk fixture ini. Kebocoran nol adalah syarat mutlak, dan `pnpm rag:eval` keluar non-nol bila ada.
 
@@ -254,8 +255,8 @@ WeKnora karena 54329 dan 58080 masuk rentang tersebut. Periksa dengan
 
 ## 10. Batas yang belum selesai
 
-- **Q4 belum dikerjakan.** Tidak ada 40 pertanyaan berlabel, tidak ada angka recall@5, tidak ada review grounding oleh pemilik domain. Tanpa itu kualitas jawaban belum terukur.
-- **Ambang relevansi tidak bisa dipasang dengan mesin ini, dan itu terukur.** Q4 menunjukkan 0/10 abstain pada pertanyaan tanpa bukti: sumber yang cocok lemah tetap dikembalikan. Penyebabnya bukan pilihan angka yang belum dibuat, melainkan tidak adanya sinyal: `score` pada hybrid-search WeKnora selalu bernilai 0,016 — konstanta RRF 1/61 — sehingga tidak membedakan relevansi sama sekali, dan parameter `vector_threshold` berperilaku tidak monotonik saat diukur (ambang 0,0–0,7 menghasilkan 14/14/14/12/15/15/15 hit). Memasang angka di atas sinyal yang tidak ada akan menyembunyikan masalah, bukan menyelesaikannya. Yang tidak pernah terjadi: mengarang jawaban. Perbaikan yang mungkin — menghitung kemiripan sendiri memakai model embedding, lalu mengkalibrasinya terhadap 40 pertanyaan Q4 yang kini tersedia.
+- **Q4 dijalankan pada corpus sintetis, bukan pada corpus nyata.** 40 pertanyaan berlabel, recall@5 dan abstain terukur (§8). Yang belum ada: review grounding jawaban oleh pemilik domain pada dokumen sungguhan — dan itu memang tidak bisa dilakukan dengan data sintetis.
+- **Ambang relevansi — dulu dinyatakan mustahil, ternyata keliru; lihat §14.** Klaim lama bahwa `score` hybrid-search selalu 0,016 benar hanya ketika hasil keyword dan vektor difusi (RRF). Dengan `disable_keywords_match=true` WeKnora mengembalikan kemiripan kosinus asli, terbatas `knowledge_ids`. Gerbangnya kini terpasang, dikalibrasi pada Q4, dan menaikkan abstain dari 0/10 menjadi 8/10 tanpa menurunkan recall. Yang tidak pernah terjadi tetap sama: mengarang jawaban.
 - **`AI_GENERATION` diuji, tetapi tidak dinyalakan secara default.** Dengan `qwen2.5:1.5b-instruct` di Ollama host, jawaban benar-benar grounded pada dokumen. Biayanya diukur: **35–42 detik per jawaban** pada laptop 7,7 GB RAM (target Q5 ≤15 detik), dan permintaan berbarengan membuatnya gagal `503` karena mesin kehabisan memori — saat pengujian hanya tersisa 0,35 GB. Karena itu default tetap `AI_GENERATION=off`: retrieval-only menjawab p95 di bawah 1 detik dan tidak pernah gagal. Untuk menyalakannya:
 
   ```sh
@@ -552,3 +553,63 @@ terpakai tanpa merusak invarian "yang terindeks adalah yang disetujui".
 lahir di sisi WeKnora, tidak punya versi IntraDocs, karena itu tidak bisa dikutip. Semuanya
 tetap mati, dan menyalakannya hanya masuk akal bila hasilnya dibawa kembali ke IntraDocs
 sebagai **saran yang diadopsi lewat revisi** — pola yang sama seperti saran label pada §11.
+
+## 14. Gerbang relevansi: sinyal yang ternyata ada
+
+Sampai sebelum bagian ini, dokumen ini menyatakan ambang relevansi tidak mungkin dipasang karena
+`score` hybrid-search selalu 0,016. Pernyataan itu **keliru sebagian**, dan koreksinya dicatat di
+sini apa adanya.
+
+Yang benar: nilai 0,016 adalah konstanta RRF (1/61) yang muncul **hanya ketika hasil keyword dan
+vektor difusi**. Pada instance ini mesin keyword (ParadeDB) praktis tidak mengembalikan apa pun
+untuk kueri berbahasa Indonesia, sehingga sebagian besar respons sebenarnya sudah membawa skor
+vektor asli — tetapi semantiknya berubah-ubah antar kueri, dan itulah yang membuat percobaan
+`vector_threshold` dulu terlihat tidak monotonik. Cara mendapatkan skor yang **konsisten**:
+panggil hybrid-search kedua kalinya dengan `disable_keywords_match=true`, dalam scope
+`knowledge_ids` yang sama. Respons itu berisi kemiripan kosinus bge-m3 per chunk.
+
+(`/api/v1/knowledge-search` juga mengembalikan skor asli, tetapi **mengabaikan `knowledge_ids`**
+— diuji: dua ID diminta, tujuh dokumen kembali — sehingga tidak dipakai untuk apa pun.)
+
+### Cara kerja `gateByRelevance` (`packages/core/src/rag.ts`)
+
+1. Dua panggilan paralel dalam scope actor: fusi (untuk recall) dan vektor-saja (untuk skor).
+   Latensi p95 tidak berubah (720 ms vs 786 ms sebelumnya).
+2. Kandidat fusi dipertahankan bila kemiripannya ≥ `WEKNORA_MIN_RELEVANCE`, **atau** ia adalah
+   exact keyword match (`match_type=1`). Chunk konteks (`match_type` 2/4/5 — tetangga, parent,
+   relasi) tidak pernah dihitung sebagai bukti.
+3. Hit vektor yang terlewat oleh fusi ditambahkan bila lolos ambang; hasil diurutkan menurut
+   kemiripan.
+4. Kosong berarti abstain. Otorisasi **tidak** diputuskan di sini — `validateRetrieval` tetap
+   berjalan sesudahnya, pada setiap hit yang lolos.
+5. `WEKNORA_MIN_RELEVANCE=0` mematikan gerbang dan mengembalikan perilaku lama persis.
+
+### Kalibrasi pada Q4 (`pnpm rag:eval`, server di-restart per titik)
+
+| Ambang | recall@5 (20 answerable) | abstain (10 tanpa bukti) | Catatan |
+|---|---|---|---|
+| 0 (mati) | 20/20 | 0/10 | keadaan sebelumnya |
+| **0,45 (default)** | **20/20** | **8/10** | n06 (0,458 → VPN), n10 (0,522 → kebijakan backup aktif) masih lolos |
+| 0,48 | 19/20 | 9/10 | a20 (dua sumber) kehilangan sumber keduanya |
+| 0,52 | 15/20 | 9/10 | a10, a13, a16 abstain padahal terjawab |
+
+Distribusi mentahnya: pertanyaan terjawab memiliki skor terbaik 0,491–0,766 (median ≈0,59);
+pertanyaan tanpa bukti 0,314–0,522 (7 dari 10 di bawah 0,40). Kedua kelompok **bertumpang
+tindih di 0,45–0,52**, jadi tidak ada angka yang memisahkan sempurna; 0,45 dipilih karena salah
+abstain (pengguna diberi "tidak tahu" untuk pertanyaan yang sebenarnya terjawab) lebih merugikan
+daripada menampilkan sumber lemah tanpa jawaban. Dua kasus yang tersisa memang "berdekatan
+secara sah": n10 menanyakan kebijakan retensi lama, dan yang dikembalikan adalah kebijakan
+retensi yang berlaku.
+
+Angka ini milik corpus fixture. Untuk corpus nyata, jalankan `pnpm rag:eval` dengan gold set
+milik domain itu sebelum mengubah ambang.
+
+### Satu hal yang ditemukan sambil jalan
+
+`pnpm dev` meneruskan env ke proses web lewat **allowlist eksplisit** (`scripts/runtime-env.ts`).
+`WEKNORA_MIN_RELEVANCE`, `WEKNORA_GENERATION_MODEL_ID`, `AI_GENERATION_LOCATION`, dan
+`AI_EXTERNAL_ACKNOWLEDGED` semula tidak ada di dalamnya — sehingga tiga titik kalibrasi pertama
+diam-diam berjalan pada default, dan pengaturan generasi eksternal tidak pernah sampai ke server
+web (gagal-aman ke `local`, tetapi peringatan di UI juga tidak muncul). Keempatnya kini
+diteruskan, dan `tests/unit/core.test.ts` memastikan setiap setelan yang dipahami `readAiConfig`
+benar-benar sampai ke proses web.
