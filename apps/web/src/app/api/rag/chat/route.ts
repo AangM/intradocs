@@ -9,6 +9,13 @@ export async function POST(request: Request) {
     const config = getAiConfig();
     const { question } = parseChatBody(body, config.weknora?.maxQuestionChars ?? 2000);
     const result = await answerQuestion(actor, question);
-    return { answer: result.answer, citations: result.citations, abstained: result.abstained };
+    return {
+      mode: result.mode,
+      answer: result.answer,
+      abstained: result.abstained,
+      citations: result.citations,
+      rejectedCount: result.rejectedCount,
+      scopeSize: result.scopeSize,
+    };
   });
 }

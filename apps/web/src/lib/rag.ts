@@ -139,6 +139,11 @@ export interface ChatResult {
   answer: string;
   citations: Citation[];
   abstained: boolean;
+  /** Composed by a model, or sources only. */
+  mode: 'generated' | 'evidence-only';
+  /** Same numbers retrieval reports, so the UI can say how wide the search was. */
+  scopeSize: number;
+  rejectedCount: number;
 }
 
 /**
@@ -150,12 +155,14 @@ export async function answerQuestion(actor: Actor, question: string): Promise<Ch
   const config = getAiConfig();
   const weknora = requireEnabled(config);
   const retrieval = await retrieve(actor, question);
+  const mode: ChatResult['mode'] = config.generation === 'weknora-local' ? 'generated' : 'evidence-only';
+  const shape = { mode, scopeSize: retrieval.scopeSize, rejectedCount: retrieval.rejectedCount };
   if (retrieval.citations.length === 0)
-    return { answer: ABSTAIN_MESSAGE, citations: [], abstained: true };
-  if (config.generation !== 'weknora-local') {
+    return { ...shape, answer: ABSTAIN_MESSAGE, citations: [], abstained: true };
+  if (mode !== 'generated') {
     // Retrieval-only mode: sources are shown without a generated answer rather than
     // falling back to any other provider.
-    return { answer: '', citations: retrieval.citations, abstained: false };
+    return { ...shape, answer: '', citations: retrieval.citations, abstained: false };
   }
   const client = new WeknoraClient(weknora);
   // A fresh session per turn: no cross-request memory lives in WeKnora, so nothing
@@ -175,5 +182,5 @@ export async function answerQuestion(actor: Actor, question: string): Promise<Ch
     'rag.chat',
     retrieval.citations.map((c) => c.documentId),
   );
-  return { answer: answer.answer, citations: retrieval.citations, abstained: false };
+  return { ...shape, answer: answer.answer, citations: retrieval.citations, abstained: false };
 }
