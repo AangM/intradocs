@@ -44,7 +44,8 @@
     "rag:eval": "tsx scripts/rag-eval.ts",
     "weknora:model": "tsx scripts/weknora.ts model",
     "weknora:autotag": "tsx scripts/weknora.ts autotag",
-    "weknora:agent": "tsx scripts/weknora.ts agent"
+    "weknora:agent": "tsx scripts/weknora.ts agent",
+    "weknora:lab": "tsx scripts/weknora.ts lab"
   },
   "devDependencies": {
     "@playwright/test": "1.56.1",

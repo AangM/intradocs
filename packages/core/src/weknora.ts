@@ -256,6 +256,59 @@ export class WeknoraClient {
     }
   }
 
+  /** The knowledge base record, as WeKnora stores it. Defaults to the configured base. */
+  async knowledgeBase(id = this.config.knowledgeBaseId): Promise<Record<string, unknown>> {
+    return asRecord(await this.json('GET', `/api/v1/knowledge-bases/${encodeURIComponent(id)}`));
+  }
+
+  /**
+   * Creates a knowledge base with ingest-time features chosen up front. `summary_model_id`
+   * cannot be changed afterwards in this WeKnora version, which is the reason this exists
+   * separately from setup: an experimental base is created whole rather than edited.
+   */
+  async createKnowledgeBase(input: {
+    name: string;
+    description: string;
+    embeddingModelId: string;
+    summaryModelId: string;
+    wiki: boolean;
+    questionGeneration: { enabled: boolean; questionCount: number; modelId: string };
+    autoTag: { enabled: boolean; modelId: string };
+  }): Promise<string> {
+    const data = asRecord(
+      await this.json('POST', '/api/v1/knowledge-bases', {
+        body: {
+          name: input.name,
+          description: input.description,
+          type: 'document',
+          embedding_model_id: input.embeddingModelId,
+          summary_model_id: input.summaryModelId,
+          indexing_strategy: {
+            vector_enabled: true,
+            keyword_enabled: true,
+            graph_enabled: false,
+            wiki_enabled: input.wiki,
+          },
+          chunking_config: { chunk_size: 400, chunk_overlap: 40, enable_parent_child: false },
+          question_generation_config: {
+            enabled: input.questionGeneration.enabled,
+            question_count: input.questionGeneration.questionCount,
+            model_id: input.questionGeneration.modelId,
+          },
+          auto_tag_config: {
+            enabled: input.autoTag.enabled,
+            model_id: input.autoTag.modelId,
+            max_tags: 5,
+            skip_if_tagged: true,
+          },
+        },
+      }),
+    );
+    const id = str(data.id);
+    if (!id) throw new WeknoraError('WeKnora tidak mengembalikan ID knowledge base.', 502, false);
+    return id;
+  }
+
   async findKnowledgeByKeyword(keyword: string): Promise<WeknoraKnowledge[]> {
     const query = new URLSearchParams({ keyword, page: '1', page_size: '20' });
     const data = await this.json(
@@ -500,10 +553,7 @@ export class WeknoraClient {
    * is also the only place this WeKnora version lets a rerank model or a threshold be set.
    * Idempotent: found by name and updated, or created.
    */
-  async ensureAgent(spec: {
-    name: string;
-    config: Record<string, unknown>;
-  }): Promise<string> {
+  async ensureAgent(spec: { name: string; config: Record<string, unknown> }): Promise<string> {
     const listed = await this.json('GET', '/api/v1/agents');
     const items = Array.isArray(listed) ? listed : [];
     const existing = items.find(

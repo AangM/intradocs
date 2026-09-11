@@ -631,3 +631,36 @@ diam-diam berjalan pada default, dan pengaturan generasi eksternal tidak pernah 
 web (gagal-aman ke `local`, tetapi peringatan di UI juga tidak muncul). Keempatnya kini
 diteruskan, dan `tests/unit/core.test.ts` memastikan setiap setelan yang dipahami `readAiConfig`
 benar-benar sampai ke proses web.
+
+## 15. Lab: mencoba semua fitur ingest WeKnora tanpa menyentuh gerbang kebijakan
+
+Summary hanya bisa diatur saat knowledge base dibuat; question generation, auto-tag dan wiki
+membakar inferensi pada setiap ingest. Mengubah knowledge base yang dibaca portal demi mencoba
+semua itu berarti mengubah perilaku produksi untuk sebuah eksperimen. Jalan tengahnya:
+
+```sh
+pnpm weknora:lab            # + --wiki bila ingin pipeline wiki (Map/Reduce, berat di CPU)
+docker compose --env-file .env.local --profile weknora --profile weknora-ui up -d weknora-ui
+# http://127.0.0.1:47081 → login akun layanan (var/weknora-service.json) → knowledge base "intradocs-lab"
+```
+
+`weknora:lab` membuat knowledge base kedua, **`intradocs-lab`**, dengan `summary_model_id`,
+`question_generation_config` (3 pertanyaan per chunk) dan `auto_tag_config` menyala sejak
+dibuat — diverifikasi tersimpan lewat `GET /knowledge-bases/:id` — lalu mengisinya dengan
+**versi yang sama persis** yang sudah diindeks produksi (`app.rag_index_entries`), sehingga
+aturan kelayakan exporter (disetujui, terbit, tidak dicabut, tidak kedaluwarsa) ikut terbawa.
+Kolam tag disalin dari label IntraDocs. ID-nya ditulis ke `.env.local` sebagai
+`WEKNORA_LAB_KNOWLEDGE_BASE_ID`; `readAiConfig` **tidak mengenal kunci itu**, jadi portal tidak
+mungkin membacanya tanpa perubahan kode.
+
+Di UI WeKnora Anda bisa: mengobrol dengan knowledge base lab memakai chat bawaan WeKnora
+(riwayat, query rewrite, saran pertanyaan lanjutan — semua yang dimatikan di agen portal),
+melihat summary per dokumen, pertanyaan yang dihasilkan per chunk, tag otomatis, mengunggah
+berkas (PDF/DOCX) langsung, dan bila `--wiki` dipakai, halaman wiki hasil sintesis lintas
+dokumen.
+
+Batasnya tegas dan tidak bisa dinegosiasikan oleh UI: knowledge base ini hanya boleh berisi
+corpus sintetis, karena UI menampilkan seluruh isinya tanpa klasifikasi, scope, atau grant.
+Registrasi WeKnora tertutup, jadi satu-satunya akun yang bisa masuk adalah akun layanan lokal.
+Apa pun yang terbukti berguna di lab dan **punya permukaan validasi** di IntraDocs (seperti
+tag → label) dipindahkan ke portal dengan pola yang sama: model mengusulkan, orang memutuskan.

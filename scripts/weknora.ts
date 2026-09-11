@@ -14,7 +14,7 @@ import { readAiConfig, assertLoopbackHttpOrigin } from '../packages/core/src/ai-
 import { readWorkerConfig } from '../packages/core/src/config.ts';
 import { WeknoraClient } from '../packages/core/src/weknora.ts';
 import { LocalBlobStore } from '../packages/core/src/storage.ts';
-import { processRagExport, sweepRagOrphans } from '../packages/core/src/rag.ts';
+import { processRagExport, sweepRagOrphans, buildExportPayload } from '../packages/core/src/rag.ts';
 import { ABSTAIN_MESSAGE } from '../packages/core/src/rag-messages.ts';
 import { PostgresRagExportRepository, WeknoraIndexTarget } from '../apps/worker/src/rag-export.ts';
 
@@ -710,9 +710,13 @@ async function pinAgent(): Promise<void> {
   ];
   const stillOn = expectOff.filter((k) => stored[k] === true);
   if (stillOn.length)
-    throw new Error(`WeKnora menyimpan agen dengan fitur yang seharusnya mati: ${stillOn.join(', ')}.`);
+    throw new Error(
+      `WeKnora menyimpan agen dengan fitur yang seharusnya mati: ${stillOn.join(', ')}.`,
+    );
   if (stored.fallback_strategy !== 'fixed')
-    throw new Error(`fallback_strategy tersimpan sebagai ${String(stored.fallback_strategy)}, bukan fixed.`);
+    throw new Error(
+      `fallback_strategy tersimpan sebagai ${String(stored.fallback_strategy)}, bukan fixed.`,
+    );
   if (rerankModelId && stored.rerank_model_id !== rerankModelId)
     throw new Error('WeKnora membuang rerank_model_id pada agen; rerank tidak terpasang.');
   await ensureEnv({ WEKNORA_AGENT_ID: id });
@@ -724,6 +728,143 @@ async function pinAgent(): Promise<void> {
   console.log('Restart pnpm dev agar chat memakai agen ini.');
 }
 
+/**
+ * Lab knowledge base: `pnpm weknora:lab [--wiki]`.
+ *
+ * Everything WeKnora can do to a document at ingest -- summary, generated questions,
+ * auto-tag, optionally the wiki -- is either fixed at knowledge-base creation or costs
+ * inference IntraDocs never asked for. So instead of changing the base the portal reads,
+ * a second base is created with all of it on, filled with the SAME synthetic versions the
+ * exporter already deemed indexable (approved, published, not withdrawn or expired), and
+ * explored through WeKnora's own UI. IntraDocs never reads this base: its id is written to
+ * .env.local as WEKNORA_LAB_KNOWLEDGE_BASE_ID for the operator, and readAiConfig ignores
+ * that key. The UI shows everything in it regardless of IntraDocs permissions, which is
+ * exactly why only the synthetic corpus may ever go there.
+ */
+async function lab(): Promise<void> {
+  loadLocalEnv();
+  const ai = readAiConfig(process.env);
+  if (!ai.weknora) throw new Error('AI_PROVIDER masih off. Aktifkan weknora-local dulu.');
+  const wiki = process.argv.includes('--wiki');
+  const client = new WeknoraClient(ai.weknora);
+
+  // The answering model doubles as summary/tag/question model: it is the one that fits.
+  const models = await client.listModels();
+  const llm =
+    models.find((m) => m.id === ai.weknora?.generationModelId) ??
+    models.find((m) => m.type === 'KnowledgeQA' && m.source === 'local');
+  if (!llm)
+    throw new Error(
+      'Tidak ada model KnowledgeQA lokal di WeKnora; jalankan pnpm weknora:autotag <model> dulu.',
+    );
+  const production = asKb(await client.knowledgeBase());
+  const embeddingModelId = str(production.embedding_model_id);
+
+  let labId = process.env.WEKNORA_LAB_KNOWLEDGE_BASE_ID ?? '';
+  const existing = labId ? await client.knowledgeBase(labId).catch(() => null) : null;
+  if (!existing) {
+    labId = await client.createKnowledgeBase({
+      name: 'intradocs-lab',
+      description:
+        'Salinan corpus SINTETIS untuk mencoba fitur ingest WeKnora (summary, pertanyaan, tag, wiki). Tidak dibaca IntraDocs.',
+      embeddingModelId,
+      summaryModelId: llm.id,
+      wiki,
+      questionGeneration: { enabled: true, questionCount: 3, modelId: llm.id },
+      autoTag: { enabled: true, modelId: llm.id },
+    });
+    await ensureEnv({ WEKNORA_LAB_KNOWLEDGE_BASE_ID: labId });
+    console.log(
+      `Knowledge base lab dibuat (id ${labId}); ditulis ke .env.local sebagai WEKNORA_LAB_KNOWLEDGE_BASE_ID.`,
+    );
+  } else {
+    console.log(`Knowledge base lab sudah ada (id ${labId}).`);
+  }
+  const labClient = new WeknoraClient({ ...ai.weknora, knowledgeBaseId: labId });
+
+  // Same tag pool as production, so auto-tag answers the same question there.
+  const labels = new Pool({ connectionString: localAdminUrl(), max: 1 });
+  type Row = {
+    document_id: string;
+    version_id: string;
+    title: string;
+    label: string;
+    classification: string;
+    category: string;
+    markdown_key: string;
+    markdown_sha256: string;
+  };
+  let rows: Row[];
+  let labelNames: string[];
+  try {
+    labelNames = (
+      await labels.query<{ name: string }>(
+        'SELECT DISTINCT name FROM app.labels WHERE merged_into IS NULL ORDER BY name',
+      )
+    ).rows.map((r) => r.name);
+    // Only what production already indexed: the exporter has applied every eligibility
+    // rule (approval, publication, withdrawal, expiry) before a row lands here.
+    rows = (
+      await labels.query<Row>(
+        `SELECT e.document_id, e.version_id, v.title, v.label, v.classification, c.name AS category,
+              v.markdown_key, v.markdown_sha256
+       FROM app.rag_index_entries e
+       JOIN app.document_versions v ON v.id=e.version_id
+       JOIN app.categories c ON c.id=v.category_id ORDER BY v.title`,
+      )
+    ).rows;
+  } finally {
+    await labels.end();
+  }
+  const have = await labClient.listTags();
+  for (const name of labelNames)
+    if (!have.some((t) => t.name === name)) await labClient.createTag(name);
+
+  const storage = new LocalBlobStore(
+    path.resolve(process.env.INTRADOCS_ROOT ?? ROOT, process.env.STORAGE_ROOT ?? 'var/storage'),
+  );
+  const present = new Set((await labClient.listKnowledge()).map((k) => k.title));
+  const created: string[] = [];
+  for (const r of rows) {
+    const markdown = new TextDecoder('utf-8', { fatal: true }).decode(
+      await storage.read(r.markdown_key, r.markdown_sha256),
+    );
+    const payload = buildExportPayload({
+      documentId: r.document_id,
+      versionId: r.version_id,
+      documentTitle: r.title,
+      versionLabel: r.label,
+      classification: r.classification,
+      categoryName: r.category,
+      markdown,
+    });
+    if (present.has(payload.title)) continue;
+    created.push(await labClient.createManualKnowledge(payload));
+  }
+  await labClient.reparseKnowledge(created);
+  console.log(
+    `${created.length} dokumen baru dikirim ke lab (${rows.length} total terindeks di produksi); parse + summary + pertanyaan + tag berjalan di latar.`,
+  );
+  console.log('');
+  console.log('Buka UI WeKnora ke knowledge base "intradocs-lab":');
+  console.log(
+    '  docker compose --env-file .env.local --profile weknora --profile weknora-ui up -d weknora-ui',
+  );
+  console.log(
+    `  http://127.0.0.1:${process.env.WEKNORA_UI_PORT ?? '47081'}  (login: akun layanan di var/weknora-service.json)`,
+  );
+  console.log(
+    'IntraDocs tidak membaca knowledge base ini; UI menampilkan semuanya tanpa izin IntraDocs — hanya corpus sintetis.',
+  );
+}
+
+function asKb(v: unknown): Record<string, unknown> {
+  return v && typeof v === 'object' ? (v as Record<string, unknown>) : {};
+}
+function str(v: unknown): string {
+  return typeof v === 'string' ? v : '';
+}
+
 async function main(): Promise<void> {
   const action = process.argv[2];
   if (action === 'setup') return setup();
@@ -732,6 +873,7 @@ async function main(): Promise<void> {
   if (action === 'model') return registerExternalModel();
   if (action === 'autotag') return autotag();
   if (action === 'agent') return pinAgent();
+  if (action === 'lab') return lab();
   if (action === 'stop') {
     loadLocalEnv();
     command('docker', ['compose', '--env-file', '.env.local', '--profile', 'weknora', 'stop']);
