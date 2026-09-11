@@ -492,6 +492,47 @@ export class WeknoraClient {
     });
   }
 
+  /**
+   * The agent IntraDocs chats through. Without an agent id WeKnora answers with its
+   * builtin "quick-answer" agent, whose stored config has web search, query rewriting,
+   * five turns of history and a free-model fallback switched ON; IntraDocs has been
+   * switching those off per request. This pins them off in the configuration itself, and
+   * is also the only place this WeKnora version lets a rerank model or a threshold be set.
+   * Idempotent: found by name and updated, or created.
+   */
+  async ensureAgent(spec: {
+    name: string;
+    config: Record<string, unknown>;
+  }): Promise<string> {
+    const listed = await this.json('GET', '/api/v1/agents');
+    const items = Array.isArray(listed) ? listed : [];
+    const existing = items.find(
+      (a) => a && typeof a === 'object' && str((a as Json).name) === spec.name,
+    ) as Json | undefined;
+    const body = {
+      name: spec.name,
+      description: 'Agen IntraDocs: RAG satu giliran, tanpa web, tanpa memori, tanpa alat.',
+      config: spec.config,
+    };
+    if (existing && str(existing.id)) {
+      await this.json('PUT', `/api/v1/agents/${encodeURIComponent(str(existing.id))}`, { body });
+      return str(existing.id);
+    }
+    const created = asRecord(await this.json('POST', '/api/v1/agents', { body }));
+    const id = str(created.id);
+    if (!id) throw new WeknoraError('WeKnora tidak mengembalikan ID agen.', 502, false);
+    return id;
+  }
+
+  /** Stored config of one agent, for verification; prompts stripped to keep output small. */
+  async agentConfig(agentId: string): Promise<Json> {
+    const data = asRecord(await this.json('GET', `/api/v1/agents/${encodeURIComponent(agentId)}`));
+    const config = data.config && typeof data.config === 'object' ? (data.config as Json) : {};
+    const out: Json = {};
+    for (const [k, v] of Object.entries(config)) if (!/prompt|template/.test(k)) out[k] = v;
+    return out;
+  }
+
   async deleteKnowledge(knowledgeId: string): Promise<void> {
     try {
       await this.json('DELETE', `/api/v1/knowledge/${encodeURIComponent(knowledgeId)}`);
@@ -577,6 +618,9 @@ export class WeknoraClient {
           ...(this.config.generationModelId
             ? { summary_model_id: this.config.generationModelId }
             : {}),
+          // The pinned agent carries web search, rewriting, history, tools and the
+          // free-model fallback switched off in its own configuration (see ensureAgent).
+          ...(this.config.agentId ? { agent_id: this.config.agentId } : {}),
         },
       },
     );

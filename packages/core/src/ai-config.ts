@@ -55,6 +55,8 @@ export interface WeknoraConfig extends WeknoraLimits {
    * cannot become the answering model without a change to this server's configuration.
    */
   generationModelId: string | null;
+  /** Custom WeKnora agent whose stored configuration pins every optional capability off. */
+  agentId: string | null;
   tenantId: string | null;
 }
 
@@ -216,6 +218,9 @@ export function readAiConfig(env: Record<string, string | undefined>): AiConfig 
   const tenantRaw = env.WEKNORA_TENANT_ID ?? '';
   if (tenantRaw && !/^\d{1,19}$/.test(tenantRaw))
     throw new ConfigurationError('WEKNORA_TENANT_ID harus numerik bila diisi.');
+  const agentId = env.WEKNORA_AGENT_ID ?? '';
+  if (agentId && !/^[A-Za-z0-9_-]{8,64}$/.test(agentId))
+    throw new ConfigurationError('WEKNORA_AGENT_ID harus ID agen WeKnora bila diisi.');
   const generationModelId = env.WEKNORA_GENERATION_MODEL_ID ?? '';
   if (generationModelId && !/^[A-Za-z0-9_-]{8,64}$/.test(generationModelId))
     throw new ConfigurationError('WEKNORA_GENERATION_MODEL_ID harus ID model WeKnora bila diisi.');
@@ -234,6 +239,7 @@ export function readAiConfig(env: Record<string, string | undefined>): AiConfig 
       knowledgeBaseId,
       tenantId: tenantRaw || null,
       generationModelId: generationModelId || null,
+      agentId: agentId || null,
       requestTimeoutMs: readLimit(env, 'WEKNORA_REQUEST_TIMEOUT_MS', 'requestTimeoutMs'),
       searchTimeoutMs: readLimit(env, 'WEKNORA_SEARCH_TIMEOUT_MS', 'searchTimeoutMs'),
       chatTimeoutMs: readLimit(env, 'WEKNORA_CHAT_TIMEOUT_MS', 'chatTimeoutMs'),

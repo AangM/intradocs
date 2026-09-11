@@ -15,6 +15,7 @@ import { readWorkerConfig } from '../packages/core/src/config.ts';
 import { WeknoraClient } from '../packages/core/src/weknora.ts';
 import { LocalBlobStore } from '../packages/core/src/storage.ts';
 import { processRagExport, sweepRagOrphans } from '../packages/core/src/rag.ts';
+import { ABSTAIN_MESSAGE } from '../packages/core/src/rag-messages.ts';
 import { PostgresRagExportRepository, WeknoraIndexTarget } from '../apps/worker/src/rag-export.ts';
 
 const ENV_FILE = path.join(ROOT, '.env.local');
@@ -630,6 +631,99 @@ async function autotag(): Promise<void> {
   );
 }
 
+/**
+ * Pins the WeKnora agent IntraDocs chats through: `pnpm weknora:agent`.
+ *
+ * Every optional capability is switched off in the stored configuration -- web search,
+ * web fetch, query rewriting and expansion, multi-turn history, tools, MCP, skills,
+ * attachments, FAQ boosting, question suggestions -- and the fallback for "nothing
+ * retrieved" is a fixed abstention instead of a free model answer. The generation model
+ * and, when one exists, the rerank model are pinned here too. The agent id lands in
+ * .env.local as WEKNORA_AGENT_ID; restart pnpm dev afterwards.
+ */
+async function pinAgent(): Promise<void> {
+  loadLocalEnv();
+  const ai = readAiConfig(process.env);
+  if (!ai.weknora) throw new Error('AI_PROVIDER masih off. Aktifkan weknora-local dulu.');
+  const rerankModelId = process.env.WEKNORA_RERANK_MODEL_ID ?? '';
+  if (rerankModelId && !/^[A-Za-z0-9_-]{8,64}$/.test(rerankModelId))
+    throw new Error('WEKNORA_RERANK_MODEL_ID harus ID model WeKnora bila diisi.');
+  const client = new WeknoraClient(ai.weknora);
+  const id = await client.ensureAgent({
+    name: 'intradocs-portal',
+    config: {
+      agent_mode: 'quick-answer',
+      system_prompt_id: 'default_kb',
+      context_template_id: 'default_context',
+      model_id: ai.weknora.generationModelId ?? '',
+      rerank_model_id: rerankModelId,
+      temperature: 0.2,
+      max_completion_tokens: 0,
+      thinking: false,
+      citation_enabled: true,
+      max_iterations: 1,
+      allowed_tools: [],
+      mcp_selection_mode: '',
+      mcp_services: [],
+      skills_selection_mode: '',
+      selected_skills: [],
+      kb_selection_mode: 'all',
+      knowledge_bases: [ai.weknora.knowledgeBaseId],
+      retrieve_kb_only_when_mentioned: false,
+      retain_retrieval_history: false,
+      image_upload_enabled: false,
+      audio_upload_enabled: false,
+      attachment_image_understanding: false,
+      data_analysis_enabled: false,
+      faq_priority_enabled: false,
+      web_search_enabled: false,
+      web_fetch_enabled: false,
+      multi_turn_enabled: false,
+      history_turns: 0,
+      embedding_top_k: 10,
+      keyword_threshold: 0.3,
+      vector_threshold: 0.5,
+      rerank_top_k: 6,
+      rerank_threshold: 0.3,
+      enable_query_expansion: false,
+      enable_rewrite: false,
+      fallback_strategy: 'fixed',
+      fallback_response: ABSTAIN_MESSAGE,
+      question_suggestions: {
+        starters: { enabled: false, mode: 'hybrid', items: [], count: 0 },
+        follow_ups: { enabled: false, mode: 'hybrid', count: 0, categories: [] },
+      },
+    },
+  });
+  // Read back what WeKnora actually stored; a field it silently dropped must be visible.
+  const stored = await client.agentConfig(id);
+  const expectOff = [
+    'web_search_enabled',
+    'web_fetch_enabled',
+    'multi_turn_enabled',
+    'enable_rewrite',
+    'enable_query_expansion',
+    'image_upload_enabled',
+    'audio_upload_enabled',
+    'data_analysis_enabled',
+    'faq_priority_enabled',
+  ];
+  const stillOn = expectOff.filter((k) => stored[k] === true);
+  if (stillOn.length)
+    throw new Error(`WeKnora menyimpan agen dengan fitur yang seharusnya mati: ${stillOn.join(', ')}.`);
+  if (stored.fallback_strategy !== 'fixed')
+    throw new Error(`fallback_strategy tersimpan sebagai ${String(stored.fallback_strategy)}, bukan fixed.`);
+  if (rerankModelId && stored.rerank_model_id !== rerankModelId)
+    throw new Error('WeKnora membuang rerank_model_id pada agen; rerank tidak terpasang.');
+  await ensureEnv({ WEKNORA_AGENT_ID: id });
+  console.log(`Agen intradocs-portal siap (id ${id}); WEKNORA_AGENT_ID ditulis ke .env.local.`);
+  console.log(
+    `  model=${String(stored.model_id) || '(default tenant)'} rerank=${String(stored.rerank_model_id) || '(tidak ada)'} ` +
+      `web=${String(stored.web_search_enabled)} rewrite=${String(stored.enable_rewrite)} history=${String(stored.history_turns)} fallback=${String(stored.fallback_strategy)}`,
+  );
+  console.log('Restart pnpm dev agar chat memakai agen ini.');
+}
+
 async function main(): Promise<void> {
   const action = process.argv[2];
   if (action === 'setup') return setup();
@@ -637,6 +731,7 @@ async function main(): Promise<void> {
   if (action === 'status') return status();
   if (action === 'model') return registerExternalModel();
   if (action === 'autotag') return autotag();
+  if (action === 'agent') return pinAgent();
   if (action === 'stop') {
     loadLocalEnv();
     command('docker', ['compose', '--env-file', '.env.local', '--profile', 'weknora', 'stop']);
@@ -644,7 +739,7 @@ async function main(): Promise<void> {
     return;
   }
   throw new Error(
-    'Gunakan: pnpm weknora:setup | weknora:sync | weknora:status | weknora:model | weknora:autotag | weknora:stop.',
+    'Gunakan: pnpm weknora:setup | weknora:sync | weknora:status | weknora:model | weknora:autotag | weknora:agent | weknora:stop.',
   );
 }
 

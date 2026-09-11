@@ -45,6 +45,7 @@ export function childEnvironment(
     'WEKNORA_MAX_ANSWER_CHARS',
     'WEKNORA_MIN_RELEVANCE',
     'WEKNORA_GENERATION_MODEL_ID',
+    'WEKNORA_AGENT_ID',
   ];
   const keys =
     target === 'web'
