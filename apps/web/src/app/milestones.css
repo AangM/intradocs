@@ -851,3 +851,36 @@ summary,
 .metadata-help .tiny {
   font-size: 12px;
 }
+
+/* S08 · undangan lokal ------------------------------------------------------ */
+.invite-card {
+  grid-column: 1 / -1;
+  width: 100%;
+  margin-top: 12px;
+  text-align: left;
+}
+.invite-link {
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 10px 12px;
+  margin: 8px 0;
+}
+.invite-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+.invite-page {
+  grid-template-columns: 1fr;
+  place-items: center;
+  padding: 40px 20px;
+}
+.invite-page .login-card {
+  width: min(100%, 440px);
+}

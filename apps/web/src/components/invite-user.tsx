@@ -1,0 +1,323 @@
+'use client';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Icon } from './icon';
+
+interface Category {
+  id: string;
+  name: string;
+}
+export interface InvitationItem {
+  id: string;
+  email: string;
+  name: string;
+  unit: string;
+  role: string;
+  scopeAll: boolean;
+  categories: string[];
+  createdAt: string;
+  expiresAt: string;
+  state: 'open' | 'accepted' | 'revoked' | 'expired';
+}
+
+const ROLE_LABELS: Record<string, string> = {
+  knowledge_admin: 'Admin Knowledge',
+  reviewer: 'Reviewer',
+  contributor: 'Contributor',
+  viewer: 'Viewer',
+};
+const STATE_LABELS: Record<InvitationItem['state'], string> = {
+  open: 'Terbuka',
+  accepted: 'Diterima',
+  revoked: 'Dicabut',
+  expired: 'Kedaluwarsa',
+};
+
+/**
+ * "Undang pengguna", the local form: role and scope are fixed by the administrator up
+ * front, the link is shown once and handed over by them (no mail), and the invitee only
+ * ever sets a password. SSO stays a separate, honest "not here".
+ */
+export function InviteUser({
+  categories,
+  invitations,
+  defaultUnit,
+  canPickUnit,
+  canScopeAll,
+}: {
+  categories: Category[];
+  invitations: InvitationItem[];
+  defaultUnit: string;
+  /** Super admins may invite into any unit; knowledge admins only their own. */
+  canPickUnit: boolean;
+  canScopeAll: boolean;
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [link, setLink] = useState<{ email: string; url: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    unit: defaultUnit,
+    role: 'viewer',
+    scopeAll: false,
+    categoryIds: [] as string[],
+  });
+
+  async function submit() {
+    setBusy(true);
+    setError('');
+    try {
+      const r = await fetch('/api/invitations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      const body = (await r.json()) as { error?: string; link?: string };
+      if (!r.ok || !body.link) throw new Error(body.error ?? 'Undangan gagal dibuat.');
+      setLink({ email: form.email, url: body.link });
+      setForm({ ...form, name: '', email: '', categoryIds: [] });
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Koneksi gagal.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function revoke(id: string) {
+    setBusy(true);
+    setError('');
+    try {
+      const r = await fetch(`/api/invitations/${id}`, { method: 'DELETE' });
+      if (!r.ok) throw new Error(((await r.json()) as { error?: string }).error ?? 'Gagal.');
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Koneksi gagal.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const pending = invitations.filter((i) => i.state === 'open');
+  return (
+    <>
+      <button className="btn btn-p" type="button" onClick={() => setOpen((v) => !v)}>
+        <Icon name="plus" size={16} />
+        Undang Pengguna
+      </button>
+      {open && (
+        <section className="card invite-card" aria-label="Undang pengguna">
+          <div className="card-h">
+            <h2 className="h3">Undangan lokal</h2>
+            <span className="sub tiny">
+              Tanpa email dan tanpa SSO: tautan sekali pakai (72 jam) Anda sampaikan sendiri.
+              Pengguna hanya menetapkan password; role dan cakupan sudah Anda putuskan di sini.
+            </span>
+          </div>
+          {link ? (
+            <div className="card-b">
+              <p>
+                Tautan untuk <strong>{link.email}</strong> — tampil <strong>sekali</strong>; salin
+                sekarang:
+              </p>
+              <pre className="invite-link" tabIndex={0}>
+                {link.url}
+              </pre>
+              <div className="reader-actions">
+                <button
+                  type="button"
+                  className="btn btn-sm btn-p"
+                  onClick={() => {
+                    void navigator.clipboard
+                      ?.writeText(link.url)
+                      .then(() => setCopied(true))
+                      .catch(() => setCopied(false));
+                  }}
+                >
+                  <Icon name="link" size={14} />
+                  {copied ? 'Tersalin' : 'Salin tautan'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => {
+                    setLink(null);
+                    setCopied(false);
+                  }}
+                >
+                  Undang lagi
+                </button>
+              </div>
+            </div>
+          ) : (
+            <form
+              className="card-b workflow-fields"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void submit();
+              }}
+            >
+              <fieldset disabled={busy} className="workflow-fields">
+                <div className="grid g2">
+                  <label>
+                    Nama
+                    <input
+                      className="inp"
+                      required
+                      minLength={2}
+                      maxLength={120}
+                      value={form.name}
+                      onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    />
+                  </label>
+                  <label>
+                    Email
+                    <input
+                      className="inp"
+                      type="email"
+                      required
+                      maxLength={254}
+                      value={form.email}
+                      onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    />
+                  </label>
+                  <label>
+                    Unit kerja
+                    <input
+                      className="inp"
+                      required
+                      minLength={2}
+                      maxLength={80}
+                      readOnly={!canPickUnit}
+                      value={form.unit}
+                      onChange={(e) => setForm({ ...form, unit: e.target.value })}
+                    />
+                  </label>
+                  <label>
+                    Role
+                    <select
+                      className="inp"
+                      value={form.role}
+                      onChange={(e) => setForm({ ...form, role: e.target.value })}
+                    >
+                      {Object.entries(ROLE_LABELS)
+                        .filter(([r]) => canScopeAll || r !== 'knowledge_admin')
+                        .map(([r, label]) => (
+                          <option key={r} value={r}>
+                            {label}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                </div>
+                {canScopeAll && (
+                  <label className="row">
+                    <input
+                      type="checkbox"
+                      checked={form.scopeAll}
+                      onChange={(e) =>
+                        setForm({ ...form, scopeAll: e.target.checked, categoryIds: [] })
+                      }
+                    />
+                    Scope semua kategori
+                  </label>
+                )}
+                {!form.scopeAll && (
+                  <fieldset className="scope-picker">
+                    <legend className="sub tiny">Cakupan kategori</legend>
+                    {categories.map((c) => (
+                      <label key={c.id}>
+                        <input
+                          type="checkbox"
+                          checked={form.categoryIds.includes(c.id)}
+                          onChange={(e) =>
+                            setForm({
+                              ...form,
+                              categoryIds: e.target.checked
+                                ? [...form.categoryIds, c.id]
+                                : form.categoryIds.filter((x) => x !== c.id),
+                            })
+                          }
+                        />
+                        {c.name}
+                      </label>
+                    ))}
+                  </fieldset>
+                )}
+                {error && (
+                  <p role="alert" className="inline-error">
+                    {error}
+                  </p>
+                )}
+                <div className="reader-actions">
+                  <button className="btn btn-p" type="submit">
+                    Buat tautan undangan
+                  </button>
+                  <button className="btn" type="button" onClick={() => setOpen(false)}>
+                    Tutup
+                  </button>
+                </div>
+              </fieldset>
+            </form>
+          )}
+          {invitations.length > 0 && (
+            <div className="card-b">
+              <h3 className="h4">Undangan</h3>
+              <div className="table-scroll" tabIndex={0} role="region" aria-label="Daftar undangan">
+                <table className="tbl">
+                  <thead>
+                    <tr>
+                      <th scope="col">Nama</th>
+                      <th scope="col">Email</th>
+                      <th scope="col">Role</th>
+                      <th scope="col">Cakupan</th>
+                      <th scope="col">Status</th>
+                      <th scope="col">
+                        <span className="sr-only">Aksi</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {invitations.map((i) => (
+                      <tr key={i.id}>
+                        <td>{i.name}</td>
+                        <td>{i.email}</td>
+                        <td>{ROLE_LABELS[i.role] ?? i.role}</td>
+                        <td>{i.scopeAll ? 'Semua kategori' : i.categories.join(', ') || '—'}</td>
+                        <td>
+                          <span className={`pill ${i.state === 'open' ? 'p-green' : 'p-grey'}`}>
+                            {STATE_LABELS[i.state]}
+                          </span>
+                        </td>
+                        <td>
+                          {i.state === 'open' && (
+                            <button
+                              type="button"
+                              className="btn btn-sm"
+                              disabled={busy}
+                              onClick={() => void revoke(i.id)}
+                            >
+                              Cabut
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="sub tiny">
+                {pending.length} undangan terbuka. Tautan tidak disimpan — hanya hash-nya — jadi
+                tautan yang hilang berarti cabut lalu undang ulang.
+              </p>
+            </div>
+          )}
+        </section>
+      )}
+    </>
+  );
+}

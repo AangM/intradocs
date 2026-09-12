@@ -6,6 +6,8 @@ import { ROLES, ROLE_LABELS, hasCapability, initials, type Role } from '@intrado
 import { PageHeading, Notice } from '@/components/shared';
 import { Icon } from '@/components/icon';
 import { UserStatus } from '@/components/user-status';
+import { InviteUser } from '@/components/invite-user';
+import { listInvitations } from '@intradocs/db/invitations';
 const detail: Record<Role, { icon: string; color: string; description: string }> = {
   super_admin: {
     icon: 'shield',
@@ -39,6 +41,7 @@ export default async function Users() {
   const categories = await listCategories(actor.id);
   const users = await listUsers(actor);
   const manage = hasCapability(actor, 'users.manage');
+  const invitations = await listInvitations(actor.id);
   return (
     <div className="pad">
       <PageHeading
@@ -46,17 +49,26 @@ export default async function Users() {
         subtitle={`${users.filter((u) => u.active).length} pengguna aktif terlihat · 5 role bawaan · identitas lokal`}
         actions={
           <>
-            <button className="btn" disabled>
+            <button
+              className="btn"
+              disabled
+              title="SSO/AD berada di luar rilis lokal ini: butuh IdP organisasi dan persetujuan security."
+            >
               <Icon name="refresh" size={16} />
               Sinkron SSO
-            </button>
-            <button className="btn btn-p" disabled>
-              <Icon name="plus" size={16} />
-              Undang Pengguna
             </button>
           </>
         }
       />
+      <div className="invite-row">
+        <InviteUser
+          categories={categories.map((c) => ({ id: c.id, name: c.name }))}
+          invitations={invitations}
+          defaultUnit={actor.unit}
+          canPickUnit={actor.role === 'super_admin'}
+          canScopeAll={actor.role === 'super_admin'}
+        />
+      </div>
       <div className="grid g3 rbac-cards mb">
         {ROLES.map((role) => (
           <div key={role} className={`role-card tone-${detail[role].color}`}>

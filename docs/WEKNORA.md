@@ -906,3 +906,24 @@ Rahasia sebagai "mirip" walau cuplikannya mengutip canary-nya. Bukti: `tests/htt
 - **`OLLAMA_KEEP_ALIVE=-1`** (variabel user) menjaga bge-m3 dan model penjawab tetap di GPU;
   tanpa itu reload setelah 5 menit idle memakan ~10 detik per model di mesin tertekan dan
   dua panggilan hybrid-search melewati `WEKNORA_SEARCH_TIMEOUT_MS`.
+
+## 21. S08 tanpa IdP: undangan lokal
+
+Dari tiga hal di mockup S08, satu yang bermakna dan aman tanpa identity provider:
+**Undang pengguna** (migrasi 032). Sinkron AD/SSO dan role kustom tetap di luar rilis —
+tombol SSO kini mengatakan alasannya, bukan sekadar abu-abu.
+
+Bentuknya jujur terhadap lingkungan lokal: tidak ada email. Administrator memutuskan nama,
+alamat, unit, role, dan cakupan kategori **di muka**; sistem membuat **tautan sekali pakai**
+(token 32 byte acak, hanya hash-nya yang disimpan, kedaluwarsa 72 jam) yang tampil **satu kali**
+kepada administrator untuk disampaikan sendiri. Orang yang diundang hanya melakukan satu hal
+di `/undangan/<token>`: menetapkan password (≥12 karakter). Hasilnya akun lokal biasa —
+`auth."user"` + `auth.account` seperti seed, profil dan grant lewat `app.accept_invitation()`,
+audit `user.invitation_accepted` dengan pengundang sebagai actor dan orang baru sebagai subject.
+
+Otoritasnya meniru `app.assign_user()` dan hidup di SQL: super admin mengundang role apa pun
+**kecuali super admin** (itu tetap tindakan basis data yang disengaja); knowledge admin hanya
+viewer/contributor/reviewer di unitnya sendiri, tanpa scope global, hanya kategori dalam
+scope-nya. Alamat yang sudah punya akun atau undangan terbuka ditolak. Undangan bisa dicabut;
+token yang sudah dipakai, dicabut, atau kedaluwarsa tidak bisa dibedakan dari token yang tidak
+pernah ada. Bukti: `tests/http/invitations.test.ts` (4).
