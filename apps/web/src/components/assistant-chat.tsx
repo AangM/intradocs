@@ -79,6 +79,7 @@ export function AssistantChat({
   recentDocuments,
   initialConversations,
   initialQuestion = '',
+  initialDocumentId = '',
 }: {
   maxQuestionChars: number;
   generating?: boolean;
@@ -93,6 +94,8 @@ export function AssistantChat({
   initialConversations: readonly ConversationItem[];
   /** Pre-filled into the composer (e.g. handed over from search); never auto-sent. */
   initialQuestion?: string;
+  /** Pre-selects the documents scope on this one document, if it is in recentDocuments. */
+  initialDocumentId?: string;
 }) {
   const fieldId = useId();
   const scopeId = useId();
@@ -104,11 +107,50 @@ export function AssistantChat({
   const [conversations, setConversations] = useState<ConversationItem[]>([...initialConversations]);
   const [loadingConversation, setLoadingConversation] = useState<string | null>(null);
   const [copiedTurn, setCopiedTurn] = useState<string | null>(null);
-  const [scopeKind, setScopeKind] = useState<ScopeKind>('all');
+  const handedDocument = recentDocuments.some((d) => d.id === initialDocumentId);
+  const [scopeKind, setScopeKind] = useState<ScopeKind>(handedDocument ? 'documents' : 'all');
   const [categoryId, setCategoryId] = useState<string>(categories[0]?.id ?? '');
   const [documentIds, setDocumentIds] = useState<string[]>(() =>
-    recentDocuments.slice(0, 3).map((d) => d.id),
+    handedDocument ? [initialDocumentId] : recentDocuments.slice(0, 3).map((d) => d.id),
   );
+  // Starters generated at ingest for the versions inside the chosen scope. Fetched only
+  // for a narrowed scope: the whole-corpus starters stay the curated ones.
+  const [generated, setGenerated] = useState<Array<{ question: string; documentTitle: string }>>(
+    [],
+  );
+  const scopeKey =
+    scopeKind === 'category'
+      ? `category:${categoryId}`
+      : scopeKind === 'documents'
+        ? `documents:${[...documentIds].sort().join(',')}`
+        : 'all';
+  useEffect(() => {
+    if (scopeKey === 'all' || scopeKey.endsWith(':')) return;
+    const controller = new AbortController();
+    const scope: RetrievalScope = scopeKey.startsWith('category:')
+      ? { type: 'category', categoryId: scopeKey.slice('category:'.length) }
+      : { type: 'documents', documentIds: scopeKey.slice('documents:'.length).split(',') };
+    fetch('/api/rag/suggested-questions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scope }),
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) return;
+        const body = (await response.json()) as {
+          questions: Array<{ question: string; documentTitle: string }>;
+        };
+        setGenerated(body.questions);
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [scopeKey]);
+  const starterList: Array<{ question: string; documentTitle?: string }> =
+    scopeKind === 'all' || generated.length === 0
+      ? starters.map((question) => ({ question }))
+      : generated;
   const abort = useRef<AbortController | null>(null);
   const threadEnd = useRef<HTMLDivElement | null>(null);
 
@@ -512,19 +554,20 @@ export function AssistantChat({
           <div ref={threadEnd} />
         </div>
 
-        {starters.length > 0 && turns.length === 0 && !pending && (
+        {starterList.length > 0 && turns.length === 0 && !pending && (
           <div className="reader-actions" aria-label="Contoh pertanyaan">
-            {starters.map((text) => (
+            {starterList.map((item) => (
               <button
-                key={text}
+                key={item.question}
                 type="button"
                 className="btn btn-sm"
+                title={item.documentTitle ? `Dari: ${item.documentTitle}` : undefined}
                 onClick={() => {
-                  setQuestion(text);
-                  void ask(text);
+                  setQuestion(item.question);
+                  void ask(item.question);
                 }}
               >
-                {text}
+                {item.question}
               </button>
             ))}
           </div>

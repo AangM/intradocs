@@ -136,6 +136,10 @@ export class WeknoraClient {
     const headers: Record<string, string> = {
       'X-API-Key': this.config.apiKey,
       Accept: 'application/json',
+      // WeKnora resolves the language of generated text from this header when the
+      // deployment sets no WEKNORA_LANGUAGE. Its locale map has no Indonesian entry and
+      // passes unknown values into the prompt verbatim, so the name is sent, not a tag.
+      'Accept-Language': 'Indonesian',
       ...extra,
     };
     if (this.config.tenantId) headers['X-Tenant-ID'] = this.config.tenantId;
@@ -437,6 +441,50 @@ export class WeknoraClient {
     return (await this.knowledgeState(knowledgeId)).tags;
   }
 
+  /**
+   * What WeKnora generated for one record at ingest: the summary (stored in
+   * `description`) and the questions attached to each chunk. Both are model output about
+   * a version that already exists in IntraDocs; callers show them only as suggestions,
+   * bounded here so a runaway generation cannot become a runaway page.
+   */
+  async knowledgeGenerated(
+    knowledgeId: string,
+    limits: { maxSummaryChars: number; maxQuestions: number },
+  ): Promise<{ summary: string | null; summaryStatus: string; questions: string[] }> {
+    const record = asRecord(
+      await this.json('GET', `/api/v1/knowledge/${encodeURIComponent(knowledgeId)}`),
+    );
+    const summaryStatus = str(record.summary_status, 'none');
+    const description = str(record.description).trim();
+    const summary =
+      summaryStatus === 'completed' && description
+        ? description.slice(0, limits.maxSummaryChars)
+        : null;
+    const questions: string[] = [];
+    const query = new URLSearchParams({ page: '1', page_size: '50' });
+    const chunks = await this.json(
+      'GET',
+      `/api/v1/chunks/${encodeURIComponent(knowledgeId)}?${query}`,
+    );
+    const rows = Array.isArray(chunks)
+      ? chunks
+      : Array.isArray(asRecord(chunks).data)
+        ? (asRecord(chunks).data as unknown[])
+        : [];
+    const obj = (v: unknown): Json => (v && typeof v === 'object' ? (v as Json) : {});
+    for (const row of rows) {
+      const generated = obj(obj(row).metadata).generated_questions;
+      if (!Array.isArray(generated)) continue;
+      for (const item of generated) {
+        const question = str(obj(item).question).replace(/\s+/g, ' ').trim();
+        if (!question || question.length > 300 || questions.includes(question)) continue;
+        questions.push(question);
+        if (questions.length >= limits.maxQuestions) return { summary, summaryStatus, questions };
+      }
+    }
+    return { summary, summaryStatus, questions };
+  }
+
   /** Parse state and tags of one record; what an operator polls after a reparse. */
   async knowledgeState(
     knowledgeId: string,
@@ -581,6 +629,33 @@ export class WeknoraClient {
     const out: Json = {};
     for (const [k, v] of Object.entries(config)) if (!/prompt|template/.test(k)) out[k] = v;
     return out;
+  }
+
+  /**
+   * Asks WeKnora to call a reranker once, through its own client code, so "registered"
+   * and "actually callable" are not confused again (an Ollama-backed reranker was the
+   * former and never the latter).
+   */
+  async checkRerank(input: {
+    modelName: string;
+    baseUrl: string;
+  }): Promise<{ available: boolean; message: string }> {
+    const data = asRecord(
+      await this.json('POST', '/api/v1/initialization/rerank/check', {
+        body: { source: 'local', modelName: input.modelName, baseUrl: input.baseUrl },
+      }),
+    );
+    return { available: data.available === true, message: str(data.message) };
+  }
+
+  /** Removes a whole base; used only by weknora:reindex after the replacement is live. */
+  async deleteKnowledgeBase(id: string): Promise<void> {
+    try {
+      await this.json('DELETE', `/api/v1/knowledge-bases/${encodeURIComponent(id)}`);
+    } catch (error) {
+      if (error instanceof WeknoraError && error.status === 404) return;
+      throw error;
+    }
   }
 
   async deleteKnowledge(knowledgeId: string): Promise<void> {

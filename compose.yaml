@@ -115,6 +115,12 @@ services:
       GIN_MODE: release
       LOG_LEVEL: ${WEKNORA_LOG_LEVEL:-info}
       TZ: ${WEKNORA_TZ:-Asia/Jakarta}
+      # Language of everything WeKnora generates at ingest (summary, questions, tags).
+      # Without it WeKnora falls back to zh-CN and a qwen model obliges in Chinese. Its
+      # locale map knows zh/en/ko/ja/ru/fr/de/es/pt only; any other value is passed into
+      # the prompt verbatim ("Generate questions in {{language}}"), so this is the
+      # language NAME, not a BCP-47 tag -- "id-ID" came back as English.
+      WEKNORA_LANGUAGE: ${WEKNORA_LANGUAGE:-Indonesian}
       AUTO_MIGRATE: 'true'
       DB_DRIVER: postgres
       DB_HOST: weknora-postgres
@@ -146,7 +152,8 @@ services:
       # CIDR. Adding a cloud provider here means questions and document passages leave the
       # machine, so it is opt-in through the environment and never a default; the portal
       # additionally refuses to use it until AI_GENERATION_LOCATION says so out loud.
-      SSRF_WHITELIST_EXTRA: ${WEKNORA_SSRF_WHITELIST_EXTRA:-host.docker.internal}
+      # host.docker.internal for Ollama; weknora-reranker for the optional TEI service.
+      SSRF_WHITELIST_EXTRA: ${WEKNORA_SSRF_WHITELIST_EXTRA:-host.docker.internal,weknora-reranker}
       OLLAMA_OPTIONAL: 'true'
       OLLAMA_BASE_URL: ${WEKNORA_OLLAMA_URL:-http://host.docker.internal:11434}
       CONCURRENCY_POOL_SIZE: ${WEKNORA_CONCURRENCY:-2}
@@ -214,6 +221,43 @@ services:
           cpus: '0.5'
     restart: unless-stopped
 
+  # Reranker for WeKnora's chat pipeline (optional profile `weknora-rerank`).
+  #
+  # Ollama has no /rerank endpoint, so a rerank model registered against it can never be
+  # called (WEKNORA.md §11). text-embeddings-inference serves the TEI-style /rerank that
+  # WeKnora expects. The model weights are fetched from the Hugging Face hub on first
+  # start into a named volume; nothing from the corpus is sent anywhere -- the container
+  # only receives (query, chunk) pairs from weknora-app over the compose network and is
+  # published nowhere. bge-reranker-v2-m3 is multilingual and the right choice for
+  # Indonesian text; it needs ~2.3 GB RAM on CPU (fp32). Smaller Docker VMs can set
+  # WEKNORA_RERANK_HF_MODEL=BAAI/bge-reranker-base (~1.1 GB).
+  weknora-reranker:
+    profiles: ['weknora-rerank']
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.8
+    command:
+      - '--model-id'
+      - '${WEKNORA_RERANK_HF_MODEL:-BAAI/bge-reranker-v2-m3}'
+      - '--max-client-batch-size'
+      - '32'
+      - '--max-batch-tokens'
+      - '8192'
+    environment:
+      HF_HUB_ENABLE_HF_TRANSFER: '0'
+    volumes:
+      - weknora_reranker_cache:/data
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', 'http://localhost:80/health']
+      interval: 15s
+      timeout: 5s
+      retries: 40
+      start_period: 120s
+    deploy:
+      resources:
+        limits:
+          memory: ${WEKNORA_RERANK_MEMORY_LIMIT:-2800m}
+          cpus: '${WEKNORA_RERANK_CPU_LIMIT:-2}'
+    restart: unless-stopped
+
 networks:
   conversion:
     # NOT internal. Docker cannot publish a port from an internal-only network, so with
@@ -229,3 +273,4 @@ volumes:
   postgres_data:
   weknora_pgdata:
   weknora_files:
+  weknora_reranker_cache:

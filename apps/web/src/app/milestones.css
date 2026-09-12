@@ -675,3 +675,57 @@ summary,
   margin-bottom: 8px;
   font-weight: 600;
 }
+
+/* V1 · pertanyaan dan draf ringkasan dari ingest WeKnora --------------------- */
+.insight-questions {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.insight-questions a {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: #fff;
+  color: var(--ink);
+  font-size: 13px;
+  text-decoration: none;
+}
+.insight-questions a:hover {
+  border-color: var(--blue-200);
+  background: var(--blue-50);
+}
+.insight-questions .i {
+  flex: none;
+  margin-top: 2px;
+  color: var(--blue-600);
+}
+.insight-summary {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--line);
+}
+.insight-summary .h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  margin: 0 0 6px;
+}
+.insight-draft {
+  margin: 10px 0;
+  padding: 10px 14px;
+  border-left: 3px solid var(--amber);
+  background: var(--amber-bg);
+  border-radius: 0 var(--r) var(--r) 0;
+  font-size: 13px;
+  white-space: pre-wrap;
+  max-height: 260px;
+  overflow-y: auto;
+}

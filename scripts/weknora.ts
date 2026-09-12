@@ -335,6 +335,117 @@ async function withWorkerDb<T>(run: (pool: Pool) => Promise<T>): Promise<T> {
   }
 }
 
+/**
+ * Recreates the production knowledge base with ingest-time generation on:
+ * `pnpm weknora:reindex`.
+ *
+ * summary_model_id is fixed at creation, so the base the portal reads cannot simply be
+ * edited. Order of operations keeps the portal safe at every step: the new base is
+ * created and filled first; the pin in .env.local moves only after the export has
+ * drained into it; the old base is deleted last. Every version still goes through the
+ * exporter and its eligibility rules -- this never copies records across.
+ *
+ * The worker must be stopped first: it holds the OLD base id in its process and would
+ * keep exporting into it while the mapping table is being rebuilt for the new one.
+ */
+async function reindex(): Promise<void> {
+  loadLocalEnv();
+  const ai = readAiConfig(process.env);
+  if (!ai.weknora) throw new Error('AI_PROVIDER masih off. Aktifkan weknora-local dulu.');
+  const llm = ai.weknora.generationModelId;
+  if (!llm)
+    throw new Error(
+      'WEKNORA_GENERATION_MODEL_ID belum ada; jalankan pnpm weknora:generation <model> dulu.',
+    );
+  const heartbeat = new Pool({ connectionString: localAdminUrl(), max: 1 });
+  try {
+    const { rows } = await heartbeat.query<{ alive: boolean }>(
+      "SELECT last_seen > now() - interval '90 seconds' AS alive FROM app.worker_status",
+    );
+    if (rows.some((r) => r.alive))
+      throw new Error(
+        'Worker IntraDocs masih hidup (pnpm dev). Hentikan dulu; ia memegang ID knowledge base lama.',
+      );
+  } finally {
+    await heartbeat.end();
+  }
+  const oldId = ai.weknora.knowledgeBaseId;
+  const client = new WeknoraClient(ai.weknora);
+  const production = asKb(await client.knowledgeBase());
+  const embeddingModelId = str(production.embedding_model_id);
+  if (!embeddingModelId) throw new Error('Knowledge base lama tidak memuat embedding_model_id.');
+
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
+  const newId = await client.createKnowledgeBase({
+    name: `intradocs-synthetic-${stamp}`,
+    description:
+      'Knowledge base sintetis IntraDocs (M4) dengan summary, pertanyaan, dan tag pada ingest. Dikelola exporter IntraDocs.',
+    embeddingModelId,
+    summaryModelId: llm,
+    wiki: false,
+    questionGeneration: { enabled: true, questionCount: 3, modelId: llm },
+    autoTag: { enabled: true, modelId: llm },
+  });
+  const fresh = new WeknoraClient({ ...ai.weknora, knowledgeBaseId: newId });
+  const stored = asKb(await fresh.knowledgeBase(newId));
+  if (str(stored.summary_model_id) !== llm)
+    throw new Error('WeKnora tidak menyimpan summary_model_id pada knowledge base baru.');
+  console.log(`Knowledge base baru dibuat (id ${newId}); summary + pertanyaan + tag menyala.`);
+
+  // Same label pool as before, so auto-tag keeps answering "which of our labels".
+  const admin = new Pool({ connectionString: localAdminUrl(), max: 1 });
+  try {
+    const labelNames = (
+      await admin.query<{ name: string }>(
+        'SELECT DISTINCT name FROM app.labels WHERE merged_into IS NULL ORDER BY name',
+      )
+    ).rows.map((r) => r.name);
+    const have = await fresh.listTags();
+    for (const name of labelNames)
+      if (!have.some((t) => t.name === name)) await fresh.createTag(name);
+    // Forget the old mapping under the exporter's lock; reconcile() then re-queues
+    // every indexable version as a fresh upsert into the new base.
+    await admin.query('BEGIN');
+    await admin.query('SELECT pg_advisory_xact_lock(719284,1)');
+    await admin.query("DELETE FROM app.rag_export_queue WHERE state<>'running'");
+    await admin.query('DELETE FROM app.rag_index_entries');
+    await admin.query('COMMIT');
+  } catch (error) {
+    await admin.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    await admin.end();
+  }
+  process.env.WEKNORA_KNOWLEDGE_BASE_ID = newId;
+  await setEnv('WEKNORA_KNOWLEDGE_BASE_ID', newId);
+  console.log('WEKNORA_KNOWLEDGE_BASE_ID dipindahkan ke knowledge base baru; mengekspor ulang…');
+  await sync();
+  // The agent lists its knowledge bases explicitly; point it at the new one.
+  await pinAgent();
+  await client.deleteKnowledgeBase(oldId);
+  console.log(`Knowledge base lama (${oldId}) dihapus.`);
+  // Deleting a whole base is a mass delete under ParadeDB's BM25 index, and after it the
+  // keyword side of hybrid search failed with "assertion failed: item_pointer_is_valid
+  // (ctid)" (SQLSTATE XX000) until the index was rebuilt. Rebuild it here, unconditionally.
+  command('docker', [
+    'compose',
+    '--env-file',
+    '.env.local',
+    '--profile',
+    'weknora',
+    'exec',
+    '-T',
+    'weknora-postgres',
+    'sh',
+    '-c',
+    'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "REINDEX INDEX embeddings_search_idx"',
+  ]);
+  console.log('Index BM25 WeKnora (embeddings_search_idx) dibangun ulang.');
+  console.log(
+    'Summary, pertanyaan, dan tag dihitung di latar oleh WeKnora; pnpm weknora:status menunjukkan kemajuannya. Restart pnpm dev.',
+  );
+}
+
 async function sync(): Promise<void> {
   await withWorkerDb(async (pool) => {
     const ai = readAiConfig(process.env);
@@ -642,6 +753,50 @@ async function autotag(): Promise<void> {
 }
 
 const MAX_COMPLETION_TOKENS = 1024;
+
+/**
+ * Reranker, one command: `pnpm weknora:rerank`.
+ *
+ * Requires the optional compose profile: `docker compose --env-file .env.local --profile
+ * weknora --profile weknora-rerank up -d weknora-reranker`. WeKnora calls `{base_url}/rerank`
+ * (TEI/Jina style) and Ollama has no such endpoint, which is why the earlier registration
+ * never worked (WEKNORA.md §11). This registers the TEI service as a Rerank model, proves it
+ * answers through WeKnora's own check endpoint, writes WEKNORA_RERANK_MODEL_ID, and re-pins
+ * the agent. The reranker only ever reorders chunks WeKnora already retrieved within the
+ * authorised knowledge_ids; it produces no text and IntraDocs still validates every citation.
+ */
+async function rerank(): Promise<void> {
+  loadLocalEnv();
+  const ai = readAiConfig(process.env);
+  if (!ai.weknora) throw new Error('AI_PROVIDER masih off. Aktifkan weknora-local dulu.');
+  const modelName = process.env.WEKNORA_RERANK_HF_MODEL ?? 'BAAI/bge-reranker-v2-m3';
+  // Reached over the compose network; never published to the host.
+  const baseUrl = process.env.WEKNORA_RERANK_URL ?? 'http://weknora-reranker:80';
+  const client = new WeknoraClient(ai.weknora);
+  const check = await client.checkRerank({ modelName, baseUrl });
+  if (!check.available)
+    throw new Error(
+      `WeKnora tidak bisa memanggil reranker di ${baseUrl}: ${check.message}. ` +
+        'Pastikan profil weknora-rerank berjalan dan healthy (unduhan model pertama memakan waktu).',
+    );
+  console.log(`Reranker ${modelName} menjawab lewat WeKnora (${baseUrl}).`);
+  let model = (await client.listModels()).find((m) => m.type === 'Rerank' && m.name === modelName);
+  if (!model) {
+    const id = await client.registerModel({
+      name: modelName,
+      displayName: `TEI ${modelName}`,
+      type: 'Rerank',
+      source: 'local',
+      parameters: { base_url: baseUrl },
+    });
+    model = { id, name: modelName, type: 'Rerank', source: 'local' };
+    console.log(`Model rerank terdaftar di WeKnora (id ${id}).`);
+  }
+  await setEnv('WEKNORA_RERANK_MODEL_ID', model.id);
+  process.env.WEKNORA_RERANK_MODEL_ID = model.id;
+  console.log(`WEKNORA_RERANK_MODEL_ID=${model.id} ditulis ke .env.local.`);
+  await pinAgent();
+}
 
 /**
  * Answering model, one command: `pnpm weknora:generation <ollama-model>`.
@@ -978,6 +1133,8 @@ async function main(): Promise<void> {
   if (action === 'autotag') return autotag();
   if (action === 'agent') return pinAgent();
   if (action === 'generation') return generationModel();
+  if (action === 'reindex') return reindex();
+  if (action === 'rerank') return rerank();
   if (action === 'lab') return lab();
   if (action === 'stop') {
     loadLocalEnv();
@@ -986,7 +1143,7 @@ async function main(): Promise<void> {
     return;
   }
   throw new Error(
-    'Gunakan: pnpm weknora:setup | weknora:sync | weknora:status | weknora:model | weknora:generation | weknora:autotag | weknora:agent | weknora:lab | weknora:stop.',
+    'Gunakan: pnpm weknora:setup | weknora:sync | weknora:status | weknora:model | weknora:generation | weknora:reindex | weknora:rerank | weknora:autotag | weknora:agent | weknora:lab | weknora:stop.',
   );
 }
 

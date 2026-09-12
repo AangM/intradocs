@@ -194,6 +194,7 @@ Batas lain: concurrency pool WeKnora 2, ekspor berjalan serial (satu WeKnora lok
 
 | `SSRF validation failed: hostname host.docker.internal is restricted` | WeKnora memblokir target SSRF. `compose.yaml` sudah menambahkan nama itu saja ke `SSRF_WHITELIST_EXTRA`; jangan menggantinya dengan wildcard |
 | Ekspor sukses tetapi pencarian kosong | Knowledge manual dibuat berstatus `draft`. Exporter memicu `batch-reparse`; jika versi WeKnora berbeda, cek `parse_status` di DB WeKnora |
+| `503` pada retrieval; log WeKnora: `assertion failed: item_pointer_is_valid(ctid)` (SQLSTATE XX000) | Index BM25 ParadeDB rusak setelah penghapusan massal (mis. KB lama saat `weknora:reindex`). `docker compose --env-file .env.local --profile weknora exec weknora-postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "REINDEX INDEX embeddings_search_idx"'`; `weknora:reindex` kini melakukannya sendiri |
 | `bind: An attempt was made to access a socket in a way forbidden` | Port masuk rentang cadangan WinNAT. `netsh interface ipv4 show excludedportrange protocol=tcp`, lalu pilih port di luar rentang itu |
 | `converter_unavailable` saat unggah | Jaringan `conversion` harus `internal: false` selama worker berjalan di host; port internal tidak dapat dipublikasikan |
 
@@ -430,6 +431,12 @@ berarti membuat ulang knowledge base dan mengindeks ulang seluruh dokumen.
 ## 12. Summary dan UI WeKnora
 
 ### Summary: tidak dinyalakan, dan alasannya bukan teknis
+
+> **Diperbarui 12 September 2026 — lihat §17.** Summary dan question generation kini menyala
+> pada knowledge base produksi lewat `pnpm weknora:reindex`, dengan permukaan validasi yang
+> dulu belum ada: summary hanya tampil kepada orang yang boleh merevisi, sebagai draf, dan
+> tidak pernah kepada pembaca. Analisis di bawah tetap benar tentang _mengapa_ ia tidak boleh
+> tampil sebagai teks dokumen.
 
 `summary_model_id` **tidak ada** di `KnowledgeBaseConfig` — schema `UpdateKnowledgeBaseRequest`
 hanya menerima `auto_tag_config`, `chunking_config`, `faq_config`, `image_processing_config`,
@@ -725,3 +732,67 @@ lexical, mengikuti filter kategori halaman itu, dan menautkan ke asisten dengan 
 terisi — tidak terkirim otomatis, karena generasi lokal itu lambat dan orang yang memutuskan.
 Pada pertanyaan bahasa alami, lexical sering nol hasil sementara kartu itu menemukan sumbernya;
 itulah alasan mockup menaruhnya di sana.
+
+## 17. Summary, pertanyaan, dan bahasa: ingest yang dimanfaatkan sebagai saran
+
+Tiga fitur ingest WeKnora yang dulu mati kini dipakai — dengan aturan yang sama seperti saran
+label: **model mengusulkan, orang memutuskan, dan tidak ada yang bisa dikutip tanpa versi
+IntraDocs.**
+
+### `pnpm weknora:reindex`
+
+`summary_model_id` hanya bisa diset saat knowledge base dibuat, jadi KB produksi dibuat ulang:
+KB baru dengan `summary_model_id`, `question_generation_config` (3 pertanyaan per chunk) dan
+`auto_tag_config` memakai model penjawab yang sudah dipin (`WEKNORA_GENERATION_MODEL_ID`);
+kolam tag disalin; tabel pemetaan dikosongkan; `WEKNORA_KNOWLEDGE_BASE_ID` dipindah; exporter
+mengisi ulang lewat jalur normalnya (setiap versi tetap lewat aturan kelayakan); agen dipin ke
+KB baru; KB lama dihapus terakhir. Skrip menolak jalan bila worker masih hidup (heartbeat
+`app.worker_status` < 90 detik), karena worker memegang ID KB lama di prosesnya. Pada 7 versi
+sintetis seluruhnya selesai dalam ±1 menit; summary + pertanyaan + tag dihitung di latar ±1
+menit lagi di GPU.
+
+### Bahasa: `WEKNORA_LANGUAGE` adalah nama bahasa, bukan tag
+
+Putaran pertama menghasilkan pertanyaan **berbahasa Mandarin**. Sumbernya
+(`internal/middleware/language.go`): bahasa untuk teks yang dihasilkan diambil dari env
+`WEKNORA_LANGUAGE`, lalu header `Accept-Language`, lalu hardcoded `zh-CN`. Peta lokalnya hanya
+mengenal zh/en/ko/ja/ru/fr/de/es/pt; nilai lain **dimasukkan apa adanya** ke prompt
+("Generate questions in {{language}}"), sehingga `id-ID` menghasilkan bahasa Inggris.
+`compose.yaml` kini menyetel `WEKNORA_LANGUAGE=Indonesian` (nama, bukan tag) dan client
+mengirim `Accept-Language: Indonesian`. Setelah reparse, pertanyaan konsisten berbahasa
+Indonesia; summary masih campur — itu batas model 1.5B, bukan konfigurasi.
+
+### Apa yang dihasilkan, dan siapa yang melihatnya
+
+Hasil dibaca dari WeKnora (`GET /knowledge/:id` → `description` dan `summary_status`;
+`GET /chunks/:id` → `metadata.generated_questions`) lewat `WeknoraClient.knowledgeGenerated`,
+dibatasi panjangnya, dan **tidak pernah disimpan** di IntraDocs.
+
+| Keluaran               | Kualitas terukur (qwen 1.5B, 7 dokumen)                                                            | Siapa yang melihat                                             | Bentuk                                                                                                                                |
+| ---------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Pertanyaan per chunk   | Relevan dan berbahasa Indonesia pada 7/7; 1–2 per dokumen agak dangkal ("Apa tujuan dokumen ini?") | Semua pembaca dokumen itu                                      | Tautan "Tanya asisten tentang dokumen ini" → asisten dengan pertanyaan terisi dan cakupan dokumen itu; jawabannya tetap lewat gerbang |
+| Pertanyaan per cakupan | idem                                                                                               | Pengguna asisten, hanya untuk versi dalam cakupan yang dipilih | Starter menggantikan contoh statis bila cakupan dipersempit                                                                           |
+| Summary                | 4/7 layak sebagai draf; 2/7 "No textual content was extractable" (salah); 1/7 berbahasa Inggris    | **Hanya** `documents.upload` — pemilik/kontributor/reviewer    | Blok "Draf ringkasan dari model — belum ditinjau", tombol salin; ringkasan resmi hanya berubah lewat revisi yang direview             |
+
+Endpoint: `POST /api/rag/document-insights {documentId}` (pertanyaan untuk semua yang boleh
+baca; `summary` dan `currentSummary` `null` bagi yang tidak punya `documents.upload`; dokumen
+yang tidak boleh dibaca atau belum terindeks sama-sama `available:false`) dan
+`POST /api/rag/suggested-questions {scope}` (cakupan yang sama dengan retrieval; kategori di
+luar akses → daftar kosong). Bukti: `tests/http/rag.test.ts` ("generated questions reach
+readers, the draft summary only editors, and nothing leaks").
+
+Angka "2/7 summary salah" adalah alasan summary tidak tampil kepada pembaca: tidak ada
+permukaan mekanis untuk menolak teks bebas yang keliru. Bagi editor ia berguna sebagai bahan;
+bagi pembaca ia akan tampak seperti kalimat dokumen.
+
+### Rerank: server reranker sebagai profil compose opsional
+
+`compose.yaml` menambah service `weknora-reranker` (profil `weknora-rerank`,
+`text-embeddings-inference` CPU, model `BAAI/bge-reranker-v2-m3`, ~2,3 GB RAM fp32,
+`WEKNORA_RERANK_HF_MODEL=BAAI/bge-reranker-base` untuk VM yang lebih kecil), hanya terjangkau
+dari jaringan compose, dan `SSRF_WHITELIST_EXTRA` menambahkan namanya saja.
+`pnpm weknora:rerank` memverifikasi lewat `POST /initialization/rerank/check` (field
+`modelName`/`baseUrl` camelCase) bahwa WeKnora benar-benar bisa memanggilnya, mendaftarkannya
+sebagai model `Rerank`, menulis `WEKNORA_RERANK_MODEL_ID`, dan memin agen. Reranker hanya
+mengurutkan ulang chunk yang sudah diambil WeKnora di dalam `knowledge_ids` yang diotorisasi;
+ia tidak menghasilkan teks dan sitasi tetap divalidasi IntraDocs.

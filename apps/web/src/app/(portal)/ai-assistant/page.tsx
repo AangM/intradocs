@@ -9,14 +9,17 @@ import Link from 'next/link';
 export default async function Assistant({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string | string[] }>;
+  searchParams: Promise<{ q?: string | string[]; doc?: string | string[] }>;
 }) {
   const actor = await requireActor();
   const config = getAiConfig();
   // A question handed over from the search page is only pre-filled, never sent: the
   // person decides when a (slow, local) generation starts.
-  const handed = (await searchParams).q;
-  const initialQuestion = typeof handed === 'string' ? handed.slice(0, 2000) : '';
+  const params = await searchParams;
+  const initialQuestion = typeof params.q === 'string' ? params.q.slice(0, 2000) : '';
+  // A document handed over from its page pre-selects the "dokumen yang saya buka" scope;
+  // it only takes effect if that document is in the actor's own read history.
+  const initialDocumentId = typeof params.doc === 'string' ? params.doc : '';
   // With AI off the page keeps the original placeholder, so the portal stays usable
   // exactly as before rather than showing a broken chat box.
   if (config.retrieval === 'weknora-local' && config.weknora) {
@@ -56,6 +59,7 @@ export default async function Assistant({
           }))}
           initialConversations={conversations}
           initialQuestion={initialQuestion}
+          initialDocumentId={initialDocumentId}
         />
       </div>
     );

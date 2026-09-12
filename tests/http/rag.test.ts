@@ -316,3 +316,52 @@ test('history belongs to its owner and loses citations when access does', async 
     assert.equal((await call('GET', `/api/rag/conversations/${conversationId}`, siti)).status, 404);
   }
 });
+
+// --- ingest-time generation as suggestions (summary, questions) -----------------
+
+test('generated questions reach readers, the draft summary only editors, and nothing leaks', async () => {
+  if (!aiOn) return;
+  const siti = await login(IDS.viewer);
+  const fajar = await login(IDS.other);
+  const rizky = await login(IDS.contributor);
+
+  const reader = await call('POST', '/api/rag/document-insights', siti, { documentId: docId(1) });
+  assert.equal(reader.status, 200);
+  if (!reader.body.available) return; // ingest-time generation not finished on this machine yet
+  assert((reader.body.questions as unknown[]).length > 0, 'a reader gets the questions');
+  assert.equal(reader.body.summary, null, 'a viewer never sees the machine summary');
+
+  const editor = await call('POST', '/api/rag/document-insights', rizky, { documentId: docId(1) });
+  assert.equal(editor.status, 200);
+  assert.equal(typeof editor.body.summary, 'string', 'an editor gets the draft summary');
+  assert.equal(typeof editor.body.currentSummary, 'string');
+
+  // No scope over Infrastruktur: the answer is indistinguishable from "not indexed".
+  const outside = await call('POST', '/api/rag/document-insights', fajar, { documentId: docId(1) });
+  assert.equal(outside.status, 200);
+  assert.equal(outside.body.available, false);
+  assert.deepEqual(outside.body.questions, []);
+
+  // Confidential without a grant: same answer, and no question can hint at the content.
+  const secret = await call('POST', '/api/rag/document-insights', siti, { documentId: docId(7) });
+  assert.equal(secret.body.available, false);
+
+  assert.equal(
+    (await call('POST', '/api/rag/document-insights', siti, { documentId: docId(1), x: 1 })).status,
+    400,
+  );
+
+  // Starter questions follow the scope: a hidden category yields none.
+  const infra = await call('POST', '/api/rag/suggested-questions', siti, {
+    scope: { type: 'category', categoryId: IDS.infra },
+  });
+  assert.equal(infra.status, 200);
+  const hidden = await call('POST', '/api/rag/suggested-questions', siti, {
+    scope: { type: 'category', categoryId: IDS.security },
+  });
+  assert.deepEqual(hidden.body.questions, []);
+  assert.equal(
+    (await call('POST', '/api/rag/suggested-questions', siti, { scope: 'all' })).status,
+    400,
+  );
+});

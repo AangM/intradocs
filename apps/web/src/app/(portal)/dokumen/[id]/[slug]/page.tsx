@@ -18,6 +18,7 @@ import { AttachmentsList } from '@/components/attachments-list';
 import { WorkflowPanel } from '@/components/workflow-panel';
 import { ReaderFeedback } from '@/components/reader-feedback';
 import { LabelSuggestions } from '@/components/label-suggestions';
+import { DocumentInsights } from '@/components/document-insights';
 import { RequiredReadingMark } from '@/components/required-reading-mark';
 import { reviewInfo, versionSummaries, readerPreferences } from '@intradocs/db/workflow';
 import { findSensitiveContent } from '@intradocs/core/workflow';
@@ -240,6 +241,11 @@ export default async function Reader({
                 initialFavorite={preferences.favorite}
                 initialFeedback={preferences.feedback}
               />
+            )}
+            {/* Generated questions for every reader; the draft summary only for those who
+                could revise. The route enforces the same split server-side. */}
+            {doc.status === 'published' && !expired && (
+              <DocumentInsights documentId={id} editor={hasCapability(actor, 'documents.upload')} />
             )}
             {/* Only people who could act on a suggestion are offered one: taking it up
                 means creating a revision, which needs documents.upload. */}
