@@ -883,6 +883,13 @@ panel "Bantuan metadata" di langkah Metadata):
 | Judul/ringkasan dari AI | **Tidak dibuat** — butuh ingest draft; draf ringkasan tersedia setelah terbit (§17)                                                                                    | —                                                                          |
 
 Setiap usulan adalah tombol; tidak ada yang diterapkan sendiri, tidak ada yang disimpan.
+
+**Setelah terbit, loop-nya tertutup di form revisi.** Form `/unggah?document=…&base=…`
+menampilkan "Saran AI untuk revisi ini": draf ringkasan (§17) dengan tombol **Gunakan sebagai
+ringkasan** yang mengisi kolom Ringkasan, dan saran label tersaring (§11) sebagai tombol
+**+ label**. Keduanya hanya mengisi form; revisinya tetap direview. Inilah versi "diisikan AI
+atau diisi sendiri" yang bisa dibuat aman: AI mengisi _form_, orang mengirim _revisi_.
+
 Viewer tanpa `documents.upload` mendapat `403`; reviewer dengan scope Keamanan saja tidak
 melihat label/kategori Infrastruktur; kontributor tanpa grant tidak pernah mendapat dokumen
 Rahasia sebagai "mirip" walau cuplikannya mengutip canary-nya. Bukti: `tests/http/rag.test.ts`

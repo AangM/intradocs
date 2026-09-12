@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useRef, useState } from 'react';
 import { Icon } from './icon';
 import { MetadataHelp } from './metadata-help';
+import { RevisionSuggestions } from './revision-suggestions';
 import { CLASSIFICATIONS, CLASSIFICATION_LABELS, type Classification } from '@intradocs/core';
 type Category = { id: string; name: string; allowed: boolean; minimumClassification: string };
 type Result = { documentId: string; versionId: string; slug: string; reused: boolean };
@@ -448,6 +449,32 @@ export function UploadForm({
                 Pemilik
                 <input className="inp" value={ownerName} readOnly />
               </label>
+              {/* A revision starts from a published, indexed version, so what the model
+                  generated about it (§17) and the filtered label suggestions can be taken
+                  into the form here -- by a press, never by default. */}
+              {revision && (
+                <RevisionSuggestions
+                  documentId={revision.documentId}
+                  currentSummary={summary}
+                  currentLabels={labels
+                    .split(',')
+                    .map((l) => l.trim())
+                    .filter(Boolean)}
+                  onUseSummary={(text) => {
+                    setSummary(text.slice(0, 1000));
+                    changed();
+                  }}
+                  onAddLabel={(name) => {
+                    const current = labels
+                      .split(',')
+                      .map((l) => l.trim())
+                      .filter(Boolean);
+                    if (current.some((l) => l.toLowerCase() === name.toLowerCase())) return;
+                    setLabels([...current, name].join(', '));
+                    changed();
+                  }}
+                />
+              )}
               {/* Draft-side help: the file stays here; see MetadataHelp for what travels. */}
               <MetadataHelp
                 title={title}
