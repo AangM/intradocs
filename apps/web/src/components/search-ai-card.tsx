@@ -87,19 +87,23 @@ export function SearchAiCard({ query, categoryId }: { query: string; categoryId:
       {state.kind === 'ok' && state.data.citations.length > 0 && (
         <>
           <ol className="rag-sources">
-            {state.data.citations.map((citation) => (
-              <li key={`${citation.versionId}-${citation.snippet.slice(0, 24)}`}>
-                <Link href={citation.href} prefetch={false} className="document-title">
-                  {citation.documentTitle}
-                </Link>
-                <div className="sub tiny">
-                  {citation.categoryName} · v{citation.versionLabel} ·{' '}
-                  {CLASSIFICATION_LABELS[citation.classification] ?? citation.classification}
-                  {citation.heading ? ` · ${citation.heading}` : ''}
-                </div>
-                <p className="rag-snippet">{citation.snippet}</p>
-              </li>
-            ))}
+            {/* One entry per document -- the best-ranked chunk -- since this is a
+                result list, not the evidence list the assistant shows. */}
+            {state.data.citations
+              .filter((c, i, all) => all.findIndex((x) => x.documentId === c.documentId) === i)
+              .map((citation, n) => (
+                <li key={`${citation.versionId}-${n}`}>
+                  <Link href={citation.href} prefetch={false} className="document-title">
+                    {citation.documentTitle}
+                  </Link>
+                  <div className="sub tiny">
+                    {citation.categoryName} · v{citation.versionLabel} ·{' '}
+                    {CLASSIFICATION_LABELS[citation.classification] ?? citation.classification}
+                    {citation.heading ? ` · ${citation.heading}` : ''}
+                  </div>
+                  <p className="rag-snippet">{citation.snippet}</p>
+                </li>
+              ))}
           </ol>
           <p className="sub tiny" style={{ marginTop: 10 }}>
             {state.data.scope} versi aktif dalam cakupan

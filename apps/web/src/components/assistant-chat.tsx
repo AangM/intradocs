@@ -500,8 +500,8 @@ export function AssistantChat({
                   <>
                     <h3 className="rag-sources-title">Sumber ({turn.citations.length})</h3>
                     <ol className="rag-sources">
-                      {turn.citations.map((citation) => (
-                        <li key={`${citation.versionId}-${citation.snippet.slice(0, 24)}`}>
+                      {turn.citations.map((citation, n) => (
+                        <li key={`${citation.versionId}-${n}`}>
                           <Link href={citation.href} prefetch={false} className="document-title">
                             {citation.documentTitle}
                           </Link>

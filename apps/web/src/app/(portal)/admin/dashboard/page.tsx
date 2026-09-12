@@ -69,7 +69,14 @@ export default async function Dashboard({
           },
           {
             label: 'Approval rata-rata',
-            value: data.approvalHours === null ? '—' : `${data.approvalHours} jam`,
+            value:
+              data.approvalHours === null
+                ? '—'
+                : data.approvalHours < 1
+                  ? `${Math.max(1, Math.round(data.approvalHours * 60))} menit`
+                  : data.approvalHours < 48
+                    ? `${Math.round(data.approvalHours * 10) / 10} jam`
+                    : `${Math.round(data.approvalHours / 24)} hari`,
             note: 'Submit sampai persetujuan final',
             icon: 'clock',
           },

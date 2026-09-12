@@ -29,6 +29,18 @@ Buka `http://localhost:3000`. Credential acak ada **hanya** di `var/demo-account
 
 `knowledge:start` membuat token converter acak di `.env.local` bila belum ada; **restart `pnpm dev` sesudahnya**. Scanner belum siap/signature kedaluwarsa = upload ditolak, bukan bypass. `pnpm services:stop`/`pnpm knowledge:stop` tidak menghapus volume.
 
+### Sebelum demo: jalankan build produksi
+
+`pnpm dev` mengompilasi setiap halaman saat pertama dibuka; di laptop yang sekaligus menjalankan WeKnora, Ollama, ClamAV, dan converter, itu terasa sebagai jeda 5–15 detik per halaman. Untuk demo pakai build produksi:
+
+```sh
+docker compose --env-file .env.local --profile weknora up -d   # postgres, WeKnora, scanner, converter
+pnpm weknora:status                                            # health, hybrid search, jumlah index
+pnpm build && pnpm start                                       # web + worker, mode produksi
+```
+
+Cek terakhir sebelum orang lain melihat: Ollama hidup (`curl http://localhost:11434/api/version`), `pnpm weknora:status` menyebut "Hybrid search: ok", dan satu pertanyaan pemantik di AI Assistant dijawab dengan sitasi.
+
 ## Memperbarui folder sebelumnya
 
 Backup DB + `var/storage` menurut kebijakan Anda; jangan menghapus data. Dari folder paket baru:
