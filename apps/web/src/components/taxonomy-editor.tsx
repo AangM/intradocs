@@ -1,7 +1,8 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { TaxonomyCategory, TaxonomyLabel } from '@intradocs/db/taxonomy';
+import type { TaxonomyCategory, TaxonomyLabel, TaxonomySuggestions } from '@intradocs/db/taxonomy';
+import { Icon } from './icon';
 import { CLASSIFICATION_LABELS, type Classification } from '@intradocs/core';
 const empty: TaxonomyCategory = {
   id: '',
@@ -17,13 +18,17 @@ const empty: TaxonomyCategory = {
 export function TaxonomyEditor({
   categories,
   labels,
+  suggestions,
 }: {
   categories: TaxonomyCategory[];
   labels: TaxonomyLabel[];
+  suggestions: TaxonomySuggestions;
 }) {
   const router = useRouter();
   const [category, setCategory] = useState(empty),
     [tighten, setTighten] = useState(false);
+  const [dragging, setDragging] = useState<string | null>(null),
+    [dropTarget, setDropTarget] = useState<string | null>(null);
   const [label, setLabel] = useState<TaxonomyLabel>({
     id: '',
     categoryId: categories[0]?.id ?? '',
@@ -70,6 +75,45 @@ export function TaxonomyEditor({
     }
     return n;
   }
+  /**
+   * Drag a category onto a sibling to take its place. Ordering only: a parent change
+   * goes through the form, because the server refuses to move a category that already
+   * holds documents. Positions of the affected siblings are rewritten 10 apart so the
+   * next drop has room without renumbering everything.
+   */
+  async function reorder(sourceId: string, targetId: string) {
+    const source = categories.find((c) => c.id === sourceId),
+      target = categories.find((c) => c.id === targetId);
+    if (!source || !target || source.id === target.id || source.parentId !== target.parentId)
+      return;
+    const siblings = categories
+      .filter((c) => c.parentId === source.parentId)
+      .sort((a, b) => a.position - b.position || a.name.localeCompare(b.name));
+    const movingDown = siblings.indexOf(source) < siblings.indexOf(target);
+    const without = siblings.filter((c) => c.id !== source.id);
+    const at = without.findIndex((c) => c.id === target.id) + (movingDown ? 1 : 0);
+    const ordered = [...without.slice(0, at), source, ...without.slice(at)];
+    setBusy(true);
+    setError('');
+    try {
+      for (const [i, c] of ordered.entries()) {
+        const position = (i + 1) * 10;
+        if (c.position === position) continue;
+        const r = await fetch('/api/taxonomy/categories', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...c, position, confirmTightening: false }),
+        });
+        if (!r.ok) throw new Error(((await r.json()) as { error?: string }).error ?? 'Gagal.');
+      }
+      setMessage('Urutan disimpan dan diaudit.');
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Koneksi gagal.');
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
     <>
       <div className="taxonomy-layout">
@@ -86,9 +130,80 @@ export function TaxonomyEditor({
               Tambah kategori
             </button>
           </div>
+          <p className="sub tiny taxonomy-hint">
+            Seret sebuah kategori ke kategori setingkat untuk mengubah urutannya. Memindahkan induk
+            tetap lewat form di bawah.
+          </p>
           <ul className="taxonomy-tree">
             {categories.map((c) => (
-              <li key={c.id} style={{ paddingLeft: 16 + depth(c) * 16 }}>
+              <li
+                key={c.id}
+                style={{ paddingLeft: 16 + depth(c) * 16 }}
+                draggable={!busy}
+                className={`${dragging === c.id ? 'dragging' : ''} ${dropTarget === c.id ? 'drop-target' : ''}`}
+                onDragStart={(e) => {
+                  setDragging(c.id);
+                  e.dataTransfer.effectAllowed = 'move';
+                  e.dataTransfer.setData('text/plain', c.id);
+                }}
+                onDragEnd={() => {
+                  setDragging(null);
+                  setDropTarget(null);
+                }}
+                onDragOver={(e) => {
+                  const source = categories.find((x) => x.id === dragging);
+                  if (!source || source.id === c.id || source.parentId !== c.parentId) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
+                  if (dropTarget !== c.id) setDropTarget(c.id);
+                }}
+                onDragLeave={() => {
+                  if (dropTarget === c.id) setDropTarget(null);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const source = e.dataTransfer.getData('text/plain') || dragging;
+                  setDragging(null);
+                  setDropTarget(null);
+                  if (source) void reorder(source, c.id);
+                }}
+              >
+                <span className="drag-handle" aria-hidden="true">
+                  <Icon name="more" size={14} />
+                </span>
+                {/* Keyboard and screen-reader path for the same reorder; drag is a shortcut. */}
+                <span className="order-buttons">
+                  {(() => {
+                    const siblings = categories
+                      .filter((x) => x.parentId === c.parentId)
+                      .sort((a, b) => a.position - b.position || a.name.localeCompare(b.name));
+                    const at = siblings.findIndex((x) => x.id === c.id);
+                    const up = siblings[at - 1],
+                      down = siblings[at + 1];
+                    return (
+                      <>
+                        <button
+                          type="button"
+                          className="btn-icon"
+                          aria-label={`Naikkan ${c.name}`}
+                          disabled={busy || !up}
+                          onClick={() => up && void reorder(c.id, up.id)}
+                        >
+                          <Icon name="up" size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-icon"
+                          aria-label={`Turunkan ${c.name}`}
+                          disabled={busy || !down}
+                          onClick={() => down && void reorder(c.id, down.id)}
+                        >
+                          <Icon name="down" size={12} />
+                        </button>
+                      </>
+                    );
+                  })()}
+                </span>
                 <button
                   className="taxonomy-select"
                   onClick={() => {
@@ -247,8 +362,21 @@ export function TaxonomyEditor({
         <section className="card">
           <div className="card-h">
             <h2 className="h3">Label</h2>
+            <a className="btn btn-sm" href="/api/taxonomy/export">
+              <Icon name="download" size={14} />
+              Ekspor taksonomi
+            </a>
           </div>
           <div className="card-b">
+            <TaxonomyHygiene
+              suggestions={suggestions}
+              labels={labels}
+              busy={busy}
+              onMerge={(source, target, revision) =>
+                void save('/api/taxonomy/merge', { source, target, revision })
+              }
+              onRemove={(l) => void save('/api/taxonomy/labels', { ...l, remove: true })}
+            />
             <div className="label-list">
               {labels.map((l) => (
                 <button className={`tag tone-${l.color}`} key={l.id} onClick={() => setLabel(l)}>
@@ -346,5 +474,116 @@ export function TaxonomyEditor({
       )}
       {message && <p role="status">{message}</p>}
     </>
+  );
+}
+
+/**
+ * "Saran perapian taksonomi": computed on the server from names and usage, applied only
+ * through the same merge and delete calls a person would make by hand. Merging keeps the
+ * merged name as an alias (V1 S07), so nothing a document carries is lost.
+ */
+function TaxonomyHygiene({
+  suggestions,
+  labels,
+  busy,
+  onMerge,
+  onRemove,
+}: {
+  suggestions: TaxonomySuggestions;
+  labels: TaxonomyLabel[];
+  busy: boolean;
+  onMerge: (source: string, target: string, revision: number) => void;
+  onRemove: (label: TaxonomyLabel) => void;
+}) {
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const duplicates = suggestions.duplicates.filter((d) => !dismissed.has(`${d.a.id}:${d.b.id}`));
+  const unused = suggestions.unused.filter((u) => !dismissed.has(u.id));
+  if (duplicates.length === 0 && unused.length === 0) return null;
+  const dismiss = (key: string) => setDismissed((set) => new Set([...set, key]));
+  const revisionOf = (labelId: string) => labels.find((l) => l.id === labelId)?.revision ?? 0;
+  return (
+    <section className="hygiene" aria-label="Saran perapian taksonomi">
+      <div className="hygiene-h">
+        <Icon name="spark" size={15} />
+        <strong>Saran perapian taksonomi</strong>
+        <span className="sub tiny">
+          Dihitung dari nama dan pemakaian label; tidak ada yang berubah sebelum Anda menekan
+          tombolnya.
+        </span>
+      </div>
+      <ul className="hygiene-list">
+        {duplicates.map((d) => {
+          const key = `${d.a.id}:${d.b.id}`;
+          // Merge INTO the more-used label; the other becomes its alias.
+          const [keep, fold] = d.a.usedBy >= d.b.usedBy ? [d.a, d.b] : [d.b, d.a];
+          return (
+            <li key={key}>
+              <div>
+                Label <span className="tag">{d.a.name}</span> dan{' '}
+                <span className="tag">{d.b.name}</span> di {d.categoryName}{' '}
+                {d.reason === 'name'
+                  ? `namanya mirip ${Math.round(d.nameSimilarity * 100)}%`
+                  : `dipakai bersama pada ${Math.round(d.usageOverlap * 100)}% versi`}
+                {d.reason === 'name' && d.usageOverlap > 0
+                  ? ` dan tumpang tindih pemakaian ${Math.round(d.usageOverlap * 100)}%`
+                  : ''}
+                {' — pertimbangkan penggabungan.'}
+              </div>
+              <div className="reader-actions">
+                <button
+                  type="button"
+                  className="btn btn-sm btn-p"
+                  disabled={busy}
+                  onClick={() => onMerge(fold.id, keep.id, revisionOf(fold.id))}
+                >
+                  Gabungkan “{fold.name}” → “{keep.name}”
+                </button>
+                <button type="button" className="btn btn-sm" onClick={() => dismiss(key)}>
+                  Abaikan
+                </button>
+              </div>
+            </li>
+          );
+        })}
+        {unused.length > 0 && (
+          <li>
+            <div>
+              {unused.length} label tidak dipakai versi aktif mana pun:{' '}
+              {unused.map((u) => (
+                <span className="tag" key={u.id}>
+                  {u.name} · {u.categoryName}
+                  <button
+                    type="button"
+                    className="tag-x"
+                    aria-label={`Hapus label ${u.name}`}
+                    disabled={busy}
+                    onClick={() =>
+                      onRemove({
+                        id: u.id,
+                        categoryId: u.categoryId,
+                        name: u.name,
+                        color: labels.find((l) => l.id === u.id)?.color ?? 'grey',
+                        revision: revisionOf(u.id),
+                      })
+                    }
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+            <div className="reader-actions">
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={() => unused.forEach((u) => dismiss(u.id))}
+              >
+                Abaikan
+              </button>
+            </div>
+          </li>
+        )}
+      </ul>
+    </section>
   );
 }

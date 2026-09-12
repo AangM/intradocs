@@ -1,10 +1,14 @@
 import { requireActor } from '@/lib/session';
-import { taxonomyData } from '@intradocs/db/taxonomy';
+import { taxonomyData, taxonomySuggestions } from '@intradocs/db/taxonomy';
 import { PageHeading, Notice } from '@/components/shared';
 import { TaxonomyEditor } from '@/components/taxonomy-editor';
+import { TaxonomyRules } from '@/components/taxonomy-rules';
 export default async function Taxonomy() {
   const actor = await requireActor('taxonomy.view');
-  const data = await taxonomyData(actor.id);
+  const [data, suggestions] = await Promise.all([
+    taxonomyData(actor.id),
+    taxonomySuggestions(actor.id),
+  ]);
   return (
     <div className="pad">
       <PageHeading
@@ -16,7 +20,8 @@ export default async function Taxonomy() {
         penurunan klasifikasi ditolak karena memerlukan review akses terpisah. Kritikal selalu
         membutuhkan dua tahap.
       </Notice>
-      <TaxonomyEditor {...data} />
+      <TaxonomyEditor {...data} suggestions={suggestions} />
+      <TaxonomyRules categories={data.categories} />
     </div>
   );
 }

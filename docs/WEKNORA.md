@@ -844,3 +844,26 @@ Markdown versinya sehingga bisa dilompati, bukan hanya ditampilkan.
 
 Perbedaannya kecil dan tidak ada yang memburuk; KB produksi di mesin ini memakainya. Tetap
 opt-in pada `weknora:reindex` karena buktinya baru dari 7 dokumen.
+
+## 19. S07 tanpa WeKnora: perapian taksonomi, urutan, ekspor, aturan
+
+Bagian mockup S07 yang belum ada tidak butuh AI, hanya belum dikerjakan:
+
+- **Saran perapian taksonomi** (`taxonomySuggestions`, migrasi 031): pasangan label yang
+  namanya mirip (trigram `pg_trgm` ≥ 0,45) atau dipakai bersama (Jaccard ≥ 0,75 atas versi
+  yang terlihat), keduanya dalam satu kategori; plus label yang tidak dipakai versi aktif mana
+  pun. Aksinya memakai API yang sudah ada: gabung (label yang lebih jarang menjadi alias) dan
+  hapus. Tidak ada yang berubah sebelum tombol ditekan.
+- **"Tidak dipakai" harus benar walau admin tidak bisa membaca dokumennya.**
+  `app.is_active_version` menyertakan `can_read_version`, jadi label yang hanya dibawa dokumen
+  Rahasia tampak tidak dipakai bagi admin tanpa grant — dan akan dihapus. Hitungannya kini dari
+  `app.label_usage_counts()` (SECURITY DEFINER, predikat publikasi saja, hanya angka), digabung
+  dengan daftar label yang terlihat lewat RLS. Bukti: `tests/integration/taxonomy-hygiene.test.ts`.
+- **Urutan**: seret kategori ke kategori setingkat, atau tombol ↑/↓ (jalur keyboard/pembaca
+  layar); keduanya menulis ulang `position` saudara-saudaranya lewat `POST /api/taxonomy/categories`
+  dan diaudit. Memindahkan induk tetap lewat form karena server menolak memindahkan kategori
+  yang sudah berisi dokumen.
+- **Ekspor taksonomi**: tombol ke `GET /api/taxonomy/export` yang sudah ada.
+- **Aturan yang berlaku**: panel ringkasan dari pengaturan kategori dan aturan tetap di kode
+  (Kritikal → dua tahap, klasifikasi minimum, pengingat review, label AI hanya saran). Bukan
+  mesin aturan bebas, dan panelnya mengatakan itu.

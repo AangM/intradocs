@@ -740,3 +740,95 @@ summary,
 .turn-vote .i.flip {
   transform: scaleY(-1);
 }
+
+/* S07 · seret-urut, saran perapian, aturan --------------------------------- */
+.taxonomy-hint {
+  margin: 0 0 6px;
+}
+.taxonomy-tree li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.taxonomy-tree li[draggable='true'] {
+  cursor: grab;
+}
+.taxonomy-tree li.dragging {
+  opacity: 0.5;
+}
+.taxonomy-tree li.drop-target {
+  box-shadow: inset 0 2px 0 var(--blue-600);
+}
+.drag-handle {
+  color: var(--muted-2);
+  flex: none;
+  transform: rotate(90deg);
+}
+.hygiene {
+  border: 1px solid var(--amber);
+  background: var(--amber-bg);
+  border-radius: var(--r);
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+.hygiene-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.hygiene-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 13px;
+}
+.hygiene-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.hygiene-list .tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.tag-x {
+  background: none;
+  border: 0;
+  cursor: pointer;
+  color: inherit;
+  padding: 0 2px;
+  font-size: 13px;
+  line-height: 1;
+}
+.rules-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+.order-buttons {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0;
+  flex: none;
+}
+.order-buttons .btn-icon {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  padding: 0 4px;
+  cursor: pointer;
+  line-height: 1;
+}
+.order-buttons .btn-icon:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
