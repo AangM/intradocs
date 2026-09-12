@@ -1,16 +1,12 @@
 import Link from 'next/link';
 import { requireActor } from '@/lib/session';
+import { getAiConfig } from '@/lib/rag';
+import { SearchAiCard } from '@/components/search-ai-card';
 import { listCategories } from '@intradocs/db/queries';
 import { searchDocuments, discoveryOptions } from '@intradocs/db/discovery';
 import { DiscoveryFilters, catalogHref } from '@/components/discovery-filters';
 import { parseCatalogQuery, type CatalogQuery } from '@intradocs/core/validation';
-import {
-  PageHeading,
-  Pending,
-  ClassificationBadge,
-  Empty,
-  documentHref,
-} from '@/components/shared';
+import { PageHeading, ClassificationBadge, Empty, documentHref } from '@/components/shared';
 import { Icon } from '@/components/icon';
 export default async function Search({
   searchParams,
@@ -31,6 +27,8 @@ export default async function Search({
       </div>
     );
   }
+  const aiConfig = getAiConfig();
+  const aiOn = aiConfig.retrieval === 'weknora-local' && Boolean(aiConfig.weknora);
   const [categories, data, options] = await Promise.all([
     listCategories(actor.id),
     searchDocuments(actor.id, query),
@@ -76,10 +74,19 @@ export default async function Search({
           title={query.q ? `Hasil untuk “${query.q}”` : 'Cari pengetahuan tim'}
           subtitle={`${data.total} hasil · pencarian lexical pada judul, metadata, dan isi · ${data.durationMs} ms di server`}
         />
-        <Pending milestone="M4">
-          Ringkasan AI, hybrid retrieval, dan kutipan belum tersedia. Tidak ada dokumen di luar hak
-          akses yang ditampilkan, termasuk judulnya.
-        </Pending>
+        {aiOn && query.q.trim() ? (
+          <SearchAiCard
+            key={`${query.q.trim()}|${query.category ?? ''}`}
+            query={query.q.trim()}
+            categoryId={query.category}
+          />
+        ) : (
+          <p className="sub tiny mb">
+            {aiOn
+              ? 'Ketik pertanyaan untuk melihat potongan dokumen yang relevan menurut AI di atas hasil lexical.'
+              : 'AI belum diaktifkan pada instalasi ini; hasil di bawah adalah pencarian lexical. Tidak ada dokumen di luar hak akses yang ditampilkan, termasuk judulnya.'}
+          </p>
+        )}
         <div className="card">
           {data.items.length ? (
             data.items.map((d) => (

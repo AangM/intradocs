@@ -270,14 +270,17 @@ WeKnora karena 54329 dan 58080 masuk rentang tersebut. Periksa dengan
 
 - **Q4 dijalankan pada corpus sintetis, bukan pada corpus nyata.** 40 pertanyaan berlabel, recall@5 dan abstain terukur (§8). Yang belum ada: review grounding jawaban oleh pemilik domain pada dokumen sungguhan — dan itu memang tidak bisa dilakukan dengan data sintetis.
 - **Ambang relevansi — dulu dinyatakan mustahil, ternyata keliru; lihat §14.** Klaim lama bahwa `score` hybrid-search selalu 0,016 benar hanya ketika hasil keyword dan vektor difusi (RRF). Dengan `disable_keywords_match=true` WeKnora mengembalikan kemiripan kosinus asli, terbatas `knowledge_ids`. Gerbangnya kini terpasang, dikalibrasi pada Q4, dan menaikkan abstain dari 0/10 menjadi 8/10 tanpa menurunkan recall. Yang tidak pernah terjadi tetap sama: mengarang jawaban.
-- **`AI_GENERATION` diuji, tetapi tidak dinyalakan secara default.** Dengan `qwen2.5:1.5b-instruct` di Ollama host, jawaban benar-benar grounded pada dokumen. Biayanya diukur: **35–42 detik per jawaban** pada laptop 7,7 GB RAM (target Q5 ≤15 detik), dan permintaan berbarengan membuatnya gagal `503` karena mesin kehabisan memori — saat pengujian hanya tersisa 0,35 GB. Karena itu default tetap `AI_GENERATION=off`: retrieval-only menjawab p95 di bawah 1 detik dan tidak pernah gagal. Untuk menyalakannya:
+- **`AI_GENERATION` diuji, tetapi tidak dinyalakan secara default.** Dengan `qwen2.5:1.5b-instruct` di Ollama host, jawaban benar-benar grounded pada dokumen. Biayanya bergantung mesin: **35–42 detik per jawaban** pada laptop 7,7 GB RAM tanpa GPU (target Q5 ≤15 detik), permintaan berbarengan gagal `503` karena kehabisan memori; pada laptop kedua dengan GPU 6 GB, **2,4 detik hangat / 19 detik dingin**. Karena itu default tetap `AI_GENERATION=off`: retrieval-only menjawab p95 di bawah 1 detik dan tidak pernah gagal. Untuk menyalakannya:
 
   ```sh
   ollama pull qwen2.5:1.5b-instruct
-  # daftarkan sebagai model type=KnowledgeQA di WeKnora, lalu di .env.local:
+  pnpm weknora:generation qwen2.5:1.5b-instruct   # turunan ber-num_predict, daftar, pin, agen
+  # lalu di .env.local:
   AI_GENERATION=weknora-local
   WEKNORA_CHAT_TIMEOUT_MS=150000   # default 60 detik terlalu ketat untuk CPU lokal
   ```
+
+  **Jangan mendaftarkan model Ollama telanjang sebagai penjawab.** Ditemukan saat pengujian: model 1.5B sesekali tidak berhenti — satu jawaban tercatat `completion_tokens=40960` (batas konteks digeser terus), **7–15 menit** di GPU, dan karena Ollama melayani satu permintaan per model secara berurutan, setiap permintaan berikutnya mengantre di belakangnya sampai `WEKNORA_CHAT_TIMEOUT_MS` habis dan menjadi `503`. `max_completion_tokens` pada agen WeKnora **disimpan tetapi tidak diteruskan** ke `/api/chat` Ollama sebagai `num_predict`. Yang bekerja adalah menaruh batas itu pada modelnya: `weknora:generation` membuat turunan `<model>-intradocs` lewat `POST /api/create` dengan `num_predict 1024` dan `repeat_penalty 1.15`, memverifikasi lewat `/api/show`, mendaftarkannya sebagai model `KnowledgeQA` lokal, menulis `WEKNORA_GENERATION_MODEL_ID`, lalu memin agen. Setelah itu tiga pertanyaan berturut-turut terjawab 18,9 s (dingin), 2,4 s, 2,4 s, dan `tests/http/rag.test.ts` (13) lulus termasuk dua tes yang butuh generasi.
 
   Perangkat dengan RAM lebih besar (≥16 GB) sebaiknya memakai model yang lebih mampu; 1.5B dipilih semata karena itu yang muat di sini.
 
@@ -352,6 +355,13 @@ Baseline `qwen2.5:1.5b-instruct` lewat perintah itu (7 dokumen terindeks, `skip_
 3 tag cocok label yang ada, 4 tidak cocok (semuanya `Standar`/`Tata Kelola` di kategori yang
 tidak memilikinya), 2 dokumen tanpa tag, **0 saran baru lolos**. Angka pembanding untuk model
 berikutnya.
+
+Diulang pada laptop kedua (12 September 2026, kolam 9 label unik setelah perbaikan seed §3,
+GPU): 2 tag cocok (`SOP`, `Standar`), 2 tidak cocok (`Tata Kelola` pada Konfigurasi VPN dan
+pada Lampiran Rahasia), 3 dokumen tanpa tag, **0 saran baru lolos**. Konsisten dengan baseline;
+bukan soal mesin. Catatan metode: run pertama di mesin itu berjalan saat `app.labels` masih
+kosong dan menghasilkan 7 dokumen tanpa tag — angka itu mengukur kolam yang kosong, bukan
+model, dan tidak dipakai.
 
 **Model lebih besar, terukur** (`qwen2.5:3b-instruct`, 1,9 GB, dijalankan dengan dev server
 dimatikan agar muat di RAM; kolam tag sama, semua keterikatan lama dilepas dulu):
@@ -677,3 +687,41 @@ corpus sintetis, karena UI menampilkan seluruh isinya tanpa klasifikasi, scope, 
 Registrasi WeKnora tertutup, jadi satu-satunya akun yang bisa masuk adalah akun layanan lokal.
 Apa pun yang terbukti berguna di lab dan **punya permukaan validasi** di IntraDocs (seperti
 tag → label) dipindahkan ke portal dengan pola yang sama: model mengusulkan, orang memutuskan.
+
+## 16. Asisten: cakupan dan riwayat (S09)
+
+Mockup S09 memuat tiga hal yang sampai September 2026 belum ada di portal: pemilih ruang
+lingkup jawaban, riwayat percakapan, dan pertanyaan lanjutan dalam satu utas. Ketiganya kini
+ada, dengan batas yang sama seperti retrieval itu sendiri.
+
+**Cakupan mempersempit, tidak pernah memperluas.** Body `POST /api/rag/chat` dan
+`/api/rag/search` menerima `scope` bertipe ketat — `{type:'all'}`,
+`{type:'category',categoryId}` (termasuk sub-kategorinya), atau
+`{type:'documents',documentIds}` (maksimal 20, diambil dari `app.read_history` milik actor)
+— dan `conversationId` milik sendiri. Field lain tetap ditolak `400`. Cakupan menjadi `WHERE`
+tambahan pada `listAuthorizedSources`, di atas baris yang sudah disaring RLS: kategori atau
+dokumen di luar akses actor menghasilkan nol baris, yang tidak bisa dibedakan dari kategori
+kosong — permintaan abstain dan tidak belajar apa pun. Bukti: `tests/http/rag.test.ts`
+("a scope narrows retrieval and cannot reach a category outside the actor").
+
+**Riwayat disimpan di IntraDocs, bukan di WeKnora.** Sesi WeKnora tetap dibuat dan dihapus
+per giliran; tidak ada yang menumpuk di sana. Migrasi 029 menambah `app.ai_conversations`,
+`app.ai_turns`, `app.ai_turn_citations` dengan RLS: percakapan hanya terbaca pemiliknya
+(super admin pun mendapat `404`), dan sitasi tersimpan hanya terbaca selama
+`app.can_read_version` masih benar untuk versinya. Bila sebuah sumber tidak lagi boleh dibaca,
+sitasinya hilang dari jawaban lama dan **teks jawabannya ikut disembunyikan** — ia disusun dari
+potongan yang kini tersembunyi — dengan keterangan berapa sumber yang tertutup. Endpoint:
+`GET /api/rag/conversations`, `GET|DELETE /api/rag/conversations/:id`. Bukti: tes "history
+belongs to its owner and loses citations when access does".
+
+**Pertanyaan lanjutan tidak membawa konteks ke retrieval.** Setiap giliran mencari ulang dari
+dokumen; jawaban sebelumnya tidak pernah menjadi masukan giliran berikutnya. Ini sengaja:
+perubahan izin berlaku pada pesan berikutnya, dan agen portal tetap `multi_turn_enabled=false`.
+Yang "lanjutan" adalah utasnya di layar dan di riwayat, bukan memori model.
+
+**Halaman pencarian (S02)** kini memakai separuh retrieval yang sama: kartu "Sumber yang relevan
+menurut AI" memanggil `/api/rag/search` (tanpa generasi, tanpa penyimpanan) di atas hasil
+lexical, mengikuti filter kategori halaman itu, dan menautkan ke asisten dengan pertanyaan
+terisi — tidak terkirim otomatis, karena generasi lokal itu lambat dan orang yang memutuskan.
+Pada pertanyaan bahasa alami, lexical sering nol hasil sementara kartu itu menemukan sumbernya;
+itulah alasan mockup menaruhnya di sana.

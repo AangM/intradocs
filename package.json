@@ -45,7 +45,8 @@
     "weknora:model": "tsx scripts/weknora.ts model",
     "weknora:autotag": "tsx scripts/weknora.ts autotag",
     "weknora:agent": "tsx scripts/weknora.ts agent",
-    "weknora:lab": "tsx scripts/weknora.ts lab"
+    "weknora:lab": "tsx scripts/weknora.ts lab",
+    "weknora:generation": "tsx scripts/weknora.ts generation"
   },
   "devDependencies": {
     "@playwright/test": "1.56.1",

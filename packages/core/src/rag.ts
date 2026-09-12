@@ -2,7 +2,7 @@
 // locator resolution. No I/O, no network, no database — so every rule below is
 // unit-testable offline and cannot be softened by a live service being agreeable.
 import { createHash } from 'node:crypto';
-import { headingSlug, InputError } from './validation.ts';
+import { headingSlug, InputError, parseUuid } from './validation.ts';
 
 /**
  * Bumping this forces every version to be re-exported on the next sync. Change it
@@ -377,19 +377,68 @@ export function parseQuestion(value: unknown, maxChars: number): string {
 }
 
 /**
- * Body shape for the chat endpoint. Any extra field is rejected outright, so a client
- * cannot smuggle a system prompt, a knowledge base ID, a model name or a scope.
+ * What a question is asked against. `all` is every active version the actor may read;
+ * the other two NARROW that set -- a category the actor can see, or documents the actor
+ * has opened. A scope never widens anything: the IDs are filtered through the same
+ * row-level policies as the unscoped list, so an ID outside the actor's access simply
+ * contributes nothing and the request abstains.
  */
-export function parseChatBody(value: unknown, maxChars: number): { question: string } {
+export type RetrievalScope =
+  | { type: 'all' }
+  | { type: 'category'; categoryId: string }
+  | { type: 'documents'; documentIds: string[] };
+
+export const MAX_SCOPE_DOCUMENT_IDS = 20;
+
+export function parseScope(value: unknown): RetrievalScope {
+  if (value === undefined) return { type: 'all' };
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw new InputError('Cakupan tidak valid.');
+  const scope = value as Record<string, unknown>;
+  const keys = Object.keys(scope).sort();
+  if (scope.type === 'all' && keys.join() === 'type') return { type: 'all' };
+  if (scope.type === 'category' && keys.join() === 'categoryId,type')
+    return { type: 'category', categoryId: parseUuid(scope.categoryId) };
+  if (scope.type === 'documents' && keys.join() === 'documentIds,type') {
+    if (!Array.isArray(scope.documentIds) || scope.documentIds.length === 0)
+      throw new InputError('Pilih minimal satu dokumen.');
+    if (scope.documentIds.length > MAX_SCOPE_DOCUMENT_IDS)
+      throw new InputError(`Maksimal ${MAX_SCOPE_DOCUMENT_IDS} dokumen per cakupan.`);
+    return { type: 'documents', documentIds: [...new Set(scope.documentIds.map(parseUuid))] };
+  }
+  throw new InputError('Cakupan tidak valid.');
+}
+
+export interface ChatBody {
+  question: string;
+  scope: RetrievalScope;
+  /** Continue an existing conversation; ownership is checked when the turn is stored. */
+  conversationId: string | null;
+}
+
+/**
+ * Body shape for the chat endpoint. Beyond the question, a client may only narrow the
+ * scope and name a conversation of its own; any other field is rejected outright, so a
+ * client cannot smuggle a system prompt, a knowledge base ID or a model name.
+ */
+export function parseChatBody(value: unknown, maxChars: number): ChatBody {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw new InputError('Payload tidak valid.');
   const body = value as Record<string, unknown>;
-  const keys = Object.keys(body);
-  if (keys.length !== 1 || keys[0] !== 'question')
-    throw new InputError(
-      'Hanya field question yang diizinkan. Prompt sistem, knowledge base dan model ditentukan server.',
-    );
-  return { question: parseQuestion(body.question, maxChars) };
+  const allowed = new Set(['question', 'scope', 'conversationId']);
+  for (const key of Object.keys(body))
+    if (!allowed.has(key))
+      throw new InputError(
+        'Hanya field question, scope dan conversationId yang diizinkan. Prompt sistem, knowledge base dan model ditentukan server.',
+      );
+  return {
+    question: parseQuestion(body.question, maxChars),
+    scope: parseScope(body.scope),
+    conversationId:
+      body.conversationId === undefined || body.conversationId === null
+        ? null
+        : parseUuid(body.conversationId),
+  };
 }
 
 export { ABSTAIN_MESSAGE } from './rag-messages.ts';

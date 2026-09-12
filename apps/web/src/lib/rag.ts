@@ -14,6 +14,7 @@ import {
   ABSTAIN_MESSAGE,
   type Citation,
   type RawHit,
+  type RetrievalScope,
 } from '@intradocs/core/rag';
 import {
   listAuthorizedSources,
@@ -21,6 +22,7 @@ import {
   readAuthorizedMarkdownKeys,
   recordRagAudit,
 } from '@intradocs/db/rag';
+import { storeTurn } from '@intradocs/db/assistant';
 import { getStorage } from './storage.ts';
 
 /**
@@ -57,10 +59,14 @@ export interface RetrievalResult {
  * within that scope, then re-read the database for whatever came back. The last step is
  * not redundant — a grant revoked while WeKnora was answering fails closed here.
  */
-export async function retrieve(actor: Actor, question: string): Promise<RetrievalResult> {
+export async function retrieve(
+  actor: Actor,
+  question: string,
+  within: RetrievalScope = { type: 'all' },
+): Promise<RetrievalResult> {
   const config = getAiConfig();
   const weknora = requireEnabled(config);
-  const scope = await listAuthorizedSources(actor.id, weknora.maxScopeDocuments);
+  const scope = await listAuthorizedSources(actor.id, weknora.maxScopeDocuments, within);
   if (scope.length === 0) {
     await recordRagAudit(actor.id, 'rag.abstained');
     return { citations: [], knowledgeIds: [], rejectedCount: 0, scopeSize: 0 };
@@ -144,6 +150,8 @@ export interface ChatResult {
   /** Same numbers retrieval reports, so the UI can say how wide the search was. */
   scopeSize: number;
   rejectedCount: number;
+  /** The IntraDocs-side thread this turn was appended to. */
+  conversationId: string;
 }
 
 /**
@@ -151,19 +159,31 @@ export interface ChatResult {
  * never asked: an abstention is returned instead, so there is no path where an answer
  * exists without evidence behind it.
  */
-export async function answerQuestion(actor: Actor, question: string): Promise<ChatResult> {
+export async function answerQuestion(
+  actor: Actor,
+  question: string,
+  within: RetrievalScope = { type: 'all' },
+  conversationId: string | null = null,
+): Promise<ChatResult> {
   const config = getAiConfig();
   const weknora = requireEnabled(config);
-  const retrieval = await retrieve(actor, question);
+  const retrieval = await retrieve(actor, question, within);
   const mode: ChatResult['mode'] =
     config.generation === 'weknora-local' ? 'generated' : 'evidence-only';
   const shape = { mode, scopeSize: retrieval.scopeSize, rejectedCount: retrieval.rejectedCount };
+  // History lives in IntraDocs, one row per turn, after the turn is fully validated.
+  // Every turn still retrieves on its own: an earlier answer never feeds a later one, so
+  // a permission change takes effect on the very next message.
+  const remember = async (turn: Omit<ChatResult, 'conversationId'>): Promise<ChatResult> => {
+    const stored = await storeTurn(actor.id, conversationId, { ...turn, question, scope: within });
+    return { ...turn, conversationId: stored.conversationId };
+  };
   if (retrieval.citations.length === 0)
-    return { ...shape, answer: ABSTAIN_MESSAGE, citations: [], abstained: true };
+    return remember({ ...shape, answer: ABSTAIN_MESSAGE, citations: [], abstained: true });
   if (mode !== 'generated') {
     // Retrieval-only mode: sources are shown without a generated answer rather than
     // falling back to any other provider.
-    return { ...shape, answer: '', citations: retrieval.citations, abstained: false };
+    return remember({ ...shape, answer: '', citations: retrieval.citations, abstained: false });
   }
   const client = new WeknoraClient(weknora);
   // A fresh session per turn: no cross-request memory lives in WeKnora, so nothing
@@ -183,5 +203,10 @@ export async function answerQuestion(actor: Actor, question: string): Promise<Ch
     'rag.chat',
     retrieval.citations.map((c) => c.documentId),
   );
-  return { ...shape, answer: answer.answer, citations: retrieval.citations, abstained: false };
+  return remember({
+    ...shape,
+    answer: answer.answer,
+    citations: retrieval.citations,
+    abstained: false,
+  });
 }

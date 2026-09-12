@@ -185,3 +185,134 @@ test('the API key never appears in any response or rendered page', async () => {
     assert(!/WEKNORA_API_KEY/.test(body));
   }
 });
+
+// --- scope and history (S09) -------------------------------------------------
+
+async function call(method: string, path: string, cookie: string, body?: unknown) {
+  const r = await fetch(base + path, {
+    method,
+    headers: {
+      Origin: base,
+      'Content-Type': 'application/json',
+      Cookie: cookie,
+    },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+  const text = await r.text();
+  return { status: r.status, body: text ? (JSON.parse(text) as Record<string, unknown>) : {} };
+}
+
+test('a scope narrows retrieval and cannot reach a category outside the actor', async () => {
+  if (!aiOn) return;
+  const siti = await login(IDS.viewer);
+  const question = 'Bagaimana langkah konfigurasi VPN pada perangkat uji?';
+  const all = JSON.parse((await search(siti, { question })).text);
+  const infra = JSON.parse(
+    (await search(siti, { question, scope: { type: 'category', categoryId: IDS.infra } })).text,
+  );
+  assert(infra.scope > 0 && infra.scope <= all.scope, 'a category scope is a subset');
+  for (const c of infra.citations as Array<{ categoryName: string }>)
+    assert.equal(c.categoryName, 'Infrastruktur & Jaringan');
+  // Keamanan Informasi is not in siti's grants: the scope is empty, not an error, and
+  // nothing distinguishes it from a category with no indexed documents.
+  const security = JSON.parse(
+    (await search(siti, { question, scope: { type: 'category', categoryId: IDS.security } })).text,
+  );
+  assert.equal(security.scope, 0);
+  assert.equal(security.citations.length, 0);
+  // Free-form scopes are not a way to name a knowledge base.
+  assert.equal((await search(siti, { question, scope: 'all' })).status, 400);
+  assert.equal(
+    (await search(siti, { question, scope: { type: 'knowledge_base', id: 'kb' } })).status,
+    400,
+  );
+});
+
+/**
+ * Waits for the export queue to drain. The revocation test above withdraws and restores
+ * a document, which the worker answers with an unindex, a re-export and a reparse -- and
+ * a reparse runs the auto-tag model. Generation on the same small machine collapses from
+ * seconds to minutes while that runs, so the history test does not start until it is over.
+ */
+async function exportQueueIdle(timeoutMs = 240_000) {
+  const until = Date.now() + timeoutMs;
+  while (Date.now() < until) {
+    const { rows } = await admin.query<{ state: string; total: string }>(
+      'SELECT state,total FROM app.rag_export_status()',
+    );
+    const busy = rows.some(
+      (r) => !['done', 'indexed', 'dead'].includes(r.state) && Number(r.total) > 0,
+    );
+    if (!busy) return;
+    await new Promise((r) => setTimeout(r, 5_000));
+  }
+}
+
+test('history belongs to its owner and loses citations when access does', async () => {
+  if (!aiOn) return;
+  await exportQueueIdle();
+  const siti = await login(IDS.viewer);
+  const budi = await login(IDS.super);
+  const question = 'Bagaimana langkah konfigurasi VPN pada perangkat uji?';
+  const first = await call('POST', '/api/rag/chat', siti, {
+    question,
+    scope: { type: 'category', categoryId: IDS.infra },
+  });
+  assert.equal(first.status, 200, JSON.stringify(first.body));
+  const conversationId = first.body.conversationId as string;
+  assert.match(conversationId, /^[0-9a-f-]{36}$/);
+  assert((first.body.citations as unknown[]).length > 0, 'the VPN runbook must be cited');
+  try {
+    const second = await call('POST', '/api/rag/chat', siti, {
+      question: 'Berapa harga saham perusahaan hari ini?',
+      conversationId,
+    });
+    assert.equal(second.status, 200, JSON.stringify(second.body));
+    assert.equal(second.body.conversationId, conversationId);
+    assert.equal(second.body.abstained, true);
+
+    const listed = await call('GET', '/api/rag/conversations', siti);
+    assert(
+      (listed.body.conversations as Array<{ id: string; turns: number }>).some(
+        (c) => c.id === conversationId && c.turns === 2,
+      ),
+    );
+    const read = await call('GET', `/api/rag/conversations/${conversationId}`, siti);
+    assert.equal(read.status, 200);
+    const turns = read.body.turnList as Array<{
+      citations: unknown[];
+      hiddenCitations: number;
+      answer: string;
+    }>;
+    assert.equal(turns.length, 2);
+    assert.equal(turns[0]!.hiddenCitations, 0);
+
+    // Even a super admin does not see someone else's questions, and cannot append.
+    assert.equal((await call('GET', `/api/rag/conversations/${conversationId}`, budi)).status, 404);
+    assert.equal(
+      (await call('POST', '/api/rag/chat', budi, { question: 'x?', conversationId })).status,
+      400,
+    );
+
+    // Take siti's Infrastruktur grant away. No document changes state, so the worker
+    // has nothing to re-export; only app.can_read_version flips, and with it the stored
+    // snippets and the answer built on them.
+    await admin.query('DELETE FROM app.category_grants WHERE user_id=$1 AND category_id=$2', [
+      IDS.viewer,
+      IDS.infra,
+    ]);
+    const after = await call('GET', `/api/rag/conversations/${conversationId}`, siti);
+    const turn = (after.body.turnList as typeof turns)[0]!;
+    assert(turn.hiddenCitations > 0, 'a revoked source must be reported as hidden');
+    assert.equal(turn.answer, '', 'an answer built on a hidden source is withheld');
+    assert(!turn.citations.some((c) => (c as { documentId: string }).documentId === docId(1)));
+  } finally {
+    await admin.query(
+      'INSERT INTO app.category_grants(user_id,category_id) VALUES($1,$2) ON CONFLICT DO NOTHING',
+      [IDS.viewer, IDS.infra],
+    );
+    const gone = await call('DELETE', `/api/rag/conversations/${conversationId}`, siti);
+    assert.equal(gone.status, 200);
+    assert.equal((await call('GET', `/api/rag/conversations/${conversationId}`, siti)).status, 404);
+  }
+});

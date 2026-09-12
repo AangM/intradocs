@@ -15,7 +15,8 @@
     "./versions": "./src/versions.ts",
     "./access-requests": "./src/access-requests.ts",
     "./required-reading": "./src/required-reading.ts",
-    "./label-suggestions": "./src/label-suggestions.ts"
+    "./label-suggestions": "./src/label-suggestions.ts",
+    "./assistant": "./src/assistant.ts"
   },
   "dependencies": {
     "@intradocs/core": "workspace:*",

@@ -1,17 +1,34 @@
 import { requireActor } from '@/lib/session';
 import { getAiConfig } from '@/lib/rag';
+import { listCategories } from '@intradocs/db/queries';
+import { listConversations, listRecentlyReadDocuments } from '@intradocs/db/assistant';
 import { AssistantChat } from '@/components/assistant-chat';
 import { PageHeading, Pending } from '@/components/shared';
 import { Icon } from '@/components/icon';
 import Link from 'next/link';
-export default async function Assistant() {
-  await requireActor();
+export default async function Assistant({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string | string[] }>;
+}) {
+  const actor = await requireActor();
   const config = getAiConfig();
+  // A question handed over from the search page is only pre-filled, never sent: the
+  // person decides when a (slow, local) generation starts.
+  const handed = (await searchParams).q;
+  const initialQuestion = typeof handed === 'string' ? handed.slice(0, 2000) : '';
   // With AI off the page keeps the original placeholder, so the portal stays usable
   // exactly as before rather than showing a broken chat box.
-  if (config.retrieval === 'weknora-local' && config.weknora)
+  if (config.retrieval === 'weknora-local' && config.weknora) {
+    // Scope options come from RLS-filtered tables: the categories this actor sees and
+    // the documents they have opened. Neither list can name anything they cannot read.
+    const [categories, recentDocuments, conversations] = await Promise.all([
+      listCategories(actor.id),
+      listRecentlyReadDocuments(actor.id),
+      listConversations(actor.id),
+    ]);
     return (
-      <div className="pad">
+      <div className="pad assistant-page">
         <PageHeading
           title="AI Assistant"
           subtitle="Jawaban bersumber dokumen resmi sesuai akses Anda."
@@ -31,9 +48,18 @@ export default async function Assistant() {
             'Apa prasyarat memasang agent monitoring di server laboratorium?',
             'Berapa harga saham perusahaan hari ini?',
           ]}
+          categories={categories.map((c) => ({ id: c.id, parentId: c.parentId, name: c.name }))}
+          recentDocuments={recentDocuments.map((d) => ({
+            id: d.id,
+            title: d.title,
+            categoryName: d.categoryName,
+          }))}
+          initialConversations={conversations}
+          initialQuestion={initialQuestion}
         />
       </div>
     );
+  }
   return (
     <div className="pad">
       <PageHeading

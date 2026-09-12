@@ -57,6 +57,16 @@ async function ensureEnv(entries: Record<string, string>): Promise<Map<string, s
   return current;
 }
 
+/** Sets one key, replacing an existing value; used where a pin must move, not merely exist. */
+async function setEnv(key: string, value: string): Promise<void> {
+  const text = await readFile(ENV_FILE, 'utf8');
+  const lines = text.split(/\r?\n/);
+  const at = lines.findIndex((line) => line.startsWith(`${key}=`));
+  if (at >= 0) lines[at] = `${key}=${value}`;
+  else lines.push(`${key}=${value}`);
+  await writeFile(ENV_FILE, lines.join('\n').replace(/\n*$/, '\n'), { mode: 0o600 });
+}
+
 /**
  * WeKnora runs its own PostgreSQL (ParadeDB) container.
  *
@@ -631,6 +641,92 @@ async function autotag(): Promise<void> {
   );
 }
 
+const MAX_COMPLETION_TOKENS = 1024;
+
+/**
+ * Answering model, one command: `pnpm weknora:generation <ollama-model>`.
+ *
+ * The cap on the agent (max_completion_tokens above) is stored by WeKnora but never
+ * reaches Ollama's /api/chat as num_predict: a runaway answer was measured at 40,960
+ * tokens and 7-15 minutes, with every later request queued behind it until it timed
+ * out. Ollama applies a model's own parameters to every request, so the answering
+ * model is a derivative of the pulled one with num_predict and a repeat penalty baked
+ * in, created through Ollama's API (no Modelfile on disk). That derivative -- not the
+ * bare model -- is registered in WeKnora as the KnowledgeQA model, pinned in
+ * .env.local, and the agent is re-pinned to it.
+ */
+async function generationModel(): Promise<void> {
+  loadLocalEnv();
+  const ai = readAiConfig(process.env);
+  if (!ai.weknora) throw new Error('AI_PROVIDER masih off. Aktifkan weknora-local dulu.');
+  const base = process.argv[3] ?? '';
+  if (!/^[a-z0-9][a-z0-9._\/-]*(:[a-z0-9._-]+)?$/i.test(base))
+    throw new Error(
+      'Gunakan: pnpm weknora:generation <nama-model-ollama>, misal qwen2.5:1.5b-instruct.',
+    );
+  const ollamaHost = assertLoopbackHttpOrigin(
+    process.env.OLLAMA_HOST_URL ?? 'http://127.0.0.1:11434',
+    'OLLAMA_HOST_URL',
+  );
+  const tags = (await (
+    await fetch(`${ollamaHost}/api/tags`, { signal: AbortSignal.timeout(10_000) })
+  ).json()) as { models?: Array<{ name?: string }> };
+  if (!(tags.models ?? []).some((m) => m.name === base))
+    throw new Error(`Model ${base} belum ada di Ollama lokal. Jalankan: ollama pull ${base}`);
+
+  const derived = `${base}-intradocs`;
+  const created = await fetch(`${ollamaHost}/api/create`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: derived,
+      from: base,
+      parameters: { num_predict: MAX_COMPLETION_TOKENS, repeat_penalty: 1.15 },
+      stream: false,
+    }),
+    signal: AbortSignal.timeout(120_000),
+  });
+  if (!created.ok) throw new Error(`Ollama menolak membuat ${derived}: HTTP ${created.status}`);
+  const shown = (await (
+    await fetch(`${ollamaHost}/api/show`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: derived }),
+      signal: AbortSignal.timeout(10_000),
+    })
+  ).json()) as { parameters?: string };
+  const parameters = (shown.parameters ?? '')
+    .split('\n')
+    .map((line) => line.trim().split(/\s+/).join(' '));
+  if (!parameters.includes(`num_predict ${MAX_COMPLETION_TOKENS}`))
+    throw new Error(`Ollama tidak menyimpan num_predict pada ${derived}; jawaban tidak dibatasi.`);
+  console.log(`Model Ollama ${derived} siap (num_predict=${MAX_COMPLETION_TOKENS}).`);
+
+  const client = new WeknoraClient(ai.weknora);
+  let model = (await client.listModels()).find(
+    (m) => m.type === 'KnowledgeQA' && m.source === 'local' && m.name === derived,
+  );
+  if (!model) {
+    const id = await client.registerModel({
+      name: derived,
+      displayName: `ollama ${derived}`,
+      type: 'KnowledgeQA',
+      source: 'local',
+      parameters: {
+        base_url: process.env.WEKNORA_OLLAMA_URL ?? 'http://host.docker.internal:11434',
+      },
+    });
+    model = { id, name: derived, type: 'KnowledgeQA', source: 'local' };
+    console.log(`Model ${derived} terdaftar di WeKnora (id ${id}).`);
+  }
+  await setEnv('WEKNORA_GENERATION_MODEL_ID', model.id);
+  console.log(`WEKNORA_GENERATION_MODEL_ID=${model.id} ditulis ke .env.local.`);
+  // loadLocalEnv never overrides a variable already in the process, so hand the new pin
+  // to pinAgent directly; otherwise the agent would keep the model read at start-up.
+  process.env.WEKNORA_GENERATION_MODEL_ID = model.id;
+  await pinAgent();
+}
+
 /**
  * Pins the WeKnora agent IntraDocs chats through: `pnpm weknora:agent`.
  *
@@ -658,7 +754,11 @@ async function pinAgent(): Promise<void> {
       model_id: ai.weknora.generationModelId ?? '',
       rerank_model_id: rerankModelId,
       temperature: 0.2,
-      max_completion_tokens: 0,
+      // 0 means unlimited, and a 1.5B model does occasionally run away: one answer was
+      // logged at 40,960 completion tokens, eleven minutes on this GPU, with every later
+      // request queued behind it and timing out. A grounded answer to a document question
+      // fits comfortably in a few hundred tokens; the cap bounds the worst case.
+      max_completion_tokens: MAX_COMPLETION_TOKENS,
       thinking: false,
       citation_enabled: true,
       max_iterations: 1,
@@ -719,11 +819,15 @@ async function pinAgent(): Promise<void> {
     );
   if (rerankModelId && stored.rerank_model_id !== rerankModelId)
     throw new Error('WeKnora membuang rerank_model_id pada agen; rerank tidak terpasang.');
+  if (Number(stored.max_completion_tokens) !== MAX_COMPLETION_TOKENS)
+    throw new Error(
+      `max_completion_tokens tersimpan sebagai ${String(stored.max_completion_tokens)}, bukan ${MAX_COMPLETION_TOKENS}; jawaban tidak dibatasi.`,
+    );
   await ensureEnv({ WEKNORA_AGENT_ID: id });
   console.log(`Agen intradocs-portal siap (id ${id}); WEKNORA_AGENT_ID ditulis ke .env.local.`);
   console.log(
     `  model=${String(stored.model_id) || '(default tenant)'} rerank=${String(stored.rerank_model_id) || '(tidak ada)'} ` +
-      `web=${String(stored.web_search_enabled)} rewrite=${String(stored.enable_rewrite)} history=${String(stored.history_turns)} fallback=${String(stored.fallback_strategy)}`,
+      `web=${String(stored.web_search_enabled)} rewrite=${String(stored.enable_rewrite)} history=${String(stored.history_turns)} fallback=${String(stored.fallback_strategy)} max_tokens=${String(stored.max_completion_tokens)}`,
   );
   console.log('Restart pnpm dev agar chat memakai agen ini.');
 }
@@ -873,6 +977,7 @@ async function main(): Promise<void> {
   if (action === 'model') return registerExternalModel();
   if (action === 'autotag') return autotag();
   if (action === 'agent') return pinAgent();
+  if (action === 'generation') return generationModel();
   if (action === 'lab') return lab();
   if (action === 'stop') {
     loadLocalEnv();
@@ -881,7 +986,7 @@ async function main(): Promise<void> {
     return;
   }
   throw new Error(
-    'Gunakan: pnpm weknora:setup | weknora:sync | weknora:status | weknora:model | weknora:autotag | weknora:agent | weknora:stop.',
+    'Gunakan: pnpm weknora:setup | weknora:sync | weknora:status | weknora:model | weknora:generation | weknora:autotag | weknora:agent | weknora:lab | weknora:stop.',
   );
 }
 
