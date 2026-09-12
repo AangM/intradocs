@@ -278,6 +278,8 @@ export class WeknoraClient {
     wiki: boolean;
     questionGeneration: { enabled: boolean; questionCount: number; modelId: string };
     autoTag: { enabled: boolean; modelId: string };
+    /** Parent/child chunking; creation-time only, the update handler drops it. */
+    parentChild?: boolean;
   }): Promise<string> {
     const data = asRecord(
       await this.json('POST', '/api/v1/knowledge-bases', {
@@ -293,7 +295,12 @@ export class WeknoraClient {
             graph_enabled: false,
             wiki_enabled: input.wiki,
           },
-          chunking_config: { chunk_size: 400, chunk_overlap: 40, enable_parent_child: false },
+          chunking_config: {
+            chunk_size: 400,
+            chunk_overlap: 40,
+            enable_parent_child: input.parentChild === true,
+            ...(input.parentChild ? { parent_chunk_size: 1200, child_chunk_size: 300 } : {}),
+          },
           question_generation_config: {
             enabled: input.questionGeneration.enabled,
             question_count: input.questionGeneration.questionCount,

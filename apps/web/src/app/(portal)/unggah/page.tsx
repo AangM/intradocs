@@ -11,7 +11,7 @@ import { UploadForm, type RevisionInput } from '@/components/upload-form';
 export default async function Upload({
   searchParams,
 }: {
-  searchParams: Promise<{ document?: string; base?: string }>;
+  searchParams: Promise<{ document?: string; base?: string; topik?: string }>;
 }) {
   const actor = await requireActor('documents.upload');
   const params = await searchParams;
@@ -38,6 +38,8 @@ export default async function Upload({
       classification: doc.classification,
     };
   }
+  // A knowledge gap handed over from the dashboard: only a title seed, nothing else.
+  const topic = typeof params.topik === 'string' ? params.topik.trim().slice(0, 80) : '';
   const [categories, scanner] = await Promise.all([uploadCategories(actor.id), scannerStatus()]);
   return (
     <div className="pad upload-page">
@@ -51,6 +53,7 @@ export default async function Upload({
         maxFileBytes={UPLOAD_LIMITS.binaryBytes}
         initialScanner={scanner}
         revision={revision}
+        initialTitle={topic}
       />
     </div>
   );

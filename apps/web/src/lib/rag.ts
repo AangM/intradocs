@@ -150,8 +150,9 @@ export interface ChatResult {
   /** Same numbers retrieval reports, so the UI can say how wide the search was. */
   scopeSize: number;
   rejectedCount: number;
-  /** The IntraDocs-side thread this turn was appended to. */
+  /** The IntraDocs-side thread this turn was appended to, and the stored turn. */
   conversationId: string;
+  turnId: string;
 }
 
 /**
@@ -174,9 +175,11 @@ export async function answerQuestion(
   // History lives in IntraDocs, one row per turn, after the turn is fully validated.
   // Every turn still retrieves on its own: an earlier answer never feeds a later one, so
   // a permission change takes effect on the very next message.
-  const remember = async (turn: Omit<ChatResult, 'conversationId'>): Promise<ChatResult> => {
+  const remember = async (
+    turn: Omit<ChatResult, 'conversationId' | 'turnId'>,
+  ): Promise<ChatResult> => {
     const stored = await storeTurn(actor.id, conversationId, { ...turn, question, scope: within });
-    return { ...turn, conversationId: stored.conversationId };
+    return { ...turn, conversationId: stored.conversationId, turnId: stored.turnId };
   };
   if (retrieval.citations.length === 0)
     return remember({ ...shape, answer: ABSTAIN_MESSAGE, citations: [], abstained: true });

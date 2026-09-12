@@ -796,3 +796,51 @@ dari jaringan compose, dan `SSRF_WHITELIST_EXTRA` menambahkan namanya saja.
 sebagai model `Rerank`, menulis `WEKNORA_RERANK_MODEL_ID`, dan memin agen. Reranker hanya
 mengurutkan ulang chunk yang sudah diambil WeKnora di dalam `knowledge_ids` yang diotorisasi;
 ia tidak menghasilkan teks dan sitasi tetap divalidasi IntraDocs.
+
+## 18. Umpan balik jawaban, gap dari asisten, FAQ yang citable, dan chunking
+
+### "Membantu / tidak" per jawaban
+
+Setiap giliran tersimpan (migrasi 029) kini bisa dinilai pemiliknya (migrasi 030,
+`POST /api/rag/answer-feedback {turnId, helpful}`). Nilai disimpan di giliran (RLS pemilik;
+orang lain → `400`, karena giliran itu tidak terlihat baginya) dan dihitung di audit sebagai
+`rag.answer_helpful` / `rag.answer_unhelpful` **tanpa teks** — dashboard menampilkan "dinilai
+membantu X/Y" dan tidak pernah pertanyaannya.
+
+### Pertanyaan yang tidak terjawab adalah knowledge gap
+
+Pertanyaan ke asisten yang berakhir abstain, dan jawaban yang dinilai tidak membantu, dicatat
+ke `app.search_events` persis seperti pencarian tanpa hasil: hanya bentuk ternormalisasi
+(`app.normalise_query` membuang yang tampak identifying), dengan kolom `source`
+(`assistant_abstained` / `assistant_unhelpful`). `app.knowledge_gaps` menggabungkannya di bawah
+ambang k-anonimitas yang sama (≥3 orang) dan mengembalikan `from_assistant` supaya dashboard
+bisa menandai "n via asisten". Menilai "tidak membantu" dua kali tidak menggandakan sinyal.
+Bukti: `tests/http/rag.test.ts` ("a vote is the owner's alone…").
+
+### FAQ dengan cara yang aman
+
+FAQ WeKnora (`faq_config`) tetap mati: entri FAQ lahir di WeKnora, tidak punya versi IntraDocs,
+dan tidak bisa dikutip atau direview. Bentuk amannya ada di dashboard: pada setiap knowledge
+gap, tombol **"Jawab sebagai dokumen"** (bagi yang punya `documents.upload`) membuka
+`/unggah?topik=<istilah>` dengan judul terisi. Jawabannya menjadi dokumen IntraDocs biasa —
+lewat review, terbit, terindeks, dan bisa dikutip asisten. Model tidak menulis FAQ; orang
+menulis dokumen.
+
+### Chunking parent-child: diukur, dipakai
+
+`enable_parent_child` **dibuang oleh handler update** (config tersimpan hanya
+`chunk_size`/`chunk_overlap`), jadi seperti `summary_model_id` ia hanya bisa diset saat KB
+dibuat: `pnpm weknora:reindex --parent-child` (parent 1200 / child 300 karakter).
+`pnpm rag:eval` kini juga melaporkan **sitasi ber-anchor** — kutipan yang ditemukan verbatim di
+Markdown versinya sehingga bisa dilompati, bukan hanya ditampilkan.
+
+|                      | flat (400/40) | parent-child |
+| -------------------- | ------------- | ------------ |
+| recall@5             | 20/20         | 20/20        |
+| abstain penuh        | 8/10          | 8/10         |
+| kebocoran            | 0             | 0            |
+| sitasi ber-anchor    | 60/111 (54%)  | 74/130 (57%) |
+| latensi p95 (hangat) | 847 ms        | 520 ms       |
+
+Perbedaannya kecil dan tidak ada yang memburuk; KB produksi di mesin ini memakainya. Tetap
+opt-in pada `weknora:reindex` karena buktinya baru dari 7 dokumen.

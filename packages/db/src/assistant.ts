@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { Citation, RetrievalScope } from '@intradocs/core/rag';
 import { InputError } from '@intradocs/core/validation';
 import { withActor } from './index.ts';
@@ -111,6 +112,8 @@ export interface StoredTurn {
   citations: StoredCitation[];
   /** Citations stored with the turn that the reader can no longer see. */
   hiddenCitations: number;
+  /** The owner's vote, if any. */
+  helpful: boolean | null;
   createdAt: string;
 }
 
@@ -139,10 +142,11 @@ export async function readConversation(
       scope_size: number;
       rejected_count: number;
       citation_count: number;
+      helpful: boolean | null;
       created_at: string;
     }>(
       `SELECT id,question,answer,abstained,mode,scope,scope_size,rejected_count,citation_count,
-        created_at::text
+        helpful,created_at::text
        FROM app.ai_turns WHERE conversation_id=$1 ORDER BY created_at,id`,
       [conversationId],
     );
@@ -201,6 +205,7 @@ export async function readConversation(
         rejectedCount: t.rejected_count,
         citations,
         hiddenCitations: hidden,
+        helpful: t.helpful,
         createdAt: t.created_at,
       };
     });
@@ -269,6 +274,15 @@ export async function storeTurn(
       ],
     );
     const turnId = inserted.rows[0]!.id;
+    // A question the corpus could not answer is the same signal as a search with no
+    // results. Stored the same way: normalised (identifying strings dropped in SQL),
+    // reported only above the k-anonymity threshold of app.knowledge_gaps.
+    if (turn.abstained)
+      await client.query(
+        `INSERT INTO app.search_events(actor_id,result_count,duration_ms,query_norm,source)
+         VALUES(app.actor_id(),0,0,app.normalise_query($1),'assistant_abstained')`,
+        [turn.question],
+      );
     for (const [i, c] of citations.entries())
       await client.query(
         `INSERT INTO app.ai_turn_citations(turn_id,position,document_id,version_id,snippet,heading,anchor)
@@ -284,6 +298,39 @@ export async function storeTurn(
         ],
       );
     return { conversationId: id, turnId };
+  });
+}
+
+/**
+ * Records the owner's vote on one of their turns. RLS makes a foreign turn invisible, so
+ * the update matches nothing and the vote is refused rather than misattributed. An
+ * unhelpful answer is also recorded as a gap signal, like an abstention.
+ */
+export async function voteTurn(
+  actorId: string,
+  turnId: string,
+  helpful: boolean,
+): Promise<boolean> {
+  return withActor(actorId, async ({ client }) => {
+    const updated = await client.query<{ question: string; previous: boolean | null }>(
+      `UPDATE app.ai_turns t SET helpful=$2
+       FROM (SELECT id,helpful AS previous FROM app.ai_turns WHERE id=$1) old
+       WHERE t.id=old.id RETURNING t.question,old.previous`,
+      [turnId, helpful],
+    );
+    const row = updated.rows[0];
+    if (!row) return false;
+    await client.query(
+      'INSERT INTO app.audit_events(actor_id,action,request_id) VALUES(app.actor_id(),$1,$2)',
+      [helpful ? 'rag.answer_helpful' : 'rag.answer_unhelpful', randomUUID()],
+    );
+    if (!helpful && row.previous !== false)
+      await client.query(
+        `INSERT INTO app.search_events(actor_id,result_count,duration_ms,query_norm,source)
+         VALUES(app.actor_id(),0,0,app.normalise_query($1),'assistant_unhelpful')`,
+        [row.question],
+      );
+    return true;
   });
 }
 

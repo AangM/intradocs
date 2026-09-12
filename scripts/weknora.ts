@@ -375,8 +375,10 @@ async function reindex(): Promise<void> {
   const embeddingModelId = str(production.embedding_model_id);
   if (!embeddingModelId) throw new Error('Knowledge base lama tidak memuat embedding_model_id.');
 
+  const parentChild = process.argv.includes('--parent-child');
   const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
   const newId = await client.createKnowledgeBase({
+    parentChild,
     name: `intradocs-synthetic-${stamp}`,
     description:
       'Knowledge base sintetis IntraDocs (M4) dengan summary, pertanyaan, dan tag pada ingest. Dikelola exporter IntraDocs.',
@@ -390,7 +392,9 @@ async function reindex(): Promise<void> {
   const stored = asKb(await fresh.knowledgeBase(newId));
   if (str(stored.summary_model_id) !== llm)
     throw new Error('WeKnora tidak menyimpan summary_model_id pada knowledge base baru.');
-  console.log(`Knowledge base baru dibuat (id ${newId}); summary + pertanyaan + tag menyala.`);
+  console.log(
+    `Knowledge base baru dibuat (id ${newId}); summary + pertanyaan + tag menyala${parentChild ? '; chunking parent-child' : ''}.`,
+  );
 
   // Same label pool as before, so auto-tag keeps answering "which of our labels".
   const admin = new Pool({ connectionString: localAdminUrl(), max: 1 });

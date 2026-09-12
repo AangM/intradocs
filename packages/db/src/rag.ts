@@ -146,7 +146,12 @@ export async function readAuthorizedMarkdownKeys(
 }
 
 export type RagAuditAction =
-  'rag.retrieval' | 'rag.chat' | 'rag.citation_rejected' | 'rag.abstained';
+  | 'rag.retrieval'
+  | 'rag.chat'
+  | 'rag.citation_rejected'
+  | 'rag.abstained'
+  | 'rag.answer_helpful'
+  | 'rag.answer_unhelpful';
 
 /**
  * Records one RAG action. The question, the answer and any snippet stay out of the audit

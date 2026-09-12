@@ -132,11 +132,15 @@ export async function dashboardData(actorId: string, days = 30, unit: string | n
         abstained: number;
         rejected: number;
         people: number;
+        helpful: number;
+        unhelpful: number;
       }>(
         `SELECT count(*) FILTER(WHERE action='rag.retrieval')::int AS retrievals,
                 count(*) FILTER(WHERE action='rag.chat')::int AS answers,
                 count(*) FILTER(WHERE action='rag.abstained')::int AS abstained,
                 count(*) FILTER(WHERE action='rag.citation_rejected')::int AS rejected,
+                count(*) FILTER(WHERE action='rag.answer_helpful')::int AS helpful,
+                count(*) FILTER(WHERE action='rag.answer_unhelpful')::int AS unhelpful,
                 count(DISTINCT actor_id) FILTER(WHERE action IN ('rag.retrieval','rag.chat','rag.abstained'))::int AS people
          FROM app.audit_events a WHERE a.created_at>=now()-make_interval(days=>$1)
            AND ($2::text IS NULL OR EXISTS(SELECT 1 FROM app.profiles p WHERE p.id=a.actor_id AND p.unit=$2))`,
@@ -146,15 +150,22 @@ export async function dashboardData(actorId: string, days = 30, unit: string | n
     // Terms people searched for and did not find. The threshold lives in SQL, so no
     // caller can lower it: a term one person searched never reaches this array.
     const gaps = (
-      await client.query<{ term: string; searches: string; people: string; last_seen: Date }>(
-        'SELECT term,searches,people,last_seen FROM app.knowledge_gaps($1,$2)',
-        [days, unit],
-      )
+      await client.query<{
+        term: string;
+        searches: string;
+        people: string;
+        last_seen: Date;
+        from_assistant: string;
+      }>('SELECT term,searches,people,last_seen,from_assistant FROM app.knowledge_gaps($1,$2)', [
+        days,
+        unit,
+      ])
     ).rows.map((r) => ({
       term: r.term,
       searches: Number(r.searches),
       people: Number(r.people),
       lastSeen: r.last_seen.toISOString(),
+      fromAssistant: Number(r.from_assistant),
     }));
     return {
       summary: {

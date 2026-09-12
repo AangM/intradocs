@@ -15,6 +15,7 @@ export async function POST(request: Request) {
     const result = await answerQuestion(actor, question, scope, conversationId);
     return {
       conversationId: result.conversationId,
+      turnId: result.turnId,
       mode: result.mode,
       answer: result.answer,
       abstained: result.abstained,

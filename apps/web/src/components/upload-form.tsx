@@ -22,19 +22,22 @@ export function UploadForm({
   maxFileBytes,
   initialScanner,
   revision,
+  initialTitle,
 }: {
   categories: Category[];
   ownerName: string;
   maxFileBytes: number;
   initialScanner: ScannerState;
   revision?: RevisionInput;
+  /** Title seed for a new document, e.g. a knowledge-gap term from the dashboard. */
+  initialTitle?: string;
 }) {
   const [step, setStep] = useState(1),
     [file, setFile] = useState<File | null>(null),
     [attachments, setAttachments] = useState<File[]>([]),
     [source, setSource] = useState(''),
     [preview, setPreview] = useState('');
-  const [title, setTitle] = useState(revision?.title ?? ''),
+  const [title, setTitle] = useState(revision?.title ?? initialTitle ?? ''),
     [summary, setSummary] = useState(revision?.summary ?? ''),
     [categoryId, setCategoryId] = useState(
       revision?.categoryId ?? categories.find((c) => c.allowed)?.id ?? '',

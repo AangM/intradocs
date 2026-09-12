@@ -29,6 +29,8 @@ interface Turn {
   scope: RetrievalScope;
   /** Stored citations the reader can no longer open (history only). */
   hiddenCitations: number;
+  /** The owner's "membantu" vote; null until cast. */
+  helpful: boolean | null;
 }
 
 export interface ConversationItem {
@@ -203,15 +205,17 @@ export function AssistantChat({
       }
       const body = (await response.json()) as Omit<
         Turn,
-        'id' | 'question' | 'scope' | 'hiddenCitations'
+        'id' | 'question' | 'scope' | 'hiddenCitations' | 'helpful'
       > & {
         conversationId: string;
+        turnId: string;
       };
       const turn: Turn = {
-        id: `${body.conversationId}-${turns.length + 1}`,
+        id: body.turnId,
         question: trimmed,
         scope,
         hiddenCitations: 0,
+        helpful: null,
         mode: body.mode,
         answer: body.answer,
         abstained: body.abstained,
@@ -281,6 +285,19 @@ export function AssistantChat({
     }
     setConversations((list) => list.filter((c) => c.id !== id));
     if (conversationId === id) startNew();
+  }
+
+  async function vote(turnId: string, helpful: boolean) {
+    const response = await fetch('/api/rag/answer-feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ turnId, helpful }),
+    });
+    if (!response.ok) {
+      setError(await readError(response));
+      return;
+    }
+    setTurns((list) => list.map((t) => (t.id === turnId ? { ...t, helpful } : t)));
   }
 
   function startNew() {
@@ -534,6 +551,32 @@ export function AssistantChat({
                     )}
                   </div>
                 )}
+                {/* One vote per answer, on the stored turn. An unhelpful vote also counts as
+                    a knowledge-gap signal, like a search that found nothing. */}
+                <div className="turn-vote" role="group" aria-label="Apakah jawaban ini membantu?">
+                  <span className="sub tiny">Membantu?</span>
+                  <button
+                    type="button"
+                    className={`btn btn-sm${turn.helpful === true ? ' btn-p' : ''}`}
+                    aria-pressed={turn.helpful === true}
+                    onClick={() => void vote(turn.id, true)}
+                  >
+                    <Icon name="thumb" size={13} />
+                    Ya
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn btn-sm${turn.helpful === false ? ' btn-p' : ''}`}
+                    aria-pressed={turn.helpful === false}
+                    onClick={() => void vote(turn.id, false)}
+                  >
+                    <Icon name="thumb" size={13} className="flip" />
+                    Tidak
+                  </button>
+                  {turn.helpful === false && (
+                    <span className="sub tiny">Dicatat sebagai kebutuhan pengetahuan.</span>
+                  )}
+                </div>
               </div>
             </article>
           ))}

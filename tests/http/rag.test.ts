@@ -365,3 +365,61 @@ test('generated questions reach readers, the draft summary only editors, and not
     400,
   );
 });
+
+// --- answer feedback and gap signals --------------------------------------------
+
+test("a vote is the owner's alone, is counted without text, and feeds the gap aggregate", async () => {
+  if (!aiOn) return;
+  const siti = await login(IDS.viewer);
+  const budi = await login(IDS.super);
+  const question = 'Bagaimana prosedur pemesanan tiket pesawat dinas ke luar negeri?';
+  const asked = await call('POST', '/api/rag/chat', siti, { question });
+  assert.equal(asked.status, 200, JSON.stringify(asked.body));
+  assert.equal(asked.body.abstained, true, 'the fixture has nothing on travel bookings');
+  const turnId = asked.body.turnId as string;
+  const conversationId = asked.body.conversationId as string;
+  try {
+    // The abstention itself was stored as a gap signal, normalised, attributed to the assistant.
+    const stored = await admin.query<{ n: string }>(
+      "SELECT count(*) AS n FROM app.search_events WHERE source='assistant_abstained' AND actor_id=$1 AND query_norm=app.normalise_query($2)",
+      [IDS.viewer, question],
+    );
+    assert.equal(Number(stored.rows[0]!.n), 1);
+
+    assert.equal(
+      (await call('POST', '/api/rag/answer-feedback', budi, { turnId, helpful: false })).status,
+      400,
+      'another person cannot vote on this turn',
+    );
+    const before = await admin.query<{ n: string }>(
+      "SELECT count(*) AS n FROM app.audit_events WHERE action='rag.answer_unhelpful' AND actor_id=$1",
+      [IDS.viewer],
+    );
+    const voted = await call('POST', '/api/rag/answer-feedback', siti, { turnId, helpful: false });
+    assert.equal(voted.status, 200);
+    const after = await admin.query<{ n: string }>(
+      "SELECT count(*) AS n FROM app.audit_events WHERE action='rag.answer_unhelpful' AND actor_id=$1",
+      [IDS.viewer],
+    );
+    assert.equal(Number(after.rows[0]!.n), Number(before.rows[0]!.n) + 1);
+    const read = await call('GET', `/api/rag/conversations/${conversationId}`, siti);
+    assert.equal((read.body.turnList as Array<{ helpful: boolean | null }>)[0]!.helpful, false);
+    // Voting twice the same way does not double the gap signal.
+    await call('POST', '/api/rag/answer-feedback', siti, { turnId, helpful: false });
+    const gap = await admin.query<{ n: string }>(
+      "SELECT count(*) AS n FROM app.search_events WHERE source='assistant_unhelpful' AND actor_id=$1 AND query_norm=app.normalise_query($2)",
+      [IDS.viewer, question],
+    );
+    assert.equal(Number(gap.rows[0]!.n), 1);
+    assert.equal(
+      (await call('POST', '/api/rag/answer-feedback', siti, { turnId, helpful: 'ya' })).status,
+      400,
+    );
+  } finally {
+    await call('DELETE', `/api/rag/conversations/${conversationId}`, siti);
+    await admin.query(
+      "DELETE FROM app.search_events WHERE source<>'search' AND actor_id=$1 AND query_norm=app.normalise_query($2)",
+      [IDS.viewer, question],
+    );
+  }
+});

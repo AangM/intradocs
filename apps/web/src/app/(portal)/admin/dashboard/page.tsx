@@ -3,7 +3,7 @@ import { requireActor } from '@/lib/session';
 import { dashboardData } from '@intradocs/db/discovery';
 import { PageHeading, Notice, Empty, documentHref } from '@/components/shared';
 import { Icon } from '@/components/icon';
-import { formatDate, formatNumber } from '@intradocs/core';
+import { formatDate, formatNumber, hasCapability } from '@intradocs/core';
 import { aiStatus } from '@/lib/rag';
 export default async function Dashboard({
   searchParams,
@@ -20,6 +20,7 @@ export default async function Dashboard({
         .slice(0, 80) || null;
   const data = await dashboardData(actor.id, days, unit);
   const aiOn = aiStatus().retrieval !== 'off';
+  const canUpload = hasCapability(actor, 'documents.upload');
   const aiAsked = data.ai.retrievals + data.ai.answers + data.ai.abstained;
   const reads = data.activity.reduce((n, r) => n + r.reads, 0);
   return (
@@ -84,7 +85,10 @@ export default async function Dashboard({
             label: 'AI Assistant',
             value: aiOn ? formatNumber(aiAsked) : 'Mati',
             note: aiOn
-              ? `${data.ai.abstained} tidak dijawab (tanpa sumber sah) · ${data.ai.rejected} kutipan ditolak validasi · ${data.ai.people} pengguna`
+              ? `${data.ai.abstained} tidak dijawab (tanpa sumber sah) · ${data.ai.rejected} kutipan ditolak validasi · ${data.ai.people} pengguna` +
+                (data.ai.helpful + data.ai.unhelpful > 0
+                  ? ` · dinilai membantu ${data.ai.helpful}/${data.ai.helpful + data.ai.unhelpful}`
+                  : '')
               : 'Retrieval belum diaktifkan operator',
             icon: 'spark',
           },
@@ -155,15 +159,38 @@ export default async function Dashboard({
                       <th scope="col">Pencarian</th>
                       <th scope="col">Orang</th>
                       <th scope="col">Terakhir</th>
+                      <th scope="col">
+                        <span className="sr-only">Aksi</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {data.gaps.map((g) => (
                       <tr key={g.term}>
-                        <td>{g.term}</td>
+                        <td>
+                          {g.term}
+                          {g.fromAssistant > 0 && (
+                            <span className="pill p-grey" title="Sebagian sinyal dari AI Assistant">
+                              {g.fromAssistant} via asisten
+                            </span>
+                          )}
+                        </td>
                         <td>{formatNumber(g.searches)}</td>
                         <td>{formatNumber(g.people)}</td>
                         <td>{formatDate(g.lastSeen)}</td>
+                        <td>
+                          {/* The safe form of "FAQ": the answer becomes an IntraDocs
+                              document that goes through review and can be cited -- not
+                              a WeKnora FAQ entry that nothing can validate. */}
+                          {canUpload && (
+                            <Link
+                              className="btn btn-sm"
+                              href={`/unggah?topik=${encodeURIComponent(g.term)}`}
+                            >
+                              Jawab sebagai dokumen
+                            </Link>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -171,8 +198,9 @@ export default async function Dashboard({
               </div>
               <p className="sub tiny">
                 Hanya istilah yang dicari minimal tiga orang berbeda yang muncul, dalam bentuk
-                ternormalisasi. Pertanyaan satu orang tidak pernah ditampilkan, dan teksnya dihapus
-                setelah 30 hari.
+                ternormalisasi — termasuk pertanyaan ke AI Assistant yang tidak terjawab atau
+                dinilai tidak membantu. Pertanyaan satu orang tidak pernah ditampilkan, dan teksnya
+                dihapus setelah 30 hari.
               </p>
             </>
           ) : (

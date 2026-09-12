@@ -55,6 +55,10 @@ async function main(): Promise<void> {
   }
 
   const outcomes: Outcome[] = [];
+  // Locator quality: a citation with an anchor was found verbatim in the version's
+  // Markdown; one without is shown but cannot be jumped to. Chunking changes move this.
+  let anchored = 0;
+  let citedTotal = 0;
   for (const q of GOLD) {
     const cookie = await session(q.actor);
     const started = Date.now();
@@ -67,9 +71,11 @@ async function main(): Promise<void> {
     if (!response.ok)
       throw new Error(`Pertanyaan ${q.id} ditolak dengan status ${response.status}`);
     const body = (await response.json()) as {
-      citations?: Array<{ documentId: string }>;
+      citations?: Array<{ documentId: string; anchor: string | null }>;
     };
     const citations = body.citations ?? [];
+    anchored += citations.filter((c) => c.anchor).length;
+    citedTotal += citations.length;
     // Rank by first appearance, deduplicated: several chunks of one document are one hit.
     const citedDocs: string[] = [];
     for (const c of citations) if (!citedDocs.includes(c.documentId)) citedDocs.push(c.documentId);
@@ -101,6 +107,7 @@ async function main(): Promise<void> {
   console.log(`\nQ4 — ${GOLD_COUNTS.total} pertanyaan berlabel pada corpus sintetis\n`);
   console.log(
     `  answerable       : ${recallHits}/${answerable.length} recall@5 = ${recall.toFixed(1)}%`,
+    `  sitasi ber-anchor: ${anchored}/${citedTotal}`,
   );
   console.log(
     `  tanpa bukti      : ${abstained}/${noEvidence.length} abstain penuh (sisanya mengembalikan sumber lemah, tanpa jawaban)`,
