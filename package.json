@@ -48,7 +48,8 @@
     "weknora:lab": "tsx scripts/weknora.ts lab",
     "weknora:generation": "tsx scripts/weknora.ts generation",
     "weknora:reindex": "tsx scripts/weknora.ts reindex",
-    "weknora:rerank": "tsx scripts/weknora.ts rerank"
+    "weknora:rerank": "tsx scripts/weknora.ts rerank",
+    "weknora:repair": "tsx scripts/weknora.ts repair"
   },
   "devDependencies": {
     "@playwright/test": "1.56.1",

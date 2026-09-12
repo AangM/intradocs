@@ -37,6 +37,12 @@ export interface WeknoraSearchHit {
   score: number;
   /** How WeKnora found this chunk; context chunks are neighbours, not matches. */
   matchType: WeknoraMatchType;
+  /**
+   * What the chunk IS. `text` is document content; anything else (`summary`, and
+   * whatever later versions add) was written by a model at ingest and is indexed by
+   * WeKnora as if it were part of the document. Only `text` may ever be cited.
+   */
+  chunkType: string;
   seq: number;
   chunkIndex: number;
   startAt: number;
@@ -115,6 +121,7 @@ function toHit(value: unknown): WeknoraSearchHit | null {
     content,
     score: num(r.score),
     matchType: matchType(r.match_type),
+    chunkType: str(r.chunk_type, 'text'),
     seq: num(r.seq),
     chunkIndex: num(r.chunk_index),
     startAt: num(r.start_at),
@@ -584,11 +591,22 @@ export class WeknoraClient {
   }): Promise<void> {
     const kbRoute = `/api/v1/knowledge-bases/${encodeURIComponent(this.config.knowledgeBaseId)}`;
     const current = asRecord(await this.json('GET', kbRoute));
+    // The update REPLACES the whole config block: sending only auto_tag_config once reset
+    // chunking to 0/0 and the next reparse produced flat 500-character chunks. Every block
+    // the GET exposes is echoed back. What the GET does not expose (enable_parent_child)
+    // cannot be preserved here -- see weknora:autotag for the warning.
+    const keep = (key: string) => (current[key] === undefined ? {} : { [key]: current[key] });
     await this.json('PUT', kbRoute, {
       body: {
         name: str(current.name),
         description: str(current.description),
         config: {
+          ...keep('chunking_config'),
+          ...keep('indexing_strategy'),
+          ...keep('question_generation_config'),
+          ...keep('image_processing_config'),
+          ...keep('faq_config'),
+          ...keep('wiki_config'),
           auto_tag_config: {
             enabled: config.enabled,
             model_id: config.modelId,
@@ -598,6 +616,22 @@ export class WeknoraClient {
         },
       },
     });
+  }
+
+  /** Whether the base's chunks carry parent links -- the only way to see parent-child from outside. */
+  async usesParentChildChunks(): Promise<boolean> {
+    const first = (await this.listKnowledge(1))[0];
+    if (!first) return false;
+    const chunks = await this.json(
+      'GET',
+      `/api/v1/chunks/${encodeURIComponent(first.id)}?page=1&page_size=5`,
+    );
+    const rows = Array.isArray(chunks)
+      ? chunks
+      : Array.isArray(asRecord(chunks).data)
+        ? (asRecord(chunks).data as unknown[])
+        : [];
+    return rows.some((row) => Boolean(str((row as Json).parent_chunk_id)));
   }
 
   /**

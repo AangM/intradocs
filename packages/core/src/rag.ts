@@ -181,6 +181,13 @@ export interface RawHit {
   score: number;
   /** Optional: how the engine found the chunk. Absent means unknown. */
   matchType?: 'vector' | 'keyword' | 'context' | 'other';
+  /**
+   * Optional: what the engine says the chunk is. WeKnora indexes the summary it
+   * generated at ingest as a `summary` chunk next to the document's own `text` chunks,
+   * and hybrid search returns both. Absent is treated as `text` for engines that do not
+   * distinguish; anything present and not `text` is model output and is never cited.
+   */
+  chunkType?: string;
 }
 
 export interface GatedRetrieval {
@@ -256,7 +263,8 @@ export interface Citation {
   score: number;
 }
 
-export type RejectionReason = 'unknown_source' | 'duplicate' | 'empty_content';
+export type RejectionReason =
+  'unknown_source' | 'duplicate' | 'empty_content' | 'generated_content';
 
 export interface ValidatedRetrieval {
   citations: Citation[];
@@ -331,6 +339,13 @@ export function validateRetrieval(
     const source = allowed.get(hit.knowledgeId);
     if (!source) {
       rejected.push({ knowledgeId: hit.knowledgeId, reason: 'unknown_source' });
+      continue;
+    }
+    // Found in the index, about an authorised version, and still not citable: a
+    // summary WeKnora wrote about the document is not the document. It would show up as
+    // a quote with no anchor -- exactly what an invented citation looks like.
+    if (hit.chunkType !== undefined && hit.chunkType !== 'text') {
+      rejected.push({ knowledgeId: hit.knowledgeId, reason: 'generated_content' });
       continue;
     }
     const snippet = sanitizeSnippet(hit.content, options.maxSnippetChars);

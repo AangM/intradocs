@@ -68,6 +68,31 @@ async function setEnv(key: string, value: string): Promise<void> {
 }
 
 /**
+ * Rebuilds WeKnora's BM25 index. Every mass delete of chunks -- deleting a knowledge
+ * base, clearing tags and reparsing all documents -- has left ParadeDB's pg_search index
+ * asserting `item_pointer_is_valid(ctid)` (SQLSTATE XX000) on the next keyword search,
+ * which the portal sees as retrieval 503. Single-document re-exports have not triggered
+ * it. So every operator command that does a mass rewrite ends here, and `weknora:repair`
+ * exposes it on its own.
+ */
+function rebuildBm25Index(): void {
+  command('docker', [
+    'compose',
+    '--env-file',
+    '.env.local',
+    '--profile',
+    'weknora',
+    'exec',
+    '-T',
+    'weknora-postgres',
+    'sh',
+    '-c',
+    'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "REINDEX INDEX embeddings_search_idx"',
+  ]);
+  console.log('Index BM25 WeKnora (embeddings_search_idx) dibangun ulang.');
+}
+
+/**
  * WeKnora runs its own PostgreSQL (ParadeDB) container.
  *
  * Sharing the IntraDocs instance was the first design and it does not work: WeKnora's
@@ -428,23 +453,7 @@ async function reindex(): Promise<void> {
   await pinAgent();
   await client.deleteKnowledgeBase(oldId);
   console.log(`Knowledge base lama (${oldId}) dihapus.`);
-  // Deleting a whole base is a mass delete under ParadeDB's BM25 index, and after it the
-  // keyword side of hybrid search failed with "assertion failed: item_pointer_is_valid
-  // (ctid)" (SQLSTATE XX000) until the index was rebuilt. Rebuild it here, unconditionally.
-  command('docker', [
-    'compose',
-    '--env-file',
-    '.env.local',
-    '--profile',
-    'weknora',
-    'exec',
-    '-T',
-    'weknora-postgres',
-    'sh',
-    '-c',
-    'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "REINDEX INDEX embeddings_search_idx"',
-  ]);
-  console.log('Index BM25 WeKnora (embeddings_search_idx) dibangun ulang.');
+  rebuildBm25Index();
   console.log(
     'Summary, pertanyaan, dan tag dihitung di latar oleh WeKnora; pnpm weknora:status menunjukkan kemajuannya. Restart pnpm dev.',
   );
@@ -520,6 +529,21 @@ async function status(): Promise<void> {
     );
   } catch {
     console.log('Registrasi WeKnora: tidak dapat diperiksa.');
+  }
+  // A real search, so a broken BM25 index (see rebuildBm25Index) is reported here and
+  // not first met by a user as a 503.
+  try {
+    const probe = await client.hybridSearch({
+      knowledgeIds: (await client.listKnowledge(5)).map((k) => k.id),
+      queryText: 'uji indeks',
+      matchCount: 1,
+    });
+    console.log(`Hybrid search: ok (${probe.length} hit pada probe).`);
+  } catch (error) {
+    console.log(
+      `Hybrid search: GAGAL — ${error instanceof Error ? error.message.slice(0, 160) : String(error)}
+` + '  Bila log WeKnora menyebut item_pointer_is_valid(ctid): jalankan pnpm weknora:repair.',
+    );
   }
   await withWorkerDb(async (pool) => {
     const { rows } = await pool.query<{ state: string; total: string }>(
@@ -688,6 +712,7 @@ async function autotag(): Promise<void> {
   );
 
   // skip_if_tagged=false so a rerun with a different model replaces the previous verdict.
+  const hadParentChild = await client.usesParentChildChunks();
   await client.setAutoTag({ enabled: true, modelId: model.id, maxTags: 5, skipIfTagged: false });
   const triggeredAt = Date.now() - 5_000; // clock skew between host and container
   await client.reparseKnowledge(docs.map((d) => d.knowledgeId));
@@ -754,6 +779,12 @@ async function autotag(): Promise<void> {
     `${modelName}: ${correct} tag cocok label yang ada, ${wrong} tidak cocok, ${none} dokumen tanpa tag, ` +
       `${accepted} saran baru yang akan lolos ke IntraDocs.`,
   );
+  if (hadParentChild)
+    console.log(
+      'Catatan: reparse di atas memakai chunking datar — update knowledge base membuang enable_parent_child. ' +
+        'Kembalikan dengan: pnpm weknora:reindex --parent-child (hentikan pnpm dev dulu).',
+    );
+  rebuildBm25Index();
 }
 
 const MAX_COMPLETION_TOKENS = 1024;
@@ -1139,6 +1170,11 @@ async function main(): Promise<void> {
   if (action === 'generation') return generationModel();
   if (action === 'reindex') return reindex();
   if (action === 'rerank') return rerank();
+  if (action === 'repair') {
+    loadLocalEnv();
+    rebuildBm25Index();
+    return;
+  }
   if (action === 'lab') return lab();
   if (action === 'stop') {
     loadLocalEnv();
@@ -1147,7 +1183,7 @@ async function main(): Promise<void> {
     return;
   }
   throw new Error(
-    'Gunakan: pnpm weknora:setup | weknora:sync | weknora:status | weknora:model | weknora:generation | weknora:reindex | weknora:rerank | weknora:autotag | weknora:agent | weknora:lab | weknora:stop.',
+    'Gunakan: pnpm weknora:setup | weknora:sync | weknora:status | weknora:model | weknora:generation | weknora:reindex | weknora:rerank | weknora:repair | weknora:autotag | weknora:agent | weknora:lab | weknora:stop.',
   );
 }
 

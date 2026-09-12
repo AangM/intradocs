@@ -292,6 +292,37 @@ test('duplicate chunks are collapsed and empty content is dropped', () => {
   assert.deepEqual(result.rejected.map((r) => r.reason).sort(), ['duplicate', 'empty_content']);
 });
 
+test('a summary WeKnora generated at ingest is never cited, even for an authorised source', () => {
+  // WeKnora indexes the summary it wrote as a `summary` chunk beside the document's own
+  // `text` chunks, and hybrid search returns it ranked among them. It was observed on the
+  // portal as a snippet starting "# Summary ..." with no anchor -- model text presented as
+  // a quote. Rejected here, on chunk type, before any snippet is built.
+  const result = validateRetrieval(
+    [
+      {
+        knowledgeId: 'k-1',
+        chunkId: 's1',
+        content: '# Summary Ringkasan buatan model.',
+        score: 0.9,
+        chunkType: 'summary',
+      },
+      {
+        knowledgeId: 'k-1',
+        chunkId: 'c1',
+        content: 'Langkah konfigurasi VPN.',
+        score: 0.8,
+        chunkType: 'text',
+      },
+      { knowledgeId: 'k-1', chunkId: 'c2', content: 'Tanpa tipe: mesin lain.', score: 0.7 },
+    ],
+    allowed,
+    validateOptions,
+  );
+  assert.deepEqual(result.rejected, [{ knowledgeId: 'k-1', reason: 'generated_content' }]);
+  assert.equal(result.citations.length, 2);
+  assert(!JSON.stringify(result.citations).includes('# Summary'));
+});
+
 test('snippets are clamped and stripped of control characters', () => {
   assert.equal(sanitizeSnippet('a\u0000b\tc', 50), 'a b c');
   assert(sanitizeSnippet('x'.repeat(400), 50).length <= 51);

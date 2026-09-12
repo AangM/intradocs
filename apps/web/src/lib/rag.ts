@@ -75,7 +75,11 @@ export async function retrieve(
   const request = {
     knowledgeIds: scope.map((s) => s.knowledgeId),
     queryText: question,
-    matchCount: weknora.maxCandidates,
+    // Headroom for what the gate will throw away: with summary generation on, WeKnora
+    // ranks one generated `summary` chunk per document among the real ones, and with
+    // maxCandidates alone those took four of six slots and pushed a gold document out
+    // (rag:eval a19). Citations are still capped at maxCitations after validation.
+    matchCount: Math.min(weknora.maxCandidates * 2, 40),
   };
   // Two passes over the same scope: the fused ranking for recall, a vector-only pass for
   // a similarity the fused score does not carry. The gate joins them; see gateByRelevance.

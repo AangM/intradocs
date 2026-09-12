@@ -104,7 +104,7 @@ export function SearchAiCard({ query, categoryId }: { query: string; categoryId:
           <p className="sub tiny" style={{ marginTop: 10 }}>
             {state.data.scope} versi aktif dalam cakupan
             {state.data.rejected > 0
-              ? ` · ${state.data.rejected} kandidat ditolak karena gagal validasi izin`
+              ? ` · ${state.data.rejected} kandidat ditolak validasi (izin atau teks buatan mesin)`
               : ''}
             {' · '}
             <Link href={`/ai-assistant?q=${encodeURIComponent(query)}`}>

@@ -515,7 +515,7 @@ export function AssistantChat({
                 <p className="sub tiny">
                   Cakupan retrieval: {turn.scopeSize} versi aktif yang boleh Anda baca.
                   {turn.rejectedCount > 0
-                    ? ` ${turn.rejectedCount} kandidat ditolak karena gagal validasi izin.`
+                    ? ` ${turn.rejectedCount} kandidat ditolak validasi (izin atau teks buatan mesin).`
                     : ''}
                 </p>
                 {/* Built from what is already on screen -- the citations that survived

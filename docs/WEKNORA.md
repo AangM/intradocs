@@ -927,3 +927,64 @@ viewer/contributor/reviewer di unitnya sendiri, tanpa scope global, hanya katego
 scope-nya. Alamat yang sudah punya akun atau undangan terbuka ditolak. Undangan bisa dicabut;
 token yang sudah dipakai, dicabut, atau kedaluwarsa tidak bisa dibedakan dari token yang tidak
 pernah ada. Bukti: `tests/http/invitations.test.ts` (4).
+
+## 22. Model penjawab 3B, dan dua hal yang baru terlihat karenanya
+
+`qwen2.5:3b-instruct` (1,9 GB) diukur pada laptop GPU 6 GB dengan `pnpm weknora:generation
+qwen2.5:3b-instruct` lalu `pnpm weknora:reindex --parent-child` (summary/pertanyaan/tag ikut
+model yang dipin):
+
+|                                   | 1.5B                                    | 3B                          |
+| --------------------------------- | --------------------------------------- | --------------------------- |
+| jawaban hangat                    | 2,4 s                                   | 5,8–7,0 s                   |
+| summary layak dipakai (7 dokumen) | 4/7 (2 "No textual content", 1 Inggris) | **7/7**, Indonesia, koheren |
+| pertanyaan per chunk              | relevan, 1–2 dangkal                    | relevan, lebih spesifik     |
+| auto-tag: cocok / salah / kosong  | 2 / 2 / 3                               | 3 / **14** / 0              |
+| saran label lolos penyaring       | 0                                       | 3 — **ketiganya salah**     |
+| rag:eval                          | 20/20 · 8/10 · 0                        | 20/20 · 8/10 · 0            |
+
+Kesimpulan: 3B adalah pilihan yang benar untuk **jawaban dan summary** di mesin ber-GPU; untuk
+**auto-tag** ia lebih buruk — memberi lebih banyak tag, kebanyakan salah, dan tiga yang lolos
+penyaring kosakata (`Kritikal` untuk kebijakan backup, `Monitoring` untuk VPN, `SOP` untuk
+lampiran rahasia) lolos hanya karena namanya ada di kategori itu. Saran tetap saran; tidak ada
+yang diterapkan. Mesin ini kini memakai 3B; mesin tanpa GPU tetap 1.5B (§10).
+
+### Ringkasan buatan model ternyata ikut terindeks — dan tadinya bisa dikutip
+
+Saat mengukur 3B, abstain turun ke 7/10. Penyebabnya bukan model: WeKnora **mengindeks summary
+yang ia buat sebagai chunk** (`chunk_type: summary`) di samping chunk `text` dokumen, dan
+hybrid search mengembalikannya sejajar. Di portal ia muncul sebagai kutipan berawalan
+"# Summary …" **tanpa anchor** — teks buatan mesin yang tampak seperti kutipan dokumen. Ini
+melanggar aturan inti (§13) dan sudah terjadi sejak summary dinyalakan (§17), termasuk pada 1.5B
+untuk dokumen yang summary-nya berhasil.
+
+Perbaikan di gerbang: `validateRetrieval` menolak setiap hit yang `chunkType`-nya ada dan bukan
+`text` dengan alasan `generated_content` (dihitung sebagai "kandidat ditolak validasi"). Karena
+kini satu chunk per dokumen selalu dibuang, retrieval meminta `2 × WEKNORA_MAX_CANDIDATES`
+kandidat (plafon 40) dan tetap memotong sitasi pada 6 — tanpa itu recall turun ke 19/20 (a19:
+chunk asli dokumen monitoring terdorong keluar oleh empat chunk summary). Hasil setelah
+keduanya: 20/20 · 8/10 · 0, dan **sitasi ber-anchor naik 57% → 78%** karena chunk summary
+memang tidak pernah bisa dilompati. Bukti: `tests/unit/rag.test.ts` ("a summary WeKnora
+generated at ingest is never cited…").
+
+Catatan untuk jalur chat: `knowledge_ids` yang dipin ke model penjawab masih bisa memuat chunk
+summary sebagai _konteks_ di dalam WeKnora; yang dijamin adalah ia tidak pernah menjadi
+**sitasi** IntraDocs.
+
+### Update knowledge base mengganti seluruh `config`
+
+`PUT /knowledge-bases/:id` dengan hanya `auto_tag_config` (yang dilakukan `weknora:autotag`)
+**menghapus** `chunking_config` (menjadi 0/0); reparse berikutnya menghasilkan chunk datar
+±500 karakter dan sitasi ber-anchor jatuh ke 40/71. `setAutoTag` kini mengembalikan semua blok
+yang diekspos GET. `enable_parent_child` tidak diekspos GET dan dibuang handler update, jadi
+tidak bisa dipertahankan lewat API: `weknora:autotag` memeriksa `parent_chunk_id` sebelum
+mengubah apa pun dan, bila KB memakai parent-child, mencetak perintah pemulihannya
+(`weknora:reindex --parent-child`).
+
+### Index BM25: setiap penghapusan massal merusaknya
+
+Selain penghapusan KB (§7), membersihkan tag + reparse semua dokumen juga meninggalkan
+`item_pointer_is_valid(ctid)`. Ekspor ulang satu dokumen tidak pernah memicunya. Kini:
+`rebuildBm25Index()` dipanggil di akhir `weknora:reindex` dan `weknora:autotag`,
+`pnpm weknora:repair` menjalankannya sendiri, dan `pnpm weknora:status` melakukan satu
+hybrid-search sungguhan dan menyebut perintah itu bila gagal.
