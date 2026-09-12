@@ -867,3 +867,35 @@ Bagian mockup S07 yang belum ada tidak butuh AI, hanya belum dikerjakan:
 - **Aturan yang berlaku**: panel ringkasan dari pengaturan kategori dan aturan tetap di kode
   (Kritikal → dua tahap, klasifikasi minimum, pengingat review, label AI hanya saran). Bukan
   mesin aturan bebas, dan panelnya mengatakan itu.
+
+## 20. S05 "bantuan metadata" tanpa mengirim draft
+
+Mockup S05 mengusulkan judul, ringkasan, kategori, label, dan deteksi duplikat saat unggah.
+Draft saat itu adalah berkas privat yang belum direview, dan §13 sudah menjelaskan mengapa ia
+tidak boleh masuk WeKnora walau sementara. Bentuk amannya (`POST /api/uploads/metadata-help`,
+panel "Bantuan metadata" di langkah Metadata):
+
+| Bagian mockup           | Cara                                                                                                                                                                   | Yang keluar dari IntraDocs                                                 |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Deteksi duplikat        | Judul + cuplikan awal (≤1.500 karakter, satu baris) dipakai sebagai **pertanyaan** retrieval ke korpus terbit yang boleh dibaca actor; hasil dideduplikasi per dokumen | Cuplikan itu saja — batas kepercayaan yang sama dengan bertanya ke asisten |
+| Saran label             | Nama label kategori terpilih yang muncul di teks (lexical, `app.can_upload_to`)                                                                                        | Tidak ada                                                                  |
+| Saran kategori          | Kategori yang kosakata labelnya paling banyak muncul                                                                                                                   | Tidak ada                                                                  |
+| Judul/ringkasan dari AI | **Tidak dibuat** — butuh ingest draft; draf ringkasan tersedia setelah terbit (§17)                                                                                    | —                                                                          |
+
+Setiap usulan adalah tombol; tidak ada yang diterapkan sendiri, tidak ada yang disimpan.
+Viewer tanpa `documents.upload` mendapat `403`; reviewer dengan scope Keamanan saja tidak
+melihat label/kategori Infrastruktur; kontributor tanpa grant tidak pernah mendapat dokumen
+Rahasia sebagai "mirip" walau cuplikannya mengutip canary-nya. Bukti: `tests/http/rag.test.ts`
+("metadata help finds published look-alikes…").
+
+### Catatan operasional dari sesi ini
+
+- **Runner Ollama yatim.** Mematikan `ollama.exe`/`ollama app.exe` tidak mematikan
+  `llama-server` anaknya. Setelah tiga restart, empat runner (±2 GB privat masing-masing)
+  masih hidup: commit charge 26,7 GB pada mesin 7,9 GB, RAM tersedia 124 MB, `docker` CLI
+  menggantung, WeKnora gagal mencapai `host.docker.internal` (proxy backend Docker ikut
+  kelaparan), retrieval `503`. Perbaikannya: hentikan `llama-server`, restart Docker Desktop.
+  Bila me-restart Ollama, periksa `Get-Process llama-server`.
+- **`OLLAMA_KEEP_ALIVE=-1`** (variabel user) menjaga bge-m3 dan model penjawab tetap di GPU;
+  tanpa itu reload setelah 5 menit idle memakan ~10 detik per model di mesin tertekan dan
+  dua panggilan hybrid-search melewati `WEKNORA_SEARCH_TIMEOUT_MS`.

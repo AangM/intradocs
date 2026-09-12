@@ -423,3 +423,56 @@ test("a vote is the owner's alone, is counted without text, and feeds the gap ag
     );
   }
 });
+
+// --- upload-time metadata help (S05, safe form) --------------------------------
+
+test('metadata help finds published look-alikes and local hints without ingesting the draft', async () => {
+  const rizky = await login(IDS.contributor);
+  const fajar = await login(IDS.other);
+  const draft = {
+    title: 'Panduan koneksi VPN untuk perangkat uji',
+    excerpt:
+      'Runbook ini menjelaskan cara memasang profil VPN pada laptop uji, masuk dengan akun uji dan MFA, lalu memeriksa indikator jaringan.',
+    categoryId: IDS.infra,
+  };
+  const r = await call('POST', '/api/uploads/metadata-help', rizky, draft);
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  const labels = r.body.labels as string[];
+  assert(labels.includes('Runbook') && labels.includes('Jaringan'), `lexical labels: ${labels}`);
+  const categories = r.body.categories as Array<{ id: string }>;
+  assert(
+    categories.some((c) => c.id === IDS.infra),
+    'Infrastruktur must be suggested',
+  );
+  if (aiOn) {
+    const similar = r.body.similar as Array<{ documentId: string }>;
+    assert(
+      similar.some((d) => d.documentId === docId(1)),
+      'the VPN runbook is the look-alike',
+    );
+  }
+  // A viewer cannot upload, so the helper is not even offered to them.
+  assert.equal((await call('POST', '/api/uploads/metadata-help', fajar, draft)).status, 403);
+  // dewi reviews Keamanan Informasi only: Infrastruktur's labels and the category itself
+  // never appear for her.
+  const dewi = await login(IDS.reviewer);
+  const other = await call('POST', '/api/uploads/metadata-help', dewi, draft);
+  assert.equal(other.status, 200, JSON.stringify(other.body));
+  assert.deepEqual(other.body.labels, []);
+  assert(!(other.body.categories as Array<{ id: string }>).some((c) => c.id === IDS.infra));
+  // rizky has no grant on the confidential fixture: however much the excerpt quotes it,
+  // it cannot come back as a look-alike. (dewi does hold a grant, so for her it may.)
+  const baited = await call('POST', '/api/uploads/metadata-help', rizky, {
+    ...draft,
+    excerpt: draft.excerpt + ' SYNTHETIC-CONFIDENTIAL-CANARY-7 lampiran simulasi keamanan',
+  });
+  assert.equal(baited.status, 200);
+  assert(
+    !(baited.body.similar as Array<{ documentId: string }>).some((d) => d.documentId === docId(7)),
+  );
+  assert.equal(
+    (await call('POST', '/api/uploads/metadata-help', rizky, { ...draft, model: 'x' })).status,
+    400,
+  );
+  assert.equal((await call('POST', '/api/uploads/metadata-help', rizky, {})).status, 400);
+});

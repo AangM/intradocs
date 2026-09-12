@@ -832,3 +832,22 @@ summary,
   opacity: 0.3;
   cursor: default;
 }
+
+/* S05 · bantuan metadata ---------------------------------------------------- */
+.metadata-help {
+  border: 1px solid var(--blue-100);
+  background: var(--blue-50);
+  border-radius: var(--r);
+  padding: 12px 14px;
+  grid-column: 1 / -1;
+}
+.metadata-help-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 13px;
+}
+.metadata-help .tiny {
+  font-size: 12px;
+}

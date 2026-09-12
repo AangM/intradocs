@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { useRef, useState } from 'react';
 import { Icon } from './icon';
+import { MetadataHelp } from './metadata-help';
 import { CLASSIFICATIONS, CLASSIFICATION_LABELS, type Classification } from '@intradocs/core';
 type Category = { id: string; name: string; allowed: boolean; minimumClassification: string };
 type Result = { documentId: string; versionId: string; slug: string; reused: boolean };
@@ -447,6 +448,30 @@ export function UploadForm({
                 Pemilik
                 <input className="inp" value={ownerName} readOnly />
               </label>
+              {/* Draft-side help: the file stays here; see MetadataHelp for what travels. */}
+              <MetadataHelp
+                title={title}
+                excerpt={source.slice(0, 20000)}
+                categoryId={categoryId}
+                currentLabels={labels
+                  .split(',')
+                  .map((l) => l.trim())
+                  .filter(Boolean)}
+                onPickCategory={(id) => {
+                  if (revision || !categories.find((c) => c.id === id)?.allowed) return;
+                  setCategoryId(id);
+                  changed();
+                }}
+                onAddLabel={(name) => {
+                  const current = labels
+                    .split(',')
+                    .map((l) => l.trim())
+                    .filter(Boolean);
+                  if (current.some((l) => l.toLowerCase() === name.toLowerCase())) return;
+                  setLabels([...current, name].join(', '));
+                  changed();
+                }}
+              />
             </fieldset>
             <div className="upload-form-footer">
               <button className="btn" type="button" onClick={() => setStep(1)}>
