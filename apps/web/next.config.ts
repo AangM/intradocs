@@ -1,6 +1,8 @@
 import type { NextConfig } from 'next';
 const config: NextConfig = {
   poweredByHeader: false,
+  // The floating dev badge sits over the sidebar footer in demos run with `pnpm dev`.
+  devIndicators: false,
   transpilePackages: ['@intradocs/core', '@intradocs/db'],
   serverExternalPackages: ['pg'],
   async headers() {

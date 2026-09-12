@@ -188,6 +188,8 @@ export interface RawHit {
    * distinguish; anything present and not `text` is model output and is never cited.
    */
   chunkType?: string;
+  /** Cosine similarity from the vector-only pass, attached by gateByRelevance when known. */
+  relevance?: number;
 }
 
 export interface GatedRetrieval {
@@ -242,7 +244,7 @@ export function gateByRelevance(
   }
   scored.sort((a, b) => b.relevance - a.relevance);
   return {
-    kept: [...scored.map((s) => s.hit), ...keywordOnly],
+    kept: [...scored.map((s) => ({ ...s.hit, relevance: s.relevance })), ...keywordOnly],
     dropped,
     topRelevance: scored.length ? scored[0]!.relevance : null,
   };
@@ -261,6 +263,8 @@ export interface Citation {
   anchor: string | null;
   href: string;
   score: number;
+  /** Cosine similarity when the relevance gate measured one; null for keyword-only hits. */
+  relevance: number | null;
 }
 
 export type RejectionReason =
@@ -279,7 +283,16 @@ export function sanitizeSnippet(text: string, maxChars: number): string {
     // was surfacing verbatim inside citation snippets shown to readers.
     .replace(/<!--\s*intradocs:[^>]*-->/g, ' ')
     .replace(/^\s*>\s*Sumber:\s*IntraDocs[^\n]*/gm, ' ')
+    // A snippet is shown as a quote, so Markdown structure is noise: heading markers,
+    // blockquote bars, emphasis, code fences and table rules go; the words stay.
+    .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+    .replace(/^\s{0,3}>\s?/gm, '')
+    .replace(/^\s*\|?(\s*:?-{3,}:?\s*\|)+\s*:?-*:?\s*\|?\s*$/gm, ' ')
+    .replace(/```[a-z]*/g, ' ')
+    .replace(/(\*\*|__)(.*?)\1/g, '$2')
+    .replace(/\|/g, ' · ')
     .replace(/[\u0000-\u001f\u007f]/g, ' ')
+    .replace(/(\s·\s*){2,}/g, ' · ')
     .replace(/[ \t]+/g, ' ')
     .trim();
   return cleaned.length > maxChars ? `${cleaned.slice(0, maxChars).trimEnd()}…` : cleaned;
@@ -375,6 +388,7 @@ export function validateRetrieval(
       anchor: located?.anchor ?? null,
       href: `/dokumen/${source.documentId}/${source.documentSlug}${located ? `#${located.anchor}` : ''}`,
       score: hit.score,
+      relevance: hit.relevance ?? null,
     });
   }
   return { citations, rejected };

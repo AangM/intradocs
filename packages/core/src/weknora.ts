@@ -829,5 +829,21 @@ export function parseChatStream(raw: string, maxAnswerChars: number): WeknoraAns
         }
       }
   }
-  return { answer: answer.slice(0, maxAnswerChars), references };
+  return { answer: cleanAnswer(answer).slice(0, maxAnswerChars), references };
+}
+
+/**
+ * WeKnora's answering pipeline emits its own citation markup inside the text -- observed
+ * as `<kb doc="[IntraDocs:...] Title" chunk_id="..." kb_id="..." />` at the end of an
+ * answer. IntraDocs builds citations from its own validated retrieval, so the markup is
+ * noise to a reader and a leak of index ids. Any such tag is removed; nothing else in the
+ * answer is interpreted here.
+ */
+export function cleanAnswer(text: string): string {
+  return text
+    .replace(/<kb\b[^>]*\/?>/gi, '')
+    .replace(/<\/?kb>/gi, '')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }

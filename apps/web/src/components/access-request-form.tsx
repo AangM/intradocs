@@ -59,7 +59,7 @@ export function AccessRequestForm({ categories }: { categories: { id: string; na
           </option>
         ))}
       </select>
-      <fieldset disabled={busy}>
+      <fieldset disabled={busy} className="choice-group">
         <legend>Level akses yang diminta</legend>
         <label>
           <input
@@ -69,7 +69,7 @@ export function AccessRequestForm({ categories }: { categories: { id: string; na
             onChange={() => setClassification('restricted')}
           />{' '}
           Terbatas
-        </label>{' '}
+        </label>
         <label>
           <input
             type="radio"

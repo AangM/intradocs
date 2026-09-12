@@ -475,6 +475,12 @@ summary,
   gap: 24px;
   align-items: start;
 }
+.assistant-side,
+.assistant-main {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
 .assistant-side {
   background: #fff;
   border: 1px solid var(--line);
@@ -883,4 +889,90 @@ summary,
 }
 .invite-page .login-card {
   width: min(100%, 440px);
+}
+
+/* Audit log ------------------------------------------------------------------ */
+.audit-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.audit-action .i {
+  color: var(--tone, var(--muted));
+}
+.audit-action.tone-green {
+  --tone: var(--green);
+}
+.audit-action.tone-amber {
+  --tone: var(--amber);
+}
+.audit-action.tone-red {
+  --tone: var(--red);
+}
+.audit-action.tone-blue {
+  --tone: var(--blue-600);
+}
+.audit-table td {
+  vertical-align: middle;
+}
+
+/* Choice groups (radio rows) ------------------------------------------------- */
+.choice-group {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+}
+.choice-group legend {
+  font-size: 14px;
+  margin-bottom: 8px;
+  padding: 0;
+}
+.workflow-fields .choice-group label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-direction: row;
+}
+
+/* Dashboard KPI row: five tiles, never an orphan ------------------------------ */
+.kpi-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+@media (max-width: 1280px) {
+  .kpi-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 760px) {
+  .kpi-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Assistant answer text ------------------------------------------------------ */
+.answer-text p {
+  margin: 0 0 10px;
+}
+.answer-text p:last-child {
+  margin-bottom: 0;
+}
+.answer-text ul,
+.answer-text ol {
+  margin: 0 0 10px;
+  padding-left: 22px;
+}
+.answer-text li {
+  margin: 3px 0;
+}
+.answer-text code {
+  font-size: 12.5px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0 4px;
 }

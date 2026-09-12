@@ -138,7 +138,7 @@ export default async function Reader({
               {doc.approvedBy && (
                 <span className="pill p-green">
                   <Icon name="check-c" size={13} />
-                  {source ? 'Disetujui' : 'Approval fixture'}: {doc.approvedBy}
+                  Disetujui: {doc.approvedBy}
                 </span>
               )}
             </div>
@@ -147,9 +147,9 @@ export default async function Reader({
                 <Icon name="download" size={15} />
                 Unduh Markdown
               </a>
-              <Link className="btn btn-sm" href="/ai-assistant">
+              <Link className="btn btn-sm" href={`/ai-assistant?doc=${id}`}>
                 <Icon name="spark" size={15} />
-                Status AI Assistant
+                Tanya AI tentang dokumen ini
               </Link>
               {doc.labels.map((t) => (
                 <span className="tag" key={t}>
@@ -302,8 +302,8 @@ export default async function Reader({
                 </Link>
               )}
               <p className="sub tiny">
-                Pilih versi immutable pada panel Versi & Persetujuan di bawah dokumen.
-                Diff/rollback: V1.
+                Setiap versi immutable. Riwayat, perbandingan, dan pemulihan versi ada di panel
+                Versi & Persetujuan di bawah dokumen.
               </p>
             </div>
           </aside>

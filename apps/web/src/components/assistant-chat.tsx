@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { answerToMarkdown } from '@intradocs/core/answer-export';
 import type { RetrievalScope } from '@intradocs/core/rag';
 import { Icon } from './icon';
+import { AnswerText } from './answer-text';
 
 export interface AssistantCitation {
   documentId: string;
@@ -485,7 +486,11 @@ export function AssistantChat({
                     </span>
                   </p>
                 )}
-                {turn.answer && <p className="rag-answer">{turn.answer}</p>}
+                {turn.answer && (
+                  <div className="rag-answer">
+                    <AnswerText text={turn.answer} />
+                  </div>
+                )}
                 {turn.abstained && !turn.answer && (
                   <p className="rag-answer">
                     Tidak ada sumber resmi dalam cakupan akses Anda yang menjawab pertanyaan ini.

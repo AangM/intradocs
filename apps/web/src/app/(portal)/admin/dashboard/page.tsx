@@ -53,7 +53,7 @@ export default async function Dashboard({
           </form>
         }
       />
-      <div className="grid g4 mb">
+      <div className="grid kpi-grid mb">
         {[
           {
             label: 'Dokumen aktif',

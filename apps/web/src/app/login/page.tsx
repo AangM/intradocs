@@ -51,7 +51,7 @@ export default async function Login({
             <small>Sumber immutable, tanpa menjalankan HTML</small>
           </span>
         </div>
-        <span className="login-profile">M3 · Local development · AI off</span>
+        <span className="login-profile">Build lokal · corpus sintetis</span>
       </section>
       <section className="login-panel">
         <div className="login-card">

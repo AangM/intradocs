@@ -90,19 +90,19 @@ export default async function Users() {
           <div>
             <Icon name="plus" size={23} style={{ margin: '0 auto 8px' }} />
             <strong>Role kustom</strong>
-            <span className="sub tiny">Direncanakan untuk V1</span>
+            <span className="sub tiny">Di luar rilis ini</span>
           </div>
         </div>
       </div>
       <Notice>
         <strong>Scope + klasifikasi tetap berlaku.</strong> Bahkan Super Admin tidak otomatis
-        membaca Terbatas/Rahasia. Matriks berikut menunjukkan akses yang diimplementasikan di M3;
+        membaca Terbatas/Rahasia. Matriks berikut menunjukkan akses yang benar-benar diberlakukan;
         bukan janji fitur yang belum tersedia.
       </Notice>
       <section className="card mb">
         <div className="card-h">
           <Icon name="lock" />
-          <h2 className="h3">Matriks izin M1–M3</h2>
+          <h2 className="h3">Matriks izin</h2>
         </div>
         <div
           className="table-scroll"

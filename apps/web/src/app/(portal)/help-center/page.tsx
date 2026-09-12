@@ -40,7 +40,7 @@ export default async function HelpCenter() {
           </h1>
           <p>
             Cari SOP, panduan aplikasi, dan kebijakan IT dalam satu knowledge base. Mulai dengan
-            dokumen sintetis; AI Assistant akan hadir pada tahap berikutnya.
+            dokumen sintetis; jawaban AI selalu menyebut sumbernya.
           </p>
           <form className="bigsearch" action="/search" role="search">
             <Icon name="search" size={22} />
@@ -89,8 +89,8 @@ export default async function HelpCenter() {
               <div className="l">Format canonical</div>
             </div>
             <div className="hs">
-              <div className="n">Off</div>
-              <div className="l">AI · tidak mengirim data</div>
+              <div className="n">{aiOn ? 'Lokal' : 'Off'}</div>
+              <div className="l">{aiOn ? 'AI · tanpa request cloud' : 'AI · belum diaktifkan'}</div>
             </div>
           </div>
         </div>

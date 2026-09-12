@@ -320,23 +320,50 @@ export async function setUserActive(actor: Actor, target: string, active: boolea
     );
   });
 }
-export async function listAudit(
-  actor: Actor,
-): Promise<Array<{ id: string; action: string; actorId: string; createdAt: string }>> {
+export async function listAudit(actor: Actor): Promise<
+  Array<{
+    id: string;
+    action: string;
+    actorId: string;
+    /** Name when the actor may see that profile; otherwise null and the UI shows a placeholder. */
+    actorName: string | null;
+    /** Document title when the actor may read it; RLS on documents decides. */
+    documentTitle: string | null;
+    documentHref: string | null;
+    subjectName: string | null;
+    createdAt: string;
+  }>
+> {
   if (!hasCapability(actor, 'audit.view')) throw new AccessDenied();
   return withActor(actor.id, async ({ client }) => {
     const { rows } = await client.query<{
       id: string;
       action: string;
       actor_id: string;
+      actor_name: string | null;
+      document_id: string | null;
+      document_title: string | null;
+      document_slug: string | null;
+      subject_name: string | null;
       created_at: Date;
     }>(
-      'SELECT request_id::text AS id,action,actor_id,created_at FROM app.audit_events ORDER BY app.audit_events.id DESC LIMIT 50',
+      `SELECT a.request_id::text AS id,a.action,a.actor_id,a.created_at,
+        (SELECT p.name FROM app.profiles p WHERE p.id=a.actor_id) AS actor_name,
+        a.document_id,
+        (SELECT d.title FROM app.documents d WHERE d.id=a.document_id) AS document_title,
+        (SELECT d.slug FROM app.documents d WHERE d.id=a.document_id) AS document_slug,
+        (SELECT p.name FROM app.profiles p WHERE p.id=a.subject_user_id) AS subject_name
+       FROM app.audit_events a ORDER BY a.id DESC LIMIT 100`,
     );
     return rows.map((r) => ({
       id: r.id,
       action: r.action,
       actorId: r.actor_id,
+      actorName: r.actor_name,
+      documentTitle: r.document_title,
+      documentHref:
+        r.document_id && r.document_slug ? `/dokumen/${r.document_id}/${r.document_slug}` : null,
+      subjectName: r.subject_name,
       createdAt: r.created_at.toISOString(),
     }));
   });

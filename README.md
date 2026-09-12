@@ -60,21 +60,23 @@ Migrasi bersifat additive. SQL yang sudah diterapkan tidak ditulis ulang. Jangan
 
 ## Demo AI Assistant dan fitur V1 (butuh profil `weknora`)
 
-Jalankan `pnpm weknora:setup` sekali, isi `AI_PROVIDER=weknora-local` (dan `AI_GENERATION=weknora-local` bila ingin jawaban tersusun, bukan hanya sumber), lalu restart `pnpm dev`. Pada laptop 8 GB matikan profil `knowledge` (ClamAV/converter) selama demo AI; keduanya tidak muat bersamaan — unggah akan ditolak `scanner_unavailable`, bukan bypass.
+Jalankan `pnpm weknora:setup` sekali, isi `AI_PROVIDER=weknora-local` (dan `AI_GENERATION=weknora-local` bila ingin jawaban tersusun, bukan hanya sumber; pin model penjawab dengan `pnpm weknora:generation <model>`), lalu restart `pnpm dev`. Pada laptop 8 GB tanpa GPU matikan profil `knowledge` (ClamAV/converter) selama demo AI; pada laptop ber-GPU keduanya berjalan bersama.
 
-Akun demo ada di `var/demo-accounts.json` (siti = viewer Infrastruktur+Data; fajar = viewer SOP saja; rizky = contributor; budi = super admin).
+Akun demo ada di `var/demo-accounts.json` (siti = viewer Infrastruktur+Data; fajar = viewer SOP saja; rizky = contributor; dwi = reviewer Keamanan; andi = admin knowledge; budi = super admin).
 
-1. **AI Assistant** sebagai siti: klik pertanyaan pemantik. "MFA pada VPN" → jawaban dengan kutipan yang bisa dibuka ke bagian dokumen; "harga saham" → "tidak tahu" dalam ~1 detik tanpa memanggil model; injeksi "abaikan aturan akses" → tetap "tidak tahu". Jawaban tersusun memakan **30–80 detik** di CPU laptop; sumber saja di bawah 1 detik.
-2. Ulangi pertanyaan VPN sebagai **fajar**: cakupan 1 versi, abstain — scope kategori berlaku pada retrieval, bukan hanya pada halaman.
-3. **Cabut** dokumen VPN sebagai pemiliknya, lalu tanya lagi sebagai siti: hilang dari kutipan pada permintaan berikutnya meski record-nya masih di WeKnora.
-4. **Saran label** (rizky, halaman dokumen): "Lihat saran" menunjukkan tag model yang dibuang penyaring kategori dan tidak ada yang ditulis — model mengusulkan, orang memutuskan.
-5. **Permintaan akses** (`/akses`): siti mengajukan Terbatas untuk Infrastruktur; budi melihat antrean dan memutuskan dengan catatan; memutuskan permintaan sendiri ditolak database.
-6. **Bacaan wajib**: budi menandai dokumen VPN dari halaman dokumen; siti melihatnya di Help Center dan mengonfirmasi (versi tercatat); fajar tidak melihat apa pun.
-7. **Dashboard admin** (budi): ubin AI Assistant — jumlah pertanyaan, abstain, kutipan ditolak validasi, pengguna — dari jejak audit, tanpa satu pun teks pertanyaan.
+1. **Alur inti, satu tarikan napas** — rizky unggah Markdown sintetis (`/unggah`): "Bantuan metadata" menandai dokumen terbit yang mirip dan label yang disebut teks tanpa mengirim draft ke mana pun → simpan draft → ajukan review ke andi → andi setujui → worker publikasi dan indeks (±15 detik) → siapa pun dengan scope bertanya ke asisten dan mendapat jawaban **bersitasi ke dokumen yang baru saja terbit**.
+2. **AI Assistant** sebagai siti: klik pertanyaan pemantik. "MFA pada VPN" → jawaban dengan kutipan yang bisa dibuka ke bagian dokumen; "harga saham" → "tidak tahu" tanpa memanggil model; injeksi "abaikan aturan akses" → tetap "tidak tahu". Ubah **ruang lingkup** ke satu kategori atau ke "dokumen yang saya buka"; riwayat percakapan tersimpan hanya untuk pemiliknya. Nilai jawaban "Membantu / tidak".
+3. **Pencarian** (`/search`): pertanyaan bahasa alami yang lexical-nya nol hasil tetap mendapat "Sumber yang relevan menurut AI" di atasnya, dengan tautan lanjut ke asisten.
+4. Ulangi pertanyaan VPN sebagai **fajar**: cakupan 1 versi, abstain — scope kategori berlaku pada retrieval, bukan hanya pada halaman.
+5. **Cabut** dokumen VPN sebagai pemiliknya, lalu buka riwayat percakapan siti: sitasi ke dokumen itu hilang dan jawabannya ikut disembunyikan; tanya lagi → tidak dikutip.
+6. **Halaman dokumen**: "Tanya asisten tentang dokumen ini" (pertanyaan yang dihasilkan model dari dokumen); bagi yang boleh merevisi: draf ringkasan model dan saran label, keduanya hanya masuk ke form revisi lewat tombol dan tetap direview.
+7. **Kategori & Label** (andi): saran perapian (label mirip / tidak terpakai), urutan lewat seret atau ↑/↓, ekspor taksonomi, panel aturan yang berlaku.
+8. **Pengguna & RBAC** (budi): "Undang Pengguna" → tautan sekali pakai tampil satu kali → buka di jendela privat, tetapkan password, masuk sebagai akun baru dengan scope yang diputuskan admin.
+9. **Dashboard** (andi/budi): ubin AI (pertanyaan, abstain, kutipan ditolak, dinilai membantu) dari jejak audit tanpa satu pun teks; knowledge gap termasuk pertanyaan asisten yang tak terjawab, dengan "Jawab sebagai dokumen". **Audit Log** membaca aktivitas dalam bahasa manusia.
 
-Ingin mencoba summary, pertanyaan otomatis, wiki, dan chat bawaan WeKnora pada corpus yang sama? `pnpm weknora:lab` membuat knowledge base terpisah dengan semuanya menyala dan membuka UI WeKnora ke sana tanpa menyentuh yang dibaca portal — lihat [docs/WEKNORA.md §15](docs/WEKNORA.md).
+Ingin mencoba wiki dan chat bawaan WeKnora pada corpus yang sama? `pnpm weknora:lab` membuat knowledge base terpisah dengan semuanya menyala dan membuka UI WeKnora ke sana tanpa menyentuh yang dibaca portal — lihat [docs/WEKNORA.md §15](docs/WEKNORA.md).
 
-Yang sengaja **tidak** ada di portal dan alasannya ada di [docs/WEKNORA.md](docs/WEKNORA.md): rerank (Ollama tidak punya endpoint `/rerank`; WeKnora mendapat 404 — knob-nya sudah terpasang di agen `intradocs-portal` dan aktif begitu ada server reranker), summary (teks bebas tanpa permukaan validasi), wiki/Langfuse/unggah ke WeKnora (rekaman tanpa versi IntraDocs tidak bisa dikutip), UI WeKnora sebagai permukaan pengguna (tidak mengenal klasifikasi, scope, grant).
+Yang sengaja **tidak** ada di portal dan alasannya ada di [docs/WEKNORA.md](docs/WEKNORA.md): rerank tanpa server reranker (profil `weknora-rerank` + `pnpm weknora:rerank` menyalakannya bila bobotnya terunduh), wiki/Langfuse/unggah ke WeKnora (rekaman tanpa versi IntraDocs tidak bisa dikutip), UI WeKnora sebagai permukaan pengguna (tidak mengenal klasifikasi, scope, grant), dan teks buatan model sebagai sitasi (chunk `summary` ditolak gerbang, §22).
 
 ## Konversi yang jujur
 

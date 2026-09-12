@@ -3,7 +3,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { ReviewInfo, VersionSummary } from '@intradocs/db/workflow';
-import { formatDate } from '@intradocs/core';
+import { formatDate, ROLE_LABELS, type Role } from '@intradocs/core';
 import { Icon } from './icon';
 
 type Finding = { rule: string; severity: string; line: number };
@@ -191,7 +191,7 @@ export function WorkflowPanel({
                         value={c.id}
                         disabled={reviewers.some((id, j) => j !== i && id === c.id)}
                       >
-                        {c.name} · {c.role}
+                        {c.name} · {ROLE_LABELS[c.role as Role] ?? c.role}
                       </option>
                     ))}
                   </select>
@@ -251,8 +251,10 @@ export function WorkflowPanel({
         {info.findings.length > 0 && (
           <div>
             <h3>Temuan keamanan</h3>
-            {info.findings.map((f) => (
-              <div className="finding" key={f.fingerprint}>
+            {info.findings.map((f, i) => (
+              // Two matches of one rule on one line share a fingerprint; the index keeps
+              // the key unique without changing what the fingerprint means.
+              <div className="finding" key={`${f.fingerprint}-${i}`}>
                 <strong>
                   {f.rule} · baris {f.line}
                 </strong>

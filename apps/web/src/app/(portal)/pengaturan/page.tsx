@@ -1,8 +1,18 @@
 import { requireActor } from '@/lib/session';
 import { ROLE_LABELS } from '@intradocs/core';
 import { PageHeading, Notice } from '@/components/shared';
+import { aiStatus } from '@/lib/rag';
 export default async function Settings() {
   const actor = await requireActor();
+  const ai = aiStatus();
+  const aiLabel =
+    ai.retrieval === 'off'
+      ? 'AI belum diaktifkan'
+      : ai.generation === 'off'
+        ? 'AI retrieval lokal (WeKnora) · tanpa penyusunan jawaban'
+        : ai.generationLocation === 'external'
+          ? 'AI retrieval lokal · jawaban disusun provider eksternal'
+          : 'AI retrieval + jawaban lokal (WeKnora + Ollama)';
   return (
     <div className="pad">
       <PageHeading
@@ -13,7 +23,7 @@ export default async function Settings() {
         <dl className="settings-list">
           <div>
             <dt>Profil</dt>
-            <dd>local-dev · M3</dd>
+            <dd>local-dev · corpus sintetis</dd>
           </div>
           <div>
             <dt>Autentikasi</dt>
@@ -38,20 +48,25 @@ export default async function Settings() {
             <dd>Filesystem privat di luar webroot</dd>
           </div>
           <div>
-            <dt>AI / SSO</dt>
-            <dd>AI off · SSO belum terhubung</dd>
+            <dt>AI</dt>
+            <dd>{aiLabel} · tidak ada request ke cloud</dd>
+          </div>
+          <div>
+            <dt>SSO</dt>
+            <dd>Belum terhubung · identitas lokal dan undangan admin</dd>
           </div>
         </dl>
       </section>
       <Notice>
-        <strong>Privasi.</strong> Tidak ada integrasi telemetry aplikasi, API AI, analytics pihak
-        ketiga, atau font remote. Next.js telemetry dimatikan oleh runner lokal. Tautan eksternal
-        dalam dokumen hanya dibuka ketika Anda klik, tanpa referrer.
+        <strong>Privasi.</strong> Tidak ada telemetry aplikasi, API AI cloud, analytics pihak
+        ketiga, atau font remote; AI berjalan di mesin ini. Next.js telemetry dimatikan oleh runner
+        lokal. Tautan eksternal dalam dokumen hanya dibuka ketika Anda klik, tanpa referrer.
       </Notice>
       <Notice kind="warn">
         <strong>Belum layak data produksi.</strong> Jangan gunakan data atau credential Telkom
-        nyata. M1–M3 diuji dengan corpus sintetis. Pilot nyata tetap menunggu SSO, kebijakan data,
-        backup/restore, serta persetujuan mentor/security/ops. Lihat bukti rilis di docs/PLAN.md.
+        nyata. Semua fitur diuji dengan corpus sintetis. Pilot nyata tetap menunggu SSO, kebijakan
+        data, backup/restore, serta persetujuan mentor/security/ops. Lihat bukti rilis di
+        docs/PLAN.md.
       </Notice>
     </div>
   );

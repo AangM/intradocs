@@ -5,6 +5,10 @@ import { metadataHints } from '@intradocs/db/metadata-help';
 import { getAiConfig, retrieve, AiDisabled } from '@/lib/rag';
 
 const MAX_EXCERPT = 1500;
+// A "possible duplicate" is a far stronger claim than "relevant to a question": only
+// documents whose best chunk sits well above the retrieval gate are named, and few of them.
+const MIN_DUPLICATE_RELEVANCE = 0.7;
+const MAX_DUPLICATES = 3;
 
 /**
  * "Bantuan metadata" for a draft that is not yet anywhere (mockup S05).
@@ -49,6 +53,7 @@ export async function POST(request: Request) {
         const seen = new Set<string>();
         for (const c of result.citations) {
           if (seen.has(c.documentId)) continue;
+          if (c.relevance === null || c.relevance < MIN_DUPLICATE_RELEVANCE) continue;
           seen.add(c.documentId);
           similar.push({
             documentId: c.documentId,
@@ -57,7 +62,7 @@ export async function POST(request: Request) {
             href: `/dokumen/${c.documentId}/${c.documentSlug}`,
           });
         }
-        similar = similar.slice(0, 5);
+        similar = similar.slice(0, MAX_DUPLICATES);
       } catch (error) {
         // A disabled or unreachable assistant costs the duplicate hint, not the upload.
         if (!(error instanceof AiDisabled)) similar = [];

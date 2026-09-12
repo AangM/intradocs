@@ -79,10 +79,13 @@ const navigation: Array<{
 export function Shell({
   actor,
   categories,
+  aiOn = false,
   children,
 }: {
   actor: Actor;
   categories: Category[];
+  /** Server-decided; the footer must never claim more or less than the config says. */
+  aiOn?: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -246,7 +249,7 @@ export function Shell({
                   <span className="status-dot" />
                   Development lokal
                   <br />
-                  <span>AI off · tanpa data Telkom nyata</span>
+                  <span>{aiOn ? 'AI lokal' : 'AI off'} · tanpa data Telkom nyata</span>
                 </div>
               </div>
             </nav>

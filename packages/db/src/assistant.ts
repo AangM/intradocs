@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import type { Citation, RetrievalScope } from '@intradocs/core/rag';
+import { sanitizeSnippet, type Citation, type RetrievalScope } from '@intradocs/core/rag';
+import { cleanAnswer } from '@intradocs/core/weknora';
 import { InputError } from '@intradocs/core/validation';
 import { withActor } from './index.ts';
 
@@ -183,7 +184,8 @@ export async function readConversation(
         versionLabel: r.label,
         classification: r.classification,
         categoryName: r.category_name,
-        snippet: r.snippet,
+        // Stored as retrieved; presented the way a fresh citation is.
+        snippet: sanitizeSnippet(r.snippet, 4000),
         heading: r.heading,
         href: `/dokumen/${r.document_id}/${r.slug}${r.anchor ? `#${r.anchor}` : ''}`,
       });
@@ -197,7 +199,7 @@ export async function readConversation(
         question: t.question,
         // An answer composed from a source the reader may no longer see is withheld
         // with it: the text would otherwise quote what the citation now hides.
-        answer: hidden > 0 ? '' : t.answer,
+        answer: hidden > 0 ? '' : cleanAnswer(t.answer),
         abstained: t.abstained,
         mode: t.mode,
         scope: t.scope,

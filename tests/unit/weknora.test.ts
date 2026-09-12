@@ -4,7 +4,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readAiConfig } from '../../packages/core/src/ai-config.ts';
-import { WeknoraClient, WeknoraError, parseChatStream } from '../../packages/core/src/weknora.ts';
+import {
+  WeknoraClient,
+  WeknoraError,
+  parseChatStream,
+  cleanAnswer,
+} from '../../packages/core/src/weknora.ts';
 
 const config = readAiConfig({
   AI_PROVIDER: 'weknora-local',
@@ -252,4 +257,18 @@ test('garbage frames are skipped without failing the whole stream', () => {
     '',
   ].join('\n');
   assert.equal(parseChatStream(stream, 4000).answer, 'tetap terbaca');
+});
+
+test("WeKnora's own citation markup never reaches a reader", () => {
+  const raw = [
+    'SLA reset password adalah **30 menit**.  ',
+    '',
+    '<kb doc="[IntraDocs:3000-0001] Panduan" chunk_id="266c" kb_id="ce60" />',
+    '',
+    '',
+    '<kb doc="x"></kb>',
+  ].join('\n');
+  const clean = cleanAnswer(raw);
+  assert.equal(clean, 'SLA reset password adalah **30 menit**.');
+  assert(!/<kb/i.test(clean) && !/chunk_id|kb_id/.test(clean));
 });

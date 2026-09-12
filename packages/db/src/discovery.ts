@@ -56,7 +56,14 @@ export async function searchDocuments(
         updatedAt: r.created_at.toISOString(),
         status: 'published' as const,
         expiresAt: r.expires_at?.toISOString() ?? null,
-        snippet: r.snippet,
+        // Lexical chunks are raw Markdown; a result line should read as prose.
+        snippet: r.snippet
+          .replace(/<!--[\s\S]*?-->/g, ' ')
+          .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+          .replace(/^\s{0,3}>\s?/gm, '')
+          .replace(/[*_`]{1,3}/g, '')
+          .replace(/\s+/g, ' ')
+          .trim(),
       })),
       total,
       pageSize: 8,

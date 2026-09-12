@@ -146,7 +146,7 @@ export function Footer() {
           <span className="logo-mark">
             <Icon name="book" size={14} />
           </span>
-          <span className="c">IntraDocs · M3 · Dataset sintetis, bukan kebijakan resmi</span>
+          <span className="c">IntraDocs · build lokal · dataset sintetis, bukan kebijakan resmi</span>
         </div>
         <Link href="/pengaturan" className="sub">
           Status fitur & privasi
