@@ -92,6 +92,19 @@ pnpm dev
 
 `pnpm weknora:stop` menghentikan profil tanpa menghapus volume. `pnpm services:stop` hanya menyentuh PostgreSQL IntraDocs.
 
+Dua hal yang baru terlihat pada checkout benar-benar bersih (laptop kedua, September 2026):
+
+- `setup:local` kini ikut membuat `WEKNORA_DB_PASSWORD`, `WEKNORA_REDIS_PASSWORD`, `WEKNORA_JWT_SECRET`, dan `WEKNORA_AES_KEY`. Compose v5 menginterpolasi semua service di `compose.yaml`, termasuk yang di balik profil `weknora`, sehingga `up -d postgres` gagal bila keempatnya belum ada. `weknora:setup` tidak menimpa nilai yang sudah ada.
+- `seed` mengisi `app.labels` dari label dokumen. Migrasi 006 hanya melakukannya untuk dokumen yang ada saat migrasi; pada checkout baru migrasi berjalan sebelum seed, sehingga kolam auto-tag dan saran label kosong.
+
+**Dua checkout di satu mesin** (mis. git worktree): `compose.yaml` memakai nama proyek tetap `intradocs-local`, jadi checkout kedua akan menabrak volume dan port checkout pertama. Pada run pertama saja:
+
+```sh
+COMPOSE_PROJECT_NAME=intradocs-wt-<nama> POSTGRES_PORT=54330 pnpm setup:local
+```
+
+lalu di `.env.local` sebelum `weknora:setup`: `CLAMAV_PORT`, `KNOWLEDGE_PORT`, `WEKNORA_PORT`, `WEKNORA_UI_PORT` yang tidak bentrok, dan `APP_URL=http://localhost:3001` bila `:3000` sudah dipakai. Nilai-nilai itu dibaca Compose dan skrip dari `.env.local` pada setiap panggilan berikutnya.
+
 ## 4. Konfigurasi
 
 Semua server-side. `scripts/runtime-env.ts` memilih variabel mana yang sampai ke proses web dan worker; `WEKNORA_DB_PASSWORD`, `WEKNORA_REDIS_PASSWORD`, `WEKNORA_JWT_SECRET` dan `WEKNORA_AES_KEY` **sengaja tidak diteruskan** — itu milik container.

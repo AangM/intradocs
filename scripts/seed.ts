@@ -160,6 +160,14 @@ export async function seed(): Promise<void> {
           ],
         );
       }
+      // Migration 006 derives the label vocabulary from documents that exist at migration
+      // time. On a fresh checkout migrations run before this seed, so redo that backfill
+      // here or app.labels stays empty (auto-tag pool, label suggestions, taxonomy page).
+      await c.query(
+        `INSERT INTO app.labels(category_id,name)
+         SELECT DISTINCT d.category_id,label FROM app.documents d CROSS JOIN LATERAL unnest(d.labels) label
+         WHERE length(trim(label)) BETWEEN 3 AND 32 ON CONFLICT DO NOTHING`,
+      );
       for (const n of [6, 7])
         for (const userId of [IDS.reviewer, IDS.admin])
           await c.query(
