@@ -35,6 +35,43 @@ export default async function AccessRequests() {
         title="Permintaan Akses"
         subtitle="Ajukan akses ke materi Terbatas atau Rahasia pada kategori yang sudah Anda lihat. Setiap keputusan tercatat beserta alasannya."
       />
+      {isAdmin && (
+        <section className="card">
+          <div className="card-h">
+            <h2 className="h3">Menunggu keputusan pada kategori Anda</h2>
+          </div>
+          <div className="card-b">
+            {queue.length ? (
+              <ul className="personal-list">
+                {queue.map((r) => (
+                  <li key={r.id} className="access-queue-item">
+                    <div>
+                      <div>
+                        <strong>{r.requesterName}</strong> meminta{' '}
+                        {LEVEL[r.classification] ?? r.classification} pada{' '}
+                        <strong>{r.categoryName}</strong> ·{' '}
+                        <span className="tag">{STATE[r.state] ?? r.state}</span>
+                      </div>
+                      <div className="sub tiny">Diajukan {formatDate(r.createdAt)}</div>
+                      <p className="sub">{r.reason}</p>
+                      {r.state !== 'pending' && r.decisionNote && (
+                        <p className="sub">
+                          <em>Catatan keputusan:</em> {r.decisionNote}
+                        </p>
+                      )}
+                    </div>
+                    {r.state === 'pending' && <AccessRequestDecision id={r.id} />}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <Empty title="Tidak ada antrean">
+                Tidak ada permintaan dari orang lain pada kategori yang Anda kelola.
+              </Empty>
+            )}
+          </div>
+        </section>
+      )}
       <section className="card">
         <div className="card-h">
           <h2 className="h3">Ajukan permintaan</h2>
@@ -76,45 +113,6 @@ export default async function AccessRequests() {
           )}
         </div>
       </section>
-
-      {isAdmin && (
-        <section className="card">
-          <div className="card-h">
-            <h2 className="h3">Menunggu keputusan pada kategori Anda</h2>
-          </div>
-          <div className="card-b">
-            {queue.length ? (
-              <ul className="personal-list">
-                {queue.map((r) => (
-                  <li key={r.id}>
-                    <div>
-                      <strong>{r.requesterName}</strong> meminta{' '}
-                      {LEVEL[r.classification] ?? r.classification} pada{' '}
-                      <strong>{r.categoryName}</strong> ·{' '}
-                      <span className="tag">{STATE[r.state] ?? r.state}</span>
-                    </div>
-                    <div className="sub tiny">Diajukan {formatDate(r.createdAt)}</div>
-                    <p className="sub">{r.reason}</p>
-                    {r.state === 'pending' ? (
-                      <AccessRequestDecision id={r.id} />
-                    ) : (
-                      r.decisionNote && (
-                        <p className="sub">
-                          <em>Catatan keputusan:</em> {r.decisionNote}
-                        </p>
-                      )
-                    )}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <Empty title="Tidak ada antrean">
-                Tidak ada permintaan dari orang lain pada kategori yang Anda kelola.
-              </Empty>
-            )}
-          </div>
-        </section>
-      )}
     </div>
   );
 }

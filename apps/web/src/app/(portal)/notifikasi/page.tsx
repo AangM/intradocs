@@ -4,14 +4,15 @@ import { listNotifications } from '@intradocs/db/workflow';
 import { formatDate } from '@intradocs/core';
 import { PageHeading, Empty, documentHref } from '@/components/shared';
 import { NotificationRead } from '@/components/notification-read';
+// The seven kinds app.notifications can hold (migration 005), in a reader's words.
 const labels: Record<string, string> = {
-  review_requested: 'Review diminta',
-  changes_requested: 'Perbaikan diminta',
-  approved: 'Disetujui',
+  review_assigned: 'Anda ditugaskan mereview',
+  review_decided: 'Review diputuskan',
   published: 'Terpublikasi',
   review_due: 'Review berkala jatuh tempo',
-  review_reminder: 'Pengingat review',
-  rejected: 'Ditolak',
+  expired: 'Kedaluwarsa',
+  feedback: 'Masukan pembaca baru',
+  index_failed: 'Indeks gagal — publikasi diulang otomatis',
 };
 export default async function Notifications() {
   const a = await requireActor(),

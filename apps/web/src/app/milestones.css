@@ -976,3 +976,19 @@ summary,
   border-radius: 4px;
   padding: 0 4px;
 }
+
+/* Access-request decision: give the note room ------------------------------- */
+.personal-list > li.access-queue-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
+  gap: 16px;
+  align-items: start;
+}
+.access-queue-item .workflow-fields {
+  width: 100%;
+}
+@media (max-width: 900px) {
+  .personal-list > li.access-queue-item {
+    grid-template-columns: 1fr;
+  }
+}
