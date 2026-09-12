@@ -27,6 +27,12 @@ export function AnswerText({ text }: { text: string }) {
               ))}
             </ol>
           );
+        if (block.kind === 'quote')
+          return (
+            <blockquote key={i} className="answer-quote">
+              {inline(block.text)}
+            </blockquote>
+          );
         return <p key={i}>{inline(block.text)}</p>;
       })}
     </div>
@@ -34,7 +40,10 @@ export function AnswerText({ text }: { text: string }) {
 }
 
 type Block =
-  { kind: 'p'; text: string } | { kind: 'ul'; items: string[] } | { kind: 'ol'; items: string[] };
+  | { kind: 'p'; text: string }
+  | { kind: 'quote'; text: string }
+  | { kind: 'ul'; items: string[] }
+  | { kind: 'ol'; items: string[] };
 
 function splitBlocks(text: string): Block[] {
   const blocks: Block[] = [];
@@ -47,6 +56,14 @@ function splitBlocks(text: string): Block[] {
     const line = raw.replace(/^\s{0,3}#{1,6}\s+/, '').trim();
     if (!line) {
       flush();
+      continue;
+    }
+    const quoted = /^>\s?(.*)$/.exec(line);
+    if (quoted) {
+      flush();
+      const last = blocks[blocks.length - 1];
+      if (last && last.kind === 'quote') last.text += ` ${quoted[1]}`;
+      else blocks.push({ kind: 'quote', text: quoted[1]! });
       continue;
     }
     const bullet = /^[-*•]\s+(.*)$/.exec(line);

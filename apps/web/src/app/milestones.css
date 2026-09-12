@@ -992,3 +992,11 @@ summary,
     grid-template-columns: 1fr;
   }
 }
+.answer-quote {
+  margin: 6px 0 10px;
+  padding: 6px 12px;
+  border-left: 3px solid var(--blue-200);
+  background: var(--blue-50);
+  border-radius: 0 var(--r) var(--r) 0;
+  font-size: 13px;
+}
