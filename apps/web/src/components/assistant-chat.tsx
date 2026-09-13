@@ -142,6 +142,10 @@ export function AssistantChat({
   const [conversations, setConversations] = useState<ConversationItem[]>([...initialConversations]);
   const [loadingConversation, setLoadingConversation] = useState<string | null>(null);
   const [copiedTurn, setCopiedTurn] = useState<string | null>(null);
+  // The conversation whose delete is awaiting confirmation, inline in its row: a native
+  // confirm() is suppressed by some embedded browsers, and the person then saw nothing.
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
   // Turns whose citation detail (every passage, with its snippet) is open.
   const [openSources, setOpenSources] = useState<ReadonlySet<string>>(() => new Set());
   const handedDocument = recentDocuments.some((d) => d.id === initialDocumentId);
@@ -330,15 +334,26 @@ export function AssistantChat({
   }
 
   async function remove(id: string) {
-    if (pending) return;
-    if (!window.confirm('Hapus percakapan ini dari riwayat Anda?')) return;
-    const response = await fetch(`/api/rag/conversations/${id}`, { method: 'DELETE' });
-    if (!response.ok) {
-      setError(await readError(response));
-      return;
+    if (deleting) return;
+    setDeleting(id);
+    setError(null);
+    try {
+      const response = await fetch(`/api/rag/conversations/${id}`, {
+        method: 'DELETE',
+        cache: 'no-store',
+      });
+      if (!response.ok) {
+        setError(await readError(response));
+        return;
+      }
+      setConversations((list) => list.filter((c) => c.id !== id));
+      if (conversationId === id) startNew();
+    } catch {
+      setError('Tidak dapat menghapus percakapan. Coba lagi.');
+    } finally {
+      setDeleting(null);
+      setConfirmDelete(null);
     }
-    setConversations((list) => list.filter((c) => c.id !== id));
-    if (conversationId === id) startNew();
   }
 
   async function vote(turnId: string, helpful: boolean) {
@@ -390,32 +405,54 @@ export function AssistantChat({
           <p className="sub tiny chat-side-empty">Percakapan Anda akan tersimpan di sini.</p>
         ) : (
           <ul className="chat-convs">
-            {conversations.map((c) => (
-              <li key={c.id} className={c.id === conversationId ? 'on' : ''}>
-                <button
-                  type="button"
-                  className="chat-conv"
-                  onClick={() => void open(c.id)}
-                  aria-current={c.id === conversationId ? 'true' : undefined}
-                  disabled={loadingConversation !== null}
-                  title={c.title}
-                >
-                  <span className="chat-conv-t">{c.title}</span>
-                  <span className="chat-conv-m">
-                    {c.turns} pertanyaan · {formatWhen(c.updatedAt)}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  className="chat-conv-x"
-                  aria-label={`Hapus percakapan: ${c.title}`}
-                  title="Hapus"
-                  onClick={() => void remove(c.id)}
-                >
-                  <Icon name="x" size={13} />
-                </button>
-              </li>
-            ))}
+            {conversations.map((c) =>
+              confirmDelete === c.id ? (
+                <li key={c.id} className="confirm" role="group" aria-label="Konfirmasi hapus">
+                  <span className="chat-conv-q">Hapus percakapan ini?</span>
+                  <button
+                    type="button"
+                    className="chat-conv-yes"
+                    disabled={deleting !== null}
+                    onClick={() => void remove(c.id)}
+                  >
+                    {deleting === c.id ? 'Menghapus…' : 'Hapus'}
+                  </button>
+                  <button
+                    type="button"
+                    className="chat-conv-no"
+                    disabled={deleting !== null}
+                    onClick={() => setConfirmDelete(null)}
+                  >
+                    Batal
+                  </button>
+                </li>
+              ) : (
+                <li key={c.id} className={c.id === conversationId ? 'on' : ''}>
+                  <button
+                    type="button"
+                    className="chat-conv"
+                    onClick={() => void open(c.id)}
+                    aria-current={c.id === conversationId ? 'true' : undefined}
+                    disabled={loadingConversation !== null}
+                    title={c.title}
+                  >
+                    <span className="chat-conv-t">{c.title}</span>
+                    <span className="chat-conv-m">
+                      {c.turns} pertanyaan · {formatWhen(c.updatedAt)}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="chat-conv-x"
+                    aria-label={`Hapus percakapan: ${c.title}`}
+                    title="Hapus percakapan"
+                    onClick={() => setConfirmDelete(c.id)}
+                  >
+                    <Icon name="x" size={13} />
+                  </button>
+                </li>
+              ),
+            )}
           </ul>
         )}
 

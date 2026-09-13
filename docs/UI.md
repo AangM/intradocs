@@ -237,3 +237,12 @@ pada lapisan tema, bukan struktur mentor:
   label berbeda.
 
 Sisa temuan moderate: tidak ada. Load test Q5 tetap menunggu hardware target.
+
+**Perbaikan (14 September 2026): riwayat tidak bisa dihapus.** Dua sebab: tombol × pada baris
+riwayat baru terlihat saat hover (`opacity: 0`) — di layar sentuh tidak pernah muncul — dan
+penghapusan memakai `window.confirm()`, yang di beberapa browser tersemat ditolak diam-diam
+sehingga tidak terjadi apa-apa. Kini × selalu terlihat (redup saat diam, penuh saat hover/fokus
+dan pada perangkat tanpa hover), dan konfirmasi terjadi **di dalam baris** ("Hapus percakapan
+ini? Hapus / Batal") tanpa dialog native. Tes e2e `portal.spec.ts` menghapus percakapan sambil
+menolak setiap dialog native, desktop dan ponsel. 350 percakapan sisa eval/probe dibersihkan
+dari akun demo.

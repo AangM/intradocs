@@ -89,3 +89,32 @@ test('direct navigation to an unauthorized document never shows its title or bod
     page.getByRole('heading', { name: 'Lampiran Simulasi Keamanan — Rahasia' }),
   ).toHaveCount(0);
 });
+
+test('a conversation can be deleted from the history rail without a native dialog', async ({
+  page,
+}, info) => {
+  if (process.env.AI_PROVIDER !== 'weknora-local') return;
+  // Seed one conversation through the API (a greeting: no model call), then delete it
+  // from the UI. Any native confirm() would be refused here, proving none is needed.
+  page.on('dialog', (d) => void d.dismiss());
+  const seeded = await page.request.post('/api/rag/chat', {
+    data: { question: 'Halo' },
+    headers: { Origin: new URL(page.url()).origin },
+  });
+  expect(seeded.ok()).toBe(true);
+  const { conversationId } = (await seeded.json()) as { conversationId: string };
+  await page.goto('/ai-assistant');
+  if (info.project.name === 'mobile') await page.locator('label.chat-side-btn').click();
+  // The newest conversation is listed first; older "Halo" threads may exist too.
+  const rows = page.locator('.chat-convs li', { hasText: 'Halo' });
+  const before = await rows.count();
+  expect(before).toBeGreaterThan(0);
+  await rows
+    .first()
+    .getByRole('button', { name: /Hapus percakapan/ })
+    .click();
+  await page.getByRole('button', { name: 'Hapus', exact: true }).click();
+  await expect(rows).toHaveCount(before - 1);
+  const gone = await page.request.get(`/api/rag/conversations/${conversationId}`);
+  expect(gone.status()).toBe(404);
+});
