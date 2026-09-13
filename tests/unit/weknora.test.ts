@@ -271,4 +271,14 @@ test("WeKnora's own citation markup never reaches a reader", () => {
   const clean = cleanAnswer(raw);
   assert.equal(clean, 'SLA reset password adalah **30 menit**.');
   assert(!/<kb/i.test(clean) && !/chunk_id|kb_id/.test(clean));
+  // The heading the model puts above its markup goes with it; a heading that still
+  // introduces real text stays.
+  assert.equal(
+    cleanAnswer('Cantumkan requirement dan risiko.\n\nReferensi:\n<kb doc="x" />'),
+    'Cantumkan requirement dan risiko.',
+  );
+  assert.equal(
+    cleanAnswer('Lihat bagian Review.\n\n**Sumber:** standar penamaan repository.'),
+    'Lihat bagian Review.\n\n**Sumber:** standar penamaan repository.',
+  );
 });

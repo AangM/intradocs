@@ -859,10 +859,16 @@ export function parseChatStream(raw: string, maxAnswerChars: number): WeknoraAns
  * answer is interpreted here.
  */
 export function cleanAnswer(text: string): string {
-  return text
-    .replace(/<kb\b[^>]*\/?>/gi, '')
-    .replace(/<\/?kb>/gi, '')
-    .replace(/[ \t]+\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+  return (
+    text
+      .replace(/<kb\b[^>]*\/?>/gi, '')
+      .replace(/<\/?kb>/gi, '')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+      // The model introduces that markup with a heading ("Referensi:"); with the markup
+      // gone the heading would dangle above IntraDocs' own "Sumber" list.
+      .replace(/\n+\s*[*_#]*\s*(referensi|sumber|references?|sources?)\s*:?\s*[*_]*\s*$/i, '')
+      .trim()
+  );
 }
