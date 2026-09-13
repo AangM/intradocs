@@ -12,3 +12,13 @@ export const ABSTAIN_MESSAGE =
  */
 export const NO_DIRECT_ANSWER_MESSAGE =
   'Tidak ada bagian dokumen yang menjawab pertanyaan ini secara langsung, jadi tidak ada jawaban yang disusun. Sumber terdekat yang boleh Anda baca tercantum di bawah.';
+
+/**
+ * The sentence the pinned agent's prompt tells the model to write when the passages it
+ * was given do not contain the answer (scripts/weknora.ts pinAgent). The model is small
+ * and paraphrases it ("Dokumentasi yang diberikan tidak membahas hal ini."), so
+ * MODEL_DECLINE_PATTERN is what the reader-facing side actually matches on.
+ */
+export const MODEL_DECLINE_SENTENCE = 'Dokumen yang tersedia tidak membahas hal ini.';
+export const MODEL_DECLINE_PATTERN =
+  /^[\s*_#>-]*(?:dokumen(?:tasi)?|materi(?:\s+referensi)?)(?:\s+(?:yang\s+)?(?:tersedia|diberikan|ada|disediakan))?\s+tidak\s+membahas/i;

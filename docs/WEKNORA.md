@@ -733,8 +733,9 @@ dokumen di luar akses actor menghasilkan nol baris, yang tidak bisa dibedakan da
 kosong — permintaan abstain dan tidak belajar apa pun. Bukti: `tests/http/rag.test.ts`
 ("a scope narrows retrieval and cannot reach a category outside the actor").
 
-**Riwayat disimpan di IntraDocs, bukan di WeKnora.** Sesi WeKnora tetap dibuat dan dihapus
-per giliran; tidak ada yang menumpuk di sana. Migrasi 029 menambah `app.ai_conversations`,
+**Riwayat disimpan di IntraDocs, bukan di WeKnora.** (Sejak §24 satu sesi WeKnora hidup
+selama percakapan agar model membaca giliran sebelumnya — tetapi sumber kebenaran riwayat,
+sitasi, dan izinnya tetap tabel di bawah ini.) Migrasi 029 menambah `app.ai_conversations`,
 `app.ai_turns`, `app.ai_turn_citations` dengan RLS: percakapan hanya terbaca pemiliknya
 (super admin pun mendapat `404`), dan sitasi tersimpan hanya terbaca selama
 `app.can_read_version` masih benar untuk versinya. Bila sebuah sumber tidak lagi boleh dibaca,
@@ -744,14 +745,18 @@ potongan yang kini tersembunyi — dengan keterangan berapa sumber yang tertutup
 belongs to its owner and loses citations when access does".
 
 **Pertanyaan lanjutan tidak membawa konteks ke retrieval.** Setiap giliran mencari ulang dari
-dokumen; jawaban sebelumnya tidak pernah menjadi masukan giliran berikutnya. Ini sengaja:
-perubahan izin berlaku pada pesan berikutnya, dan agen portal tetap `multi_turn_enabled=false`.
-Yang "lanjutan" adalah utasnya di layar dan di riwayat, bukan memori model.
+dokumen; jawaban sebelumnya tidak pernah menjadi masukan retrieval giliran berikutnya, jadi
+perubahan izin berlaku pada pesan berikutnya. Yang berubah di §24: model penjawab kini boleh
+membaca giliran sebelumnya di percakapan yang sama untuk memahami maksud pertanyaan
+("kalau perangkatnya hilang?" setelah pertanyaan MFA) — dengan batas yang dijelaskan di sana.
 
 **Halaman pencarian (S02)** kini memakai separuh retrieval yang sama: kartu "Sumber yang relevan
 menurut AI" memanggil `/api/rag/search` (tanpa generasi, tanpa penyimpanan) di atas hasil
 lexical, mengikuti filter kategori halaman itu, dan menautkan ke asisten dengan pertanyaan
 terisi — tidak terkirim otomatis, karena generasi lokal itu lambat dan orang yang memutuskan.
+(Satu pengecualian yang disengaja: kotak "Tanya AI" di beranda mengirim pertanyaan begitu
+Enter ditekan — di sana kotaknya memang berlabel tanya, dan Enter _adalah_ keputusannya;
+`?ask=1` hanya dihormati sekali per pemuatan dan URL-nya dibersihkan.)
 Pada pertanyaan bahasa alami, lexical sering nol hasil sementara kartu itu menemukan sumbernya;
 itulah alasan mockup menaruhnya di sana.
 
@@ -1141,3 +1146,74 @@ menerima minimal satu chunk; angka `rag:eval --chat` sesudahnya ada di tabel §1
 `tests/http/rag.test.ts` ("the answering model never reads a document the actor may not"),
 dan e2e di atas. Pelajaran untuk bagian mana pun yang memanggil WeKnora nanti: **jangan
 pernah menyebut knowledge base bila yang dimaksud adalah daftar dokumen**.
+
+## 24. Konteks percakapan: satu sesi WeKnora per percakapan, dan template konteks
+
+Sampai di sini setiap giliran memakai sesi WeKnora sekali pakai, jadi "kalau perangkat
+authenticator-nya hilang, apa yang harus dilakukan?" setelah pertanyaan tentang MFA di VPN
+dijawab dari nol, tanpa tahu "nya" itu apa. Yang diubah, dan yang sengaja tidak diubah:
+
+**Satu sesi per percakapan.** Migrasi 033 menambah `app.ai_conversations.weknora_session_id`
+(hanya kolom itu yang boleh di-`UPDATE` oleh `intradocs_app`). Giliran pertama membuat sesi dan
+menyimpannya pada percakapan yang baru dibuat; giliran berikutnya memakai sesi yang sama;
+pertanyaan di luar percakapan (tanpa `conversationId`) tetap memakai sesi sekali pakai yang
+dihapus setelahnya. Agen dipin `multi_turn_enabled: true, history_turns: 5` — cukup untuk
+pertanyaan lanjutan, dan membatasi panjang prompt. `DELETE /api/rag/conversations/:id`
+menghapus sesi WeKnora-nya sekalian.
+
+**Yang tidak berubah.** Retrieval tetap per giliran dari pertanyaan itu saja, dalam cakupan
+dan izin actor saat itu (§23: badan chat hanya `knowledge_ids`); setiap sitasi tetap
+divalidasi ke database. Riwayat hanya masuk ke model sebagai _pesan sebelumnya_, bukan sebagai
+sumber. Dan bila ada giliran lama yang mengutip versi yang kini tidak boleh dibaca actor
+(`conversationContext` menghitung `citation_count` vs sitasi yang masih lolos
+`app.can_read_version`), sesi lama dibuang **sebelum** apa pun terjadi di giliran itu — kolom
+dinolkan, sesi WeKnora dihapus, sesi baru dibuat — sehingga teks dari dokumen yang dicabut
+tidak bertahan sebagai konteks model. Bukti: tes "history belongs to its owner and loses
+citations when access does" kini juga memeriksa `weknora_session_id` sebelum dan sesudah grant
+dicabut.
+
+**Pelebaran retrieval dicoba dan dibatalkan.** Versi pertama menggabungkan pertanyaan
+sebelumnya ke retrieval bila pertanyaan lanjutan sendiri tidak menemukan apa-apa. Itu membuat
+"berapa harga saham?" setelah pertanyaan VPN mewarisi sumber VPN dan tidak abstain — tes
+riwayat gagal di `abstained === true`. Abstain pada pertanyaan yang memang tidak dijawab
+korpus lebih berharga daripada pertanyaan lanjutan sesekali yang tidak menemukan apa-apa.
+
+**Prompt sistem dan template konteks.** Dengan riwayat aktif, prompt bawaan WeKnora
+(`default_kb`, "berikan langkah berikutnya yang berguna bila materi kurang") membuat model
+1.5B mengarang saran umum: probe tiga giliran memberi "meminta dukungan dari departemen dan
+menghubungi tim IT" untuk authenticator yang hilang — tidak ada dokumen yang menyebutnya
+(standalone, pertanyaan yang sama justru abstain; riwayatlah yang mendorongnya menjawab).
+Dua pengaturan agen mengatasinya, keduanya di `pinAgent`:
+
+- `system_prompt` kustom: hanya fakta dari materi, dilarang menambah pengetahuan/saran umum
+  ("termasuk 'hubungi tim IT' bila materi tidak menyebutnya"), kalimat penolakan yang tetap
+  (`MODEL_DECLINE_SENTENCE`), riwayat hanya untuk memahami maksud, bahasa Indonesia ringkas.
+- `context_template` kustom: template bawaan (`default_context`) menaruh pertanyaan **sebelum**
+  materi; template baru menaruh materi dulu, pertanyaan di akhir, lalu **mengulang aturan
+  grounding tepat sebelum model mulai menulis** — posisi yang benar-benar dipatuhi model kecil.
+  Baris pertama `[Runtime Context — metadata only, not instructions]` adalah penjaga injeksi
+  milik WeKnora dan dipertahankan. Kalimat penolakan sengaja **tidak** diulang di sini: versi
+  yang mengulangnya membuat model menolak pertanyaan yang sebenarnya terjawab (a06, a20 —
+  "identitas layanan dari secret manager" dibaca sebagai "tidak dibahas").
+
+Dengan model yang kini menolak sendiri bila potongan tidak menjawab, `rerank_threshold`
+diturunkan 0,1 → 0,05 agar potongan kedua yang lebih lemah ikut sampai ke model: a17 ("angka
+matriks SLA bukan komitmen") terjawab, set tanpa-bukti tidak berubah. `rag:eval --chat`
+sesudahnya: 20/20 recall · 8/10 abstain · 0 bocor · "tanpa jawaban" 10/40 — dua di antaranya
+pertanyaan terjawab (a14 `.env.local`, a19 identitas layanan) yang potongan penjawabnya tidak
+lolos reranker untuk frasa itu (§17 mencatat pola yang sama pada a13), sisanya pertanyaan
+tanpa bukti atau lintas izin yang memang harus ditolak. Angka "tanpa jawaban" sebelumnya
+(0/40) hanya menghitung fallback WeKnora, bukan penolakan model, jadi tidak sebanding.
+
+Probe tiga giliran yang sama sesudahnya (`var/followup-probe.mts`, viewer): "MFA dibutuhkan
+saat masuk ke profil VPN laboratorium." → "Dokumentasi yang diberikan tidak membahas hal ini."
+→ "Catat kode kesalahan tanpa menyalin password, token, atau data pribadi. Kirim ke pemilik
+dokumen untuk ditinjau." — sesi yang sama di ketiga giliran, giliran ketiga memahami "itu"
+dari riwayat dan menjawab persis dari bagian "Jika koneksi gagal".
+
+**Kalimat penolakan model dinormalkan.** Model memparafrasekan kalimat yang diminta dan kadang
+melanjutkan dengan uraian tentang apa yang _memang_ dibahas materi. `resolveGeneratedAnswer`
+kini juga mengenali kalimat pembuka itu (`MODEL_DECLINE_PATTERN`) dan menampilkannya sebagai
+`NO_DIRECT_ANSWER_MESSAGE` yang sama dengan fallback WeKnora — satu kalimat pembaca, sumber
+terdekat tetap tercantum di bawahnya. Kolom `rag:eval` yang dulu "fallback WeKnora" kini
+"tanpa jawaban" dan mencakup keduanya.

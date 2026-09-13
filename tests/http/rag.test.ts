@@ -322,6 +322,31 @@ test('history belongs to its owner and loses citations when access does', async 
     assert(turn.hiddenCitations > 0, 'a revoked source must be reported as hidden');
     assert.equal(turn.answer, '', 'an answer built on a hidden source is withheld');
     assert(!turn.citations.some((c) => (c as { documentId: string }).documentId === docId(1)));
+
+    // Conversational context (migration 033): the conversation kept one WeKnora session
+    // across its turns -- and drops it now that an earlier citation is out of reach, so
+    // the next turn talks in a fresh session with none of the revoked text as history.
+    const session = async () =>
+      (
+        await admin.query<{ s: string | null }>(
+          'SELECT weknora_session_id AS s FROM app.ai_conversations WHERE id=$1',
+          [conversationId],
+        )
+      ).rows[0]?.s ?? null;
+    const kept = await session();
+    if (process.env.AI_GENERATION === 'weknora-local') {
+      assert(kept, 'a generated conversation records its WeKnora session');
+      const third = await call('POST', '/api/rag/chat', siti, {
+        question: 'Bagaimana prosedur pemesanan tiket pesawat dinas?',
+        conversationId,
+      });
+      assert.equal(third.status, 200, JSON.stringify(third.body));
+      assert.notEqual(
+        await session(),
+        kept,
+        'a revoked citation in the history must force a new session',
+      );
+    }
   } finally {
     await admin.query(
       'INSERT INTO app.category_grants(user_id,category_id) VALUES($1,$2) ON CONFLICT DO NOTHING',

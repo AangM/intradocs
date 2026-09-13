@@ -4,6 +4,8 @@ import { apiError, PRIVATE_HEADERS } from '@/lib/http';
 import { assertSameOrigin, parseUuid } from '@intradocs/core/validation';
 import { readRuntimeConfig } from '@intradocs/core/config';
 import { readConversation, deleteConversation } from '@intradocs/db/assistant';
+import { WeknoraClient } from '@intradocs/core/weknora';
+import { getAiConfig } from '@/lib/rag';
 
 /**
  * One thread with its turns. Citations come back only for versions the reader may
@@ -32,11 +34,19 @@ export async function DELETE(request: Request, ctx: { params: Promise<{ id: stri
     assertSameOrigin(request.headers.get('origin'), readRuntimeConfig(process.env).appUrl);
     const id = parseUuid((await ctx.params).id);
     const removed = await deleteConversation(actor.id, id);
-    if (!removed)
+    if (!removed.deleted)
       return NextResponse.json(
         { error: 'Percakapan tidak ditemukan.' },
         { status: 404, headers: PRIVATE_HEADERS },
       );
+    // The WeKnora session held this person's history; it goes with the conversation.
+    if (removed.sessionId) {
+      const config = getAiConfig();
+      if (config.weknora)
+        await new WeknoraClient(config.weknora)
+          .deleteSession(removed.sessionId)
+          .catch(() => undefined);
+    }
     return NextResponse.json({ ok: true }, { headers: PRIVATE_HEADERS });
   } catch (e) {
     return apiError(e);

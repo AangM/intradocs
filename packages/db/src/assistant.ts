@@ -336,12 +336,63 @@ export async function voteTurn(
   });
 }
 
+/**
+ * The WeKnora session behind a conversation, if it is still safe to continue: null when
+ * the conversation has none yet, and null (with the old id in `staleSessionId`) when an
+ * earlier turn cites a version the owner can no longer read -- then the model's history
+ * would carry text from a document that is now out of reach, so the caller discards it
+ * and starts a fresh session.
+ */
+export async function conversationContext(
+  actorId: string,
+  conversationId: string,
+): Promise<{
+  sessionId: string | null;
+  /** The session that must be discarded because an earlier citation became unreadable. */
+  staleSessionId: string | null;
+}> {
+  return withActor(actorId, async ({ client }) => {
+    const head = await client.query<{ weknora_session_id: string | null }>(
+      'SELECT weknora_session_id FROM app.ai_conversations WHERE id=$1',
+      [conversationId],
+    );
+    if (!head.rows[0]) return { sessionId: null, staleSessionId: null };
+    const hidden = await client.query<{ n: string }>(
+      `SELECT count(*) AS n FROM app.ai_turns t
+        WHERE t.conversation_id=$1
+          AND t.citation_count > (SELECT count(*) FROM app.ai_turn_citations x
+                                    JOIN app.document_versions v ON v.id=x.version_id
+                                   WHERE x.turn_id=t.id AND app.can_read_version(v.id))`,
+      [conversationId],
+    );
+    const stale = Number(hidden.rows[0]?.n ?? 0) > 0;
+    const current = head.rows[0].weknora_session_id;
+    return { sessionId: stale ? null : current, staleSessionId: stale ? current : null };
+  });
+}
+
+export async function setConversationSession(
+  actorId: string,
+  conversationId: string,
+  sessionId: string | null,
+): Promise<void> {
+  await withActor(actorId, async ({ client }) => {
+    await client.query('UPDATE app.ai_conversations SET weknora_session_id=$2 WHERE id=$1', [
+      conversationId,
+      sessionId,
+    ]);
+  });
+}
+
 export async function deleteConversation(
   actorId: string,
   conversationId: string,
-): Promise<boolean> {
+): Promise<{ deleted: boolean; sessionId: string | null }> {
   return withActor(actorId, async ({ client }) => {
-    const r = await client.query('DELETE FROM app.ai_conversations WHERE id=$1', [conversationId]);
-    return r.rowCount === 1;
+    const r = await client.query<{ weknora_session_id: string | null }>(
+      'DELETE FROM app.ai_conversations WHERE id=$1 RETURNING weknora_session_id',
+      [conversationId],
+    );
+    return { deleted: r.rowCount === 1, sessionId: r.rows[0]?.weknora_session_id ?? null };
   });
 }

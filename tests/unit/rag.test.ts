@@ -20,6 +20,7 @@ import {
   parseQuestion,
   ABSTAIN_MESSAGE,
   NO_DIRECT_ANSWER_MESSAGE,
+  MODEL_DECLINE_SENTENCE,
   resolveGeneratedAnswer,
   type AllowedSource,
   type IndexEntry,
@@ -449,6 +450,23 @@ test("WeKnora's fixed fallback is never shown next to sources as if it were an a
   const real = resolveGeneratedAnswer(`Backup diverifikasi lewat restore. ${ABSTAIN_MESSAGE}`);
   assert.equal(real.fellBack, false);
   assert(real.answer.startsWith('Backup diverifikasi'));
+  // The model's own decline -- the sentence the pinned prompt asks for, or the small
+  // model's paraphrases of it, with or without a trailing ramble -- is the same case.
+  for (const decline of [
+    MODEL_DECLINE_SENTENCE,
+    'Dokumentasi yang diberikan tidak membahas hal ini.',
+    `${MODEL_DECLINE_SENTENCE} Memang, dokumen mencakup panduan instalasi agent pada server laboratorium.`,
+    '**Materi referensi tidak membahas** kebijakan cuti.',
+  ]) {
+    const declined = resolveGeneratedAnswer(decline);
+    assert.equal(declined.fellBack, true, decline);
+    assert.equal(declined.answer, NO_DIRECT_ANSWER_MESSAGE);
+  }
+  // ...but a sentence that merely contains the words is an answer.
+  const near = resolveGeneratedAnswer(
+    'Bagian "Jika koneksi gagal" tidak membahas MFA, hanya kode kesalahan.',
+  );
+  assert.equal(near.fellBack, false);
 });
 
 // ---- relevance gate -----------------------------------------------------------------

@@ -3,7 +3,11 @@
 // unit-testable offline and cannot be softened by a live service being agreeable.
 import { createHash } from 'node:crypto';
 import { headingSlug, InputError, parseUuid } from './validation.ts';
-import { ABSTAIN_MESSAGE, NO_DIRECT_ANSWER_MESSAGE } from './rag-messages.ts';
+import {
+  ABSTAIN_MESSAGE,
+  NO_DIRECT_ANSWER_MESSAGE,
+  MODEL_DECLINE_PATTERN,
+} from './rag-messages.ts';
 
 /**
  * Bumping this forces every version to be re-exported on the next sync. Change it
@@ -471,18 +475,28 @@ export function parseChatBody(value: unknown, maxChars: number): ChatBody {
   };
 }
 
-export { ABSTAIN_MESSAGE, NO_DIRECT_ANSWER_MESSAGE } from './rag-messages.ts';
+export {
+  ABSTAIN_MESSAGE,
+  NO_DIRECT_ANSWER_MESSAGE,
+  MODEL_DECLINE_SENTENCE,
+  MODEL_DECLINE_PATTERN,
+} from './rag-messages.ts';
 
 /**
- * The generated answer as it should reach a reader. WeKnora's agent has a fixed fallback
- * (the abstain sentence) for the case where its own pipeline kept no chunk -- its
- * thresholds, or the reranker when one is on, rejected every candidate. Shown verbatim next
- * to the sources IntraDocs' gate did pass, it would contradict them; so that one string is
- * replaced by a sentence that says what actually happened. Any other text is passed through.
+ * The generated answer as it should reach a reader. Two cases become the same reader-facing
+ * sentence, next to the sources IntraDocs' gate did pass:
+ *  - WeKnora's fixed fallback (the abstain sentence), emitted when its own pipeline --
+ *    thresholds, or the reranker when one is on -- kept no chunk. Shown verbatim it would
+ *    contradict the source list under it.
+ *  - The model's own decline, which the pinned prompt asks for when the passages do not
+ *    contain the answer. The small model paraphrases it and sometimes keeps writing about
+ *    what the passages do cover; the opening sentence is the whole signal.
+ * Any other text is passed through untouched.
  */
 export function resolveGeneratedAnswer(text: string): { answer: string; fellBack: boolean } {
   const trimmed = text.trim();
-  if (trimmed === ABSTAIN_MESSAGE) return { answer: NO_DIRECT_ANSWER_MESSAGE, fellBack: true };
+  if (trimmed === ABSTAIN_MESSAGE || MODEL_DECLINE_PATTERN.test(trimmed))
+    return { answer: NO_DIRECT_ANSWER_MESSAGE, fellBack: true };
   return { answer: text, fellBack: false };
 }
 

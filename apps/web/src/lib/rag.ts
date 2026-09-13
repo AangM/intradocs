@@ -23,7 +23,7 @@ import {
   readAuthorizedMarkdownKeys,
   recordRagAudit,
 } from '@intradocs/db/rag';
-import { storeTurn } from '@intradocs/db/assistant';
+import { storeTurn, conversationContext, setConversationSession } from '@intradocs/db/assistant';
 import { getStorage } from './storage.ts';
 
 /**
@@ -173,6 +173,21 @@ export async function answerQuestion(
 ): Promise<ChatResult> {
   const config = getAiConfig();
   const weknora = requireEnabled(config);
+  // Conversational context, when this turn continues a conversation: the WeKnora
+  // session to keep talking in -- null when there is none yet, or when an earlier turn
+  // cites a version the person can no longer read (then the old one is forgotten and
+  // deleted before anything else happens this turn, even if this turn abstains).
+  const context = conversationId
+    ? await conversationContext(actor.id, conversationId)
+    : { sessionId: null, staleSessionId: null };
+  if (conversationId && context.staleSessionId) {
+    await setConversationSession(actor.id, conversationId, null);
+    await new WeknoraClient(weknora).deleteSession(context.staleSessionId).catch(() => undefined);
+  }
+  // Retrieval is on this question alone, every turn. Widening a follow-up with the
+  // previous question was tried and dropped: it made "berapa harga saham?" after a VPN
+  // question inherit the VPN sources, and the abstention on questions the corpus cannot
+  // answer is worth more than the odd follow-up that finds nothing on its own.
   const retrieval = await retrieve(actor, question, within);
   const mode: ChatResult['mode'] =
     config.generation === 'weknora-local' ? 'generated' : 'evidence-only';
@@ -194,27 +209,40 @@ export async function answerQuestion(
     return remember({ ...shape, answer: '', citations: retrieval.citations, abstained: false });
   }
   const client = new WeknoraClient(weknora);
-  // A fresh session per turn: no cross-request memory lives in WeKnora, so nothing
-  // leaks between users and no earlier answer survives a permission change.
-  const sessionId = await client.createSession(`intradocs-${Date.now()}`);
+  // One WeKnora session per conversation, so the model can read this person's own
+  // earlier turns. Every generated turn belongs to a conversation (storeTurn opens one
+  // for a first question), so the session outlives the turn and is stored on it below;
+  // it is never shared between people, retrieval stays scoped per turn, and the stored
+  // session is dropped when an earlier citation became unreadable (conversationContext).
+  // It is deleted in WeKnora when the person deletes the conversation.
+  const sessionId = context.sessionId ?? (await client.createSession(`intradocs-${Date.now()}`));
   let answer: Awaited<ReturnType<WeknoraClient['knowledgeChat']>>;
   try {
     answer = await client.knowledgeChat(sessionId, {
       query: question,
       knowledgeIds: retrieval.knowledgeIds,
     });
-  } finally {
-    await client.deleteSession(sessionId).catch(() => undefined);
+  } catch (error) {
+    // A session WeKnora no longer knows (restart, retention) is not an answer failure:
+    // forget it so the next turn starts a fresh one.
+    if (conversationId && context.sessionId)
+      await setConversationSession(actor.id, conversationId, null).catch(() => undefined);
+    throw error;
   }
   await recordRagAudit(
     actor.id,
     'rag.chat',
     retrieval.citations.map((c) => c.documentId),
   );
-  return remember({
+  const stored = await remember({
     ...shape,
     answer: resolveGeneratedAnswer(answer.answer).answer,
     citations: retrieval.citations,
     abstained: false,
   });
+  // Remember the session on the conversation this turn now belongs to (a first turn
+  // creates the conversation inside remember); a replaced session overwrites the old one.
+  if (context.sessionId !== sessionId)
+    await setConversationSession(actor.id, stored.conversationId, sessionId).catch(() => undefined);
+  return stored;
 }

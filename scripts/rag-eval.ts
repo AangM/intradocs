@@ -136,7 +136,7 @@ async function main(): Promise<void> {
   const fallbacks = outcomes.filter((o) => o.fellBack);
   if (chat)
     console.log(
-      `  fallback WeKnora : ${fallbacks.length}/${outcomes.length} punya sumber tetapi tanpa jawaban tersusun (threshold/rerank WeKnora menolak semua kandidat)`,
+      `  tanpa jawaban    : ${fallbacks.length}/${outcomes.length} punya sumber tetapi tanpa jawaban tersusun (WeKnora menolak semua kandidat, atau model menyatakan materi tidak membahasnya)`,
     );
 
   const misses = answerable.filter((o) => !o.hit);
