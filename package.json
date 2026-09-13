@@ -42,6 +42,7 @@
     "weknora:stop": "tsx scripts/weknora.ts stop",
     "test:rag": "tsx --test --test-concurrency=1 tests/rag/*.test.ts",
     "rag:eval": "tsx scripts/rag-eval.ts",
+    "ui:shots": "tsx scripts/ui-shots.ts",
     "weknora:model": "tsx scripts/weknora.ts model",
     "weknora:autotag": "tsx scripts/weknora.ts autotag",
     "weknora:agent": "tsx scripts/weknora.ts agent",

@@ -258,6 +258,27 @@ export async function approvalQueue(actorId: string): Promise<ApprovalQueueItem[
     }));
   });
 }
+/**
+ * The three numbers the sidebar shows next to a link (mockup S03/S06): unread
+ * notifications, submissions waiting for this reviewer, and the actor's own drafts.
+ * Each is one count under RLS; nothing here names a document.
+ */
+export async function sidebarCounts(
+  actorId: string,
+): Promise<{ notifications: number; approvals: number; drafts: number }> {
+  return withActor(actorId, async ({ client }) => {
+    const { rows } = await client.query<{
+      notifications: number;
+      approvals: number;
+      drafts: number;
+    }>(
+      `SELECT (SELECT count(*) FROM app.notifications n WHERE n.user_id=app.actor_id() AND n.read_at IS NULL)::int AS notifications,
+              (SELECT count(*) FROM app.approval_requests r JOIN app.approval_steps s ON s.request_id=r.id WHERE r.state='pending' AND s.reviewer_id=app.actor_id() AND s.decision IS NULL)::int AS approvals,
+              (SELECT count(*) FROM app.documents d JOIN LATERAL(SELECT review_state FROM app.document_versions v0 WHERE v0.document_id=d.id ORDER BY v0.version_number DESC LIMIT 1) v ON true WHERE d.owner_id=app.actor_id() AND v.review_state IN ('draft','changes_requested'))::int AS drafts`,
+    );
+    return rows[0] ?? { notifications: 0, approvals: 0, drafts: 0 };
+  });
+}
 export async function setFavorite(actorId: string, id: string, value: boolean) {
   await withActor(actorId, async ({ client }) => {
     if (

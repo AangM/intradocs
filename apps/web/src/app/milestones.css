@@ -2193,3 +2193,39 @@ a.fitem:hover {
 .chart .cb {
   max-width: 72px;
 }
+
+/* Narrow screens: sources stack, catalog titles keep room, search header wraps ------- */
+@media (max-width: 640px) {
+  .src-i {
+    flex-wrap: wrap;
+  }
+  .src-body {
+    flex-basis: calc(100% - 66px);
+  }
+  .src-ok,
+  .src-go {
+    margin-left: 56px;
+    margin-top: 0;
+  }
+  .src-go {
+    margin-left: auto;
+  }
+  .msg {
+    gap: 9px;
+  }
+  .assistant-page .assistant-thread {
+    padding: 16px 12px 8px;
+  }
+  .search-head {
+    flex-wrap: wrap;
+  }
+  .appr-detail {
+    padding: 16px 14px 32px;
+  }
+}
+.doc-table .doc-cell-text {
+  min-width: 220px;
+}
+.doc-table .document-title {
+  white-space: normal;
+}

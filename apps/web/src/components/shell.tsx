@@ -80,12 +80,15 @@ export function Shell({
   actor,
   categories,
   aiOn = false,
+  counts = {},
   children,
 }: {
   actor: Actor;
   categories: Category[];
   /** Server-decided; the footer must never claim more or less than the config says. */
   aiOn?: boolean;
+  /** Badge per nav href (unread notifications, pending reviews, own drafts); zero hides it. */
+  counts?: Record<string, number>;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -219,6 +222,14 @@ export function Shell({
                       >
                         <Icon name={n.icon} size={17} />
                         {n.label}
+                        {(counts[n.href] ?? 0) > 0 && (
+                          <span
+                            className={`cnt ${n.href === '/admin/approval' ? '' : 'grey'}`}
+                            aria-label={`${counts[n.href]} item`}
+                          >
+                            {counts[n.href]}
+                          </span>
+                        )}
                       </Link>
                     ))}
                   </div>
