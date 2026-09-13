@@ -65,6 +65,8 @@ export type ReviewInfo = {
   steps: {
     stage: number;
     reviewerId: string;
+    /** Null when the profile is outside the actor's view (RLS); show the stage instead. */
+    reviewerName: string | null;
     decision: string | null;
     reason: string;
     decidedAt: string | null;
@@ -104,9 +106,10 @@ export async function reviewInfo(actorId: string, versionId: string): Promise<Re
         : [];
     const steps = r
       ? (
-          await c.query('SELECT * FROM app.approval_steps WHERE request_id=$1 ORDER BY stage', [
-            r.id,
-          ])
+          await c.query(
+            'SELECT s.*,(SELECT p.name FROM app.profiles p WHERE p.id=s.reviewer_id) AS reviewer_name FROM app.approval_steps s WHERE s.request_id=$1 ORDER BY s.stage',
+            [r.id],
+          )
         ).rows
       : [];
     const findings = (
@@ -129,6 +132,7 @@ export async function reviewInfo(actorId: string, versionId: string): Promise<Re
       steps: steps.map((s) => ({
         stage: s.stage,
         reviewerId: s.reviewer_id,
+        reviewerName: s.reviewer_name ?? null,
         decision: s.decision,
         reason: s.reason,
         decidedAt: s.decided_at?.toISOString() ?? null,
@@ -198,10 +202,40 @@ export async function retryPublication(actorId: string, vid: string) {
 export async function withdrawDocument(actorId: string, id: string, reason: string) {
   await mutate(actorId, 'SELECT app.withdraw_document($1,$2)', [id, reason]);
 }
-export async function approvalQueue(actorId: string) {
+export type ApprovalQueueItem = {
+  versionId: string;
+  documentId: string;
+  title: string;
+  slug: string;
+  ownerLabel: string;
+  stage: number;
+  requiredSteps: number;
+  submittedAt: string;
+  versionLabel: string;
+  format: string;
+  classification: string;
+  labels: string[];
+  categoryId: string;
+  categoryName: string;
+  categoryColor: string;
+  /** Security findings still waiting for a justification: what a reviewer must look at first. */
+  openFindings: number;
+  attachments: number;
+};
+export async function approvalQueue(actorId: string): Promise<ApprovalQueueItem[]> {
   return withActor(actorId, async ({ client }) => {
     const { rows } = await client.query(
-      `SELECT v.id AS version_id,d.id AS document_id,v.title,d.slug,d.owner_label,s.stage,r.required_steps,r.submitted_at FROM app.approval_requests r JOIN app.approval_steps s ON s.request_id=r.id JOIN app.document_versions v ON v.id=r.version_id JOIN app.documents d ON d.id=v.document_id WHERE r.state='pending' AND s.reviewer_id=app.actor_id() AND s.decision IS NULL ORDER BY r.submitted_at LIMIT 100`,
+      `SELECT v.id AS version_id,d.id AS document_id,v.title,d.slug,d.owner_label,s.stage,r.required_steps,r.submitted_at,
+              v.label AS version_label,v.source_format,v.classification,v.labels,v.category_id,c.name AS category_name,c.color AS category_color,
+              (SELECT count(*) FROM app.version_findings f WHERE f.version_id=v.id AND f.resolved_at IS NULL)::int AS open_findings,
+              (SELECT count(*) FROM app.version_attachments a WHERE a.version_id=v.id)::int AS attachments
+         FROM app.approval_requests r
+         JOIN app.approval_steps s ON s.request_id=r.id
+         JOIN app.document_versions v ON v.id=r.version_id
+         JOIN app.documents d ON d.id=v.document_id
+         JOIN app.categories c ON c.id=v.category_id
+        WHERE r.state='pending' AND s.reviewer_id=app.actor_id() AND s.decision IS NULL
+        ORDER BY r.submitted_at LIMIT 100`,
     );
     return rows.map((r) => ({
       versionId: r.version_id as string,
@@ -212,6 +246,15 @@ export async function approvalQueue(actorId: string) {
       stage: r.stage as number,
       requiredSteps: r.required_steps as number,
       submittedAt: r.submitted_at.toISOString() as string,
+      versionLabel: r.version_label as string,
+      format: r.source_format as string,
+      classification: r.classification as string,
+      labels: (r.labels ?? []) as string[],
+      categoryId: r.category_id as string,
+      categoryName: r.category_name as string,
+      categoryColor: r.category_color as string,
+      openFindings: r.open_findings as number,
+      attachments: r.attachments as number,
     }));
   });
 }

@@ -82,6 +82,25 @@ export function formatDate(value: string | Date): string {
     timeZone: 'Asia/Jakarta',
   }).format(d);
 }
+/**
+ * "4 jam lalu" for lists that scan by recency; the absolute date belongs in a title
+ * attribute next to it. Past only; anything older than a month falls back to the date.
+ */
+export function formatRelative(value: string | Date, now: Date = new Date()): string {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '—';
+  const seconds = Math.max(0, Math.round((now.getTime() - d.getTime()) / 1000));
+  if (seconds < 60) return 'baru saja';
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} menit lalu`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} jam lalu`;
+  const days = Math.round(hours / 24);
+  if (days === 1) return 'kemarin';
+  if (days < 7) return `${days} hari lalu`;
+  if (days < 30) return `${Math.round(days / 7)} minggu lalu`;
+  return formatDate(d);
+}
 export function isRole(value: unknown): value is Role {
   return typeof value === 'string' && (ROLES as readonly string[]).includes(value);
 }

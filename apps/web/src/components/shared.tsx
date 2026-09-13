@@ -69,6 +69,15 @@ export function ClassificationBadge({ value }: { value: Classification }) {
     </span>
   );
 }
+/** A category as a coloured tag: the same dot the sidebar uses, so the colour means one thing everywhere. */
+export function CategoryTag({ name, color }: { name: string; color: string }) {
+  return (
+    <span className={`tag cat-tag tone-${color}`}>
+      <i className="category-dot" />
+      {name}
+    </span>
+  );
+}
 export function StatusBadge({ value }: { value: DocumentItem['status'] }) {
   const labels: Record<DocumentItem['status'], string> = {
     published: 'Published',
@@ -146,7 +155,9 @@ export function Footer() {
           <span className="logo-mark">
             <Icon name="book" size={14} />
           </span>
-          <span className="c">IntraDocs · build lokal · dataset sintetis, bukan kebijakan resmi</span>
+          <span className="c">
+            IntraDocs · build lokal · dataset sintetis, bukan kebijakan resmi
+          </span>
         </div>
         <Link href="/pengaturan" className="sub">
           Status fitur & privasi

@@ -71,6 +71,60 @@ export async function searchDocuments(
     };
   });
 }
+export type SearchFacets = {
+  categories: { id: string; name: string; color: string; n: number }[];
+  labels: { name: string; n: number }[];
+  formats: { format: string; n: number }[];
+  recency: { days7: number; days90: number; all: number };
+  /** ISO dates for the "after" parameter behind the two recency facets (DB clock). */
+  since: { days7: string; days90: string };
+};
+/**
+ * Counts behind the search filters (mockup S02), for the keyword alone: each facet says
+ * how many readable published documents would remain if only that filter were applied,
+ * so a user sees what a click will do. Same visibility rule as the results -- documents
+ * outside the actor's access are not counted, so no count leaks a title or a total.
+ */
+export async function searchFacets(actorId: string, keyword: string): Promise<SearchFacets> {
+  return withActor(actorId, async ({ client }) => {
+    const source = `FROM app.documents d JOIN app.document_versions v ON v.id=d.current_version_id JOIN app.categories c ON c.id=v.category_id
+    LEFT JOIN LATERAL(SELECT 1 AS hit FROM app.lexical_chunks ch WHERE ch.version_id=v.id AND ch.search_vector@@websearch_to_tsquery('simple',$1) LIMIT 1) hit ON true
+    WHERE app.is_active_version(v.id) AND ($1='' OR position(lower($1) in lower(v.title||' '||v.summary))>0 OR hit.hit IS NOT NULL)`;
+    const [categories, labels, formats, recency] = await Promise.all([
+      client.query<{ id: string; name: string; color: string; n: number }>(
+        `SELECT c.id,c.name,c.color,count(*)::int AS n ${source} GROUP BY c.id,c.name,c.color,c.position ORDER BY c.position,c.name`,
+        [keyword],
+      ),
+      client.query<{ name: string; n: number }>(
+        `SELECT l.name,count(*)::int AS n FROM (SELECT unnest(v.labels) AS name ${source}) l GROUP BY l.name ORDER BY n DESC,l.name LIMIT 12`,
+        [keyword],
+      ),
+      client.query<{ format: string; n: number }>(
+        `SELECT v.source_format AS format,count(*)::int AS n ${source} GROUP BY v.source_format ORDER BY n DESC,format`,
+        [keyword],
+      ),
+      client.query<{
+        days7: number;
+        days90: number;
+        all: number;
+        since7: string;
+        since90: string;
+      }>(
+        `SELECT count(*) FILTER(WHERE v.created_at>=now()-interval '7 days')::int AS days7,count(*) FILTER(WHERE v.created_at>=now()-interval '90 days')::int AS days90,count(*)::int AS all,
+                to_char(now()-interval '7 days','YYYY-MM-DD') AS since7,to_char(now()-interval '90 days','YYYY-MM-DD') AS since90 ${source}`,
+        [keyword],
+      ),
+    ]);
+    const r = recency.rows[0];
+    return {
+      categories: categories.rows,
+      labels: labels.rows,
+      formats: formats.rows,
+      recency: { days7: r?.days7 ?? 0, days90: r?.days90 ?? 0, all: r?.all ?? 0 },
+      since: { days7: r?.since7 ?? '', days90: r?.since90 ?? '' },
+    };
+  });
+}
 export async function discoveryOptions(actorId: string) {
   return withActor(actorId, async ({ client }) => {
     const labels = (
