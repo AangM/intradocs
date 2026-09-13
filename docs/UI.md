@@ -91,3 +91,49 @@ Login adalah layar pendukung baru dengan token mentor: form credentials pada loc
 S05 tetap area 920 px, stepper empat langkah, dropzone, kartu metadata dan footer mentor. Tahap terakhir menjadi “Simpan Draft Privat”, bukan approval palsu. Format yang tersedia hanya MD/TXT ≤1 MiB; angka 50 MB dan format V1 tidak ditampilkan sebagai dukungan aktif. Metadata diisi manual, pemilik dari session, klasifikasi Internal. Pratinjau adalah teks lokal literal (dipotong eksplisit pada 20.000 karakter), bukan status scan. Proses simpan memakai pesan indeterminate, bukan progress persen yang dibuat-buat.
 
 S04 menambahkan detail source/hash, unduh original/provenance. H1 sumber hanya disembunyikan jika benar-benar sama dengan judul metadata, bukan semua heading pertama. Gambar/HTML tetap tidak dieksekusi. Semua perubahan desktop/mobile wajib dibandingkan dengan mockup setelah browser tersedia; belum ada screenshot yang disetujui.
+
+## Delta U09 — tema "glass", topbar berisi, beranda bertanya ke AI (September 2026)
+
+Diminta pengguna setelah melihat hasil §5 di desktop: struktur sudah sama dengan mockup,
+tetapi tampilannya "raw", banyak teks penuh, navbar kosong, dan beranda punya kotak cari yang
+tidak langsung bertanya ke AI. Delta ini **melanggar kalimat di §3** ("animasi tambahan,
+layout kartu generik … bukan perubahan otomatis yang diizinkan") atas keputusan pengguna
+sendiri, dan dibatasi agar tetap bisa dicabut: satu berkas, tanpa mengubah struktur.
+
+- **`apps/web/src/app/theme.css`**, dimuat terakhir di `layout.tsx`, adalah seluruh lapisan
+  visual: token aksen gradien (`#3b6cf6 → #6a5cf5`), latar mesh radial halus, topbar dan
+  sidebar `backdrop-filter` (glass), kartu dengan bayangan lembut, tombol primer bergradien,
+  ring fokus, transisi 160 ms, dan `prefers-reduced-motion` mematikan semua transisi. Hapus
+  satu baris `import './theme.css'` dan portal kembali ke token mentor §2 apa adanya. Token
+  §2 tidak diubah; warna Telkom dan dark mode tetap tidak ada.
+- **Topbar (S01–S10)**: topnav teks yang dulu kosong diganti pencarian di tengah
+  (`⌘/Ctrl+K` tetap), tombol "Tanya AI" (hanya bila AI aktif), lonceng notifikasi dengan titik
+  bila ada yang menunggu, dan menu akun (`<details>`: pengaturan & status fitur, dokumen
+  favorit, keluar). Di ≤768 px tombol dan teks nama disembunyikan, avatar dan lonceng tetap.
+- **Beranda (S01)**: kotak besar hero mengirim ke `/ai-assistant?ask=1` dan pertanyaan
+  langsung dikirim (sekali per pemuatan, URL dibersihkan) — lihat docs/WEKNORA.md §16;
+  tautan kecil "Buka pencarian dokumen" di bawahnya untuk yang hanya ingin mencari kata. Bila
+  AI tidak aktif, kotaknya kembali menjadi pencarian. Baris statistik: dokumen resmi, kategori,
+  pembaruan terakhir (relatif), AI aktif — semuanya angka nyata (U05 tetap). Kartu kategori
+  memberi afordansi "Buka →" saat hover.
+- **Diet teks**: subjudul halaman dan catatan kaki (audit, akses, umpan balik, notifikasi,
+  pengaturan, unggah, katalog, pencarian, asisten) dipendekkan menjadi satu kalimat tentang
+  apa yang dilihat orang, bukan tentang batas sistem; penjelasan batas pindah ke docs. Tidak
+  ada metadata yang dihapus dari tabel atau kartu (U03/U05 tetap).
+- **Asisten (S09)**: pertanyaan lanjutan kini punya konteks (docs/WEKNORA.md §24). Daftar sumber
+  menampilkan tiga kutipan pertama dan melipat sisanya di balik "Tampilkan n kutipan lagi" — enam
+  kartu kutipan penuh membuat jawaban tenggelam; baris statistik dan placeholder composer
+  dibahasakan ulang ("dicari di 9 versi · 4 kutipan disaring", "Tulis pertanyaan lanjutan…").
+- **Login**: panel cerita dipusatkan vertikal (dulu logo di atas dan setengah layar kosong),
+  tiga poin nilai dalam bahasa pengguna (jawaban bersumber, sesuai akses, selalu versi resmi)
+  menggantikan "session server + row-level security", ditambah satu kartu contoh tanya-jawab
+  yang berlabel **Contoh · dokumen sintetis** (bukan inferensi nyata, sesuai §4). Catatan teknis
+  di kanan dipadatkan menjadi dua baris. Di ponsel form mulai tepat di bawah logo.
+- **Pencarian (S02) di ponsel**: facet dilipat di balik tombol "Filter" (checkbox CSS, tanpa JS)
+  agar hasil tidak terdorong 600 px ke bawah; di desktop tidak berubah. Kaki kartu AI menjadi
+  tombol "Minta jawaban tersusun" dan satu baris angka.
+- **Topbar di ponsel**: sub-judul logo dan teks "Tanya AI" disembunyikan (ikon dengan
+  `aria-label` tetap), jarak dirapatkan; avatar tidak lagi terpotong di tepi kanan.
+
+Bukti: `pnpm ui:shots` (desktop 1440 dan `SHOT_W=390`) dijalankan ulang setelah delta ini; tidak
+ada perbandingan piksel dengan mockup untuk lapisan glass karena memang sengaja berbeda.

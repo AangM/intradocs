@@ -27,8 +27,18 @@ test.beforeEach(async ({ page }) => {
 });
 test('home, metadata search, protected reader and accessible headings', async ({ page }, info) => {
   await expect(page.getByRole('heading', { name: 'Ada yang bisa kami bantu?' })).toBeVisible();
-  await page.getByRole('textbox', { name: 'Apa yang ingin Anda cari?' }).fill('VPN');
-  await page.getByRole('button', { name: 'Cari dokumen', exact: true }).click();
+  if (process.env.AI_PROVIDER === 'weknora-local') {
+    // With AI on, the hero box asks the assistant; keyword search is the link under it.
+    await expect(
+      page.getByRole('textbox', { name: 'Apa yang ingin Anda tanyakan?' }),
+    ).toBeVisible();
+    await page.getByRole('link', { name: 'Buka pencarian dokumen' }).click();
+    await page.getByRole('textbox', { name: 'Kata kunci' }).fill('VPN');
+    await page.getByRole('textbox', { name: 'Kata kunci' }).press('Enter');
+  } else {
+    await page.getByRole('textbox', { name: 'Apa yang ingin Anda cari?' }).fill('VPN');
+    await page.getByRole('button', { name: 'Cari dokumen', exact: true }).click();
+  }
   await page.getByRole('link', { name: 'Konfigurasi VPN untuk Windows, macOS & Mobile' }).click();
   await expect(
     page

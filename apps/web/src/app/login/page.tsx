@@ -22,53 +22,81 @@ export default async function Login({
             IntraDocs<small>Knowledge Hub · Divisi IT</small>
           </span>
         </div>
-        <span className="hero-badge">
-          <Icon name="shield" size={14} />
-          Satu sumber pengetahuan tim
-        </span>
-        <h1>
-          Dokumentasi yang jelas.
-          <br />
-          <em>Akses yang tepat.</em>
-        </h1>
-        <p>
-          Temukan panduan, baca versi yang tersedia, dan jaga pengetahuan internal tetap berada
-          dalam lingkup yang berwenang.
-        </p>
-        <div className="login-proof">
-          <Icon name="lock" />
-          <span>
-            Autentikasi nyata
-            <br />
-            <small>Session server + row-level security</small>
+        <div className="login-story-body">
+          <span className="hero-badge">
+            <Icon name="shield" size={14} />
+            Satu tempat untuk pengetahuan tim
           </span>
+          <h1>
+            Tanya, temukan, <em>percaya.</em>
+          </h1>
+          <p>
+            SOP, panduan, dan kebijakan IT dalam satu tempat — dan asisten yang menjawab dari
+            dokumen resmi, lengkap dengan sumbernya.
+          </p>
+          <div className="login-sample" aria-hidden="true">
+            <div className="login-sample-q">
+              <span className="avatar">S</span>
+              Apakah MFA wajib untuk VPN lab?
+            </div>
+            <div className="login-sample-a">
+              <span className="avatar ai">
+                <Icon name="spark" size={13} />
+              </span>
+              <div>
+                Ya. Profil VPN laboratorium mensyaratkan akun uji dan MFA saat masuk.
+                <span className="login-sample-src">
+                  <Icon name="file" size={12} />
+                  Konfigurasi VPN · Langkah konfigurasi
+                </span>
+              </div>
+            </div>
+            <span className="login-sample-tag">Contoh · dokumen sintetis</span>
+          </div>
+          <div className="login-points">
+            <div className="login-proof">
+              <Icon name="spark" />
+              <span>
+                Jawaban bersumber
+                <br />
+                <small>Setiap jawaban menyebut dokumen dan bagiannya</small>
+              </span>
+            </div>
+            <div className="login-proof">
+              <Icon name="lock" />
+              <span>
+                Sesuai akses Anda
+                <br />
+                <small>Hanya dokumen yang boleh Anda baca yang muncul</small>
+              </span>
+            </div>
+            <div className="login-proof">
+              <Icon name="check-c" />
+              <span>
+                Selalu versi resmi
+                <br />
+                <small>Dokumen terbit setelah ditinjau; versi lama tetap tercatat</small>
+              </span>
+            </div>
+          </div>
         </div>
-        <div className="login-proof">
-          <Icon name="book" />
-          <span>
-            Reader Markdown
-            <br />
-            <small>Sumber immutable, tanpa menjalankan HTML</small>
-          </span>
-        </div>
-        <span className="login-profile">Build lokal · corpus sintetis</span>
+        <span className="login-profile">Build lokal · seluruh data sintetis</span>
       </section>
       <section className="login-panel">
         <div className="login-card">
           <span className="pill p-blue">SELAMAT DATANG</span>
-          <h2>Masuk ke Knowledge Hub</h2>
-          <p className="sub">Gunakan akun sintetis dari setup lokal Anda.</p>
+          <h2>Masuk ke IntraDocs</h2>
+          <p className="sub">Pakai akun demo dari setup lokal Anda.</p>
           <LoginForm returnTo={safeReturnTo(params.returnTo)} />
           <div className="callout c-info">
             <Icon name="help" />
             <div>
-              Credential acak tersedia di <code>var/demo-accounts.json</code> setelah{' '}
-              <code>pnpm setup:local</code>. Tidak ada pendaftaran publik.
+              Akun demo ada di <code>var/demo-accounts.json</code> (dibuat oleh{' '}
+              <code>pnpm setup:local</code>). Tidak ada pendaftaran publik.
             </div>
           </div>
           <p className="privacy-note">
-            Jangan gunakan password perusahaan atau memasukkan data Telkom nyata ke lingkungan demo
-            ini.
+            Lingkungan demo lokal — jangan masukkan password atau data perusahaan yang nyata.
           </p>
         </div>
       </section>

@@ -266,8 +266,8 @@ export function ApprovalDetail({
                 </div>
               ))}
               <p className="hint">
-                Pemeriksaan pola terbatas (kredensial, kunci, token), bukan jaminan DLP. Struktur
-                dan isi tetap dinilai reviewer.
+                Pemeriksaan otomatis hanya mencari pola kredensial/kunci; isi dan struktur tetap
+                Anda nilai.
               </p>
             </div>
           </section>
@@ -426,7 +426,7 @@ export function ApprovalDetail({
                   <Icon name="check" size={12} />
                 </span>
                 <div className="precheck-d">
-                  Worker mempublikasikan secara atomik; versi lama tetap aktif sampai selesai.
+                  Dokumen terbit otomatis; versi lama tetap bisa dibaca sampai selesai.
                 </div>
               </div>
               <div className="precheck-row">
@@ -434,16 +434,14 @@ export function ApprovalDetail({
                   <Icon name="check" size={12} />
                 </span>
                 <div className="precheck-d">
-                  Diindeks ke AI Assistant — hanya versi final-approved yang bisa dikutip.
+                  Masuk ke AI Assistant — hanya versi yang sudah disetujui penuh yang bisa dikutip.
                 </div>
               </div>
               <div className="precheck-row">
                 <span className="ck y">
                   <Icon name="check" size={12} />
                 </span>
-                <div className="precheck-d">
-                  Keputusan, alasan, dan reviewer tercatat di audit log.
-                </div>
+                <div className="precheck-d">Keputusan, alasan, dan nama reviewer tercatat.</div>
               </div>
               {blocking && (
                 <p className="callout c-warn">

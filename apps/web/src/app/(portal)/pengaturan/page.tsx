@@ -17,7 +17,7 @@ export default async function Settings() {
     <div className="pad">
       <PageHeading
         title="Pengaturan & Status Fitur"
-        subtitle="Konfigurasi build lokal ini bersifat fail-closed dan tidak dapat mengaktifkan cloud melalui UI."
+        subtitle="Akun Anda dan fitur yang aktif pada instalasi ini."
       />
       <section className="card card-b">
         <dl className="settings-list">
@@ -58,15 +58,12 @@ export default async function Settings() {
         </dl>
       </section>
       <Notice>
-        <strong>Privasi.</strong> Tidak ada telemetry aplikasi, API AI cloud, analytics pihak
-        ketiga, atau font remote; AI berjalan di mesin ini. Next.js telemetry dimatikan oleh runner
-        lokal. Tautan eksternal dalam dokumen hanya dibuka ketika Anda klik, tanpa referrer.
+        <strong>Privasi.</strong> Semuanya berjalan di mesin ini — tidak ada layanan AI cloud,
+        analytics, telemetry, atau font dari luar. Tautan keluar hanya dibuka saat Anda klik.
       </Notice>
       <Notice kind="warn">
-        <strong>Belum layak data produksi.</strong> Jangan gunakan data atau credential Telkom
-        nyata. Semua fitur diuji dengan corpus sintetis. Pilot nyata tetap menunggu SSO, kebijakan
-        data, backup/restore, serta persetujuan mentor/security/ops. Lihat bukti rilis di
-        docs/PLAN.md.
+        <strong>Lingkungan demo.</strong> Jangan masukkan data atau credential perusahaan yang
+        nyata; seluruh isi bersifat sintetis. Syarat pilot ada di docs/PLAN.md.
       </Notice>
     </div>
   );

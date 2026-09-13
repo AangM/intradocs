@@ -45,7 +45,7 @@ export default async function Upload({
     <div className="pad upload-page">
       <PageHeading
         title={revision ? 'Revisi Dokumen' : 'Unggah Knowledge'}
-        subtitle="Scan → canonical & provenance → draft privat → review → publikasi. Berkas tidak pernah keluar mesin ini."
+        subtitle="Pilih berkas, lengkapi metadata, simpan sebagai draft, lalu ajukan review."
       />
       <UploadForm
         categories={categories}

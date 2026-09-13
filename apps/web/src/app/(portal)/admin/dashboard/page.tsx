@@ -58,7 +58,7 @@ export default async function Dashboard({
     <div className="pad">
       <PageHeading
         title="Dashboard Knowledge Base"
-        subtitle={`Periode ${days} hari terakhir${unit ? ` · unit ${unit}` : ''} · data aktual, dibatasi scope akses Anda`}
+        subtitle={`${days} hari terakhir${unit ? ` · unit ${unit}` : ''}`}
         actions={
           <div className="row">
             <SortSelect
@@ -83,7 +83,7 @@ export default async function Dashboard({
           {
             label: 'Dokumen aktif',
             value: formatNumber(data.summary.active),
-            note: 'Snapshot kini: disetujui dan belum kedaluwarsa',
+            note: 'Terbit dan belum kedaluwarsa',
             icon: 'book',
           },
           {
@@ -117,7 +117,7 @@ export default async function Dashboard({
             label: 'AI Assistant',
             value: aiOn ? formatNumber(aiAsked) : 'Mati',
             note: aiOn
-              ? `${data.ai.abstained} tidak dijawab · ${data.ai.rejected} kutipan ditolak validasi` +
+              ? `${data.ai.abstained} tidak terjawab · ${data.ai.rejected} kutipan disaring` +
                 (data.ai.helpful + data.ai.unhelpful > 0
                   ? ` · membantu ${data.ai.helpful}/${data.ai.helpful + data.ai.unhelpful}`
                   : '')
@@ -351,9 +351,8 @@ export default async function Dashboard({
         )}
       </section>
       <p className="sub tiny">
-        Unit berdasarkan pemilik dokumen; metrik pencarian dan AI berdasarkan unit pelaku. Status
-        adalah snapshot kini, aktivitas mengikuti periode. Metrik AI dihitung dari jejak audit —
-        jumlah saja, tidak pernah pertanyaannya. Tidak ada angka buatan pada dashboard.
+        Angka dihitung dari aktivitas dalam cakupan Anda; teks pertanyaan ke AI tidak disimpan di
+        sini.
       </p>
     </div>
   );

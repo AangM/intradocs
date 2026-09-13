@@ -88,7 +88,7 @@ export default async function Catalog({
       </nav>
       <PageHeading
         title={title}
-        subtitle={`${formatNumber(data.total)} dokumen · ${categories.length} kategori · ${options.labels.length} label aktif — sesuai hak akses Anda`}
+        subtitle={`${formatNumber(data.total)} dokumen · ${categories.length} kategori · ${options.labels.length} label`}
         actions={
           canUpload ? (
             <Link className="btn btn-p" href="/unggah">
@@ -232,7 +232,8 @@ export default async function Catalog({
                             {d.title}
                           </Link>
                           <div className="document-owner">
-                            {FORMAT_LABEL[d.format] ?? d.format} · {Math.max(1, Math.round(d.bytes / 1024))} KB
+                            {FORMAT_LABEL[d.format] ?? d.format} ·{' '}
+                            {Math.max(1, Math.round(d.bytes / 1024))} KB
                             {d.status !== 'published' ? ` · diunggah ${d.ownerLabel}` : ''}
                           </div>
                         </div>
@@ -352,12 +353,9 @@ export default async function Catalog({
           )}
         </div>
       </div>
-      <p className="sub tiny mt20">
-        Katalog memfilter metadata dan versi berizin; gunakan Pencarian untuk kata di dalam isi.
-        {q.status === 'all'
-          ? ' Tampilan ini dapat menyertakan draft milik Anda atau versi historis yang masih diizinkan; status tidak sama dengan klasifikasi.'
-          : ''}
-      </p>
+      {q.status === 'all' && (
+        <p className="sub tiny mt20">Termasuk draft Anda dan versi lama yang masih boleh dibuka.</p>
+      )}
     </div>
   );
 }

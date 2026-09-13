@@ -10,7 +10,7 @@ export default async function Feedback() {
     <div className="pad">
       <PageHeading
         title="Masukan Dokumen"
-        subtitle="Maksimal 100 masukan terbaru untuk dokumen yang Anda miliki. Buka versi terkait, lalu gunakan riwayat versi untuk melanjutkan revisi terbaru."
+        subtitle="Apa kata pembaca tentang dokumen Anda."
       />
       {rows.length ? (
         <section className="card">

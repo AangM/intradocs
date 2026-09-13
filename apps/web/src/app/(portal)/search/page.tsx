@@ -100,104 +100,112 @@ export default async function Search({
             aria-label="Kata kunci"
           />
         </form>
-        <div className="row mb" style={{ justifyContent: 'space-between' }}>
-          <h2 className="h3">Filter</h2>
-          {filtered && (
-            <Link
-              className="filter-reset"
-              href={catalogHref(
-                '/search',
-                {
-                  ...query,
-                  category: null,
-                  label: undefined,
-                  format: undefined,
-                  after: undefined,
-                  owner: undefined,
-                },
-                1,
-              )}
-            >
-              Reset
-            </Link>
-          )}
-        </div>
-        <div className="fgroup">
-          <div className="ft-l">Kategori</div>
-          {facets.categories.map((c) => (
-            <Link
-              key={c.id}
-              className="fitem"
-              href={withParam('category', query.category === c.id ? undefined : c.id)}
-              aria-pressed={query.category === c.id}
-            >
-              <Check on={query.category === c.id} /> {c.name} <span className="n">{c.n}</span>
-            </Link>
-          ))}
-          {!facets.categories.length && <p className="sub tiny">Tidak ada kategori yang cocok.</p>}
-        </div>
-        {facets.labels.length > 0 && (
-          <div className="fgroup">
-            <div className="ft-l">Label</div>
-            <div className="row wrap" style={{ gap: 6 }}>
-              {facets.labels.map((l) => (
-                <Link
-                  key={l.name}
-                  className={`tag ${query.label === l.name ? 'tag-on' : ''}`}
-                  href={withParam('label', query.label === l.name ? undefined : l.name)}
-                  aria-pressed={query.label === l.name}
-                >
-                  {l.name} <span className="n">{l.n}</span>
-                </Link>
-              ))}
-            </div>
+        {/* On a phone the facets fold under this label (CSS only, no JS); on a desktop the
+            checkbox and label are hidden and the groups always show. */}
+        <input type="checkbox" id="filters-toggle" className="filters-toggle sr-only" />
+        <label htmlFor="filters-toggle" className="btn btn-sm filters-label">
+          <Icon name="filter" size={14} />
+          Filter{filtered ? ' · aktif' : ''}
+        </label>
+        <div className="filter-groups">
+          <div className="row mb" style={{ justifyContent: 'space-between' }}>
+            <h2 className="h3">Filter</h2>
+            {filtered && (
+              <Link
+                className="filter-reset"
+                href={catalogHref(
+                  '/search',
+                  {
+                    ...query,
+                    category: null,
+                    label: undefined,
+                    format: undefined,
+                    after: undefined,
+                    owner: undefined,
+                  },
+                  1,
+                )}
+              >
+                Reset
+              </Link>
+            )}
           </div>
-        )}
-        <div className="fgroup">
-          <div className="ft-l">Format berkas</div>
-          {facets.formats.map((f) => (
-            <Link
-              key={f.format}
-              className="fitem"
-              href={withParam('format', query.format === f.format ? undefined : f.format)}
-              aria-pressed={query.format === f.format}
-            >
-              <Check on={query.format === f.format} /> {FORMAT_LABEL[f.format] ?? f.format}{' '}
-              <span className="n">{f.n}</span>
+          <div className="fgroup">
+            <div className="ft-l">Kategori</div>
+            {facets.categories.map((c) => (
+              <Link
+                key={c.id}
+                className="fitem"
+                href={withParam('category', query.category === c.id ? undefined : c.id)}
+                aria-pressed={query.category === c.id}
+              >
+                <Check on={query.category === c.id} /> {c.name} <span className="n">{c.n}</span>
+              </Link>
+            ))}
+            {!facets.categories.length && (
+              <p className="sub tiny">Tidak ada kategori yang cocok.</p>
+            )}
+          </div>
+          {facets.labels.length > 0 && (
+            <div className="fgroup">
+              <div className="ft-l">Label</div>
+              <div className="row wrap" style={{ gap: 6 }}>
+                {facets.labels.map((l) => (
+                  <Link
+                    key={l.name}
+                    className={`tag ${query.label === l.name ? 'tag-on' : ''}`}
+                    href={withParam('label', query.label === l.name ? undefined : l.name)}
+                    aria-pressed={query.label === l.name}
+                  >
+                    {l.name} <span className="n">{l.n}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="fgroup">
+            <div className="ft-l">Format berkas</div>
+            {facets.formats.map((f) => (
+              <Link
+                key={f.format}
+                className="fitem"
+                href={withParam('format', query.format === f.format ? undefined : f.format)}
+                aria-pressed={query.format === f.format}
+              >
+                <Check on={query.format === f.format} /> {FORMAT_LABEL[f.format] ?? f.format}{' '}
+                <span className="n">{f.n}</span>
+              </Link>
+            ))}
+          </div>
+          <div className="fgroup">
+            <div className="ft-l">Terakhir diperbarui</div>
+            {(
+              [
+                ['7', '7 hari terakhir', facets.recency.days7, facets.since.days7],
+                ['90', '90 hari terakhir', facets.recency.days90, facets.since.days90],
+                ['all', 'Semua waktu', facets.recency.all, undefined],
+              ] as const
+            ).map(([key, label, n, after]) => (
+              <Link
+                key={key}
+                className="fitem"
+                href={withParam('after', after)}
+                aria-pressed={activeRecency === key}
+              >
+                <Check on={activeRecency === key} /> {label} <span className="n">{n}</span>
+              </Link>
+            ))}
+          </div>
+          <div className="fgroup">
+            <div className="ft-l">Status</div>
+            <span className="fitem">
+              <Check on /> Published <span className="n">{facets.recency.all}</span>
+            </span>
+            <Link className="fitem" href={`/katalog?status=mine&q=${encodeURIComponent(query.q)}`}>
+              <Check on={false} /> Draft milik saya <Icon name="arrow-r" size={12} className="n" />
             </Link>
-          ))}
+          </div>
         </div>
-        <div className="fgroup">
-          <div className="ft-l">Terakhir diperbarui</div>
-          {(
-            [
-              ['7', '7 hari terakhir', facets.recency.days7, facets.since.days7],
-              ['90', '90 hari terakhir', facets.recency.days90, facets.since.days90],
-              ['all', 'Semua waktu', facets.recency.all, undefined],
-            ] as const
-          ).map(([key, label, n, after]) => (
-            <Link
-              key={key}
-              className="fitem"
-              href={withParam('after', after)}
-              aria-pressed={activeRecency === key}
-            >
-              <Check on={activeRecency === key} /> {label} <span className="n">{n}</span>
-            </Link>
-          ))}
-        </div>
-        <div className="fgroup">
-          <div className="ft-l">Status</div>
-          <span className="fitem">
-            <Check on /> Published <span className="n">{facets.recency.all}</span>
-          </span>
-          <Link className="fitem" href={`/katalog?status=mine&q=${encodeURIComponent(query.q)}`}>
-            <Check on={false} /> Draft milik saya <Icon name="arrow-r" size={12} className="n" />
-          </Link>
-        </div>
-        <p className="sub tiny">
-          Hanya dokumen published, tidak kedaluwarsa, dan sesuai akses akun yang dihitung.
-        </p>
       </aside>
 
       <div className="search-results">
@@ -209,8 +217,7 @@ export default async function Search({
                 : `${data.total} dokumen yang boleh Anda baca`}
             </h1>
             <p className="sub" style={{ marginTop: 2 }}>
-              Ditemukan dalam {data.durationMs} ms · pencarian kata kunci
-              {aiOn ? ' + sumber menurut AI' : ''} · judul, metadata, dan isi
+              {data.durationMs} ms · judul, ringkasan, dan isi dokumen yang boleh Anda baca
             </p>
           </div>
           <div className="row">
@@ -239,8 +246,8 @@ export default async function Search({
           !query.q && (
             <p className="sub tiny mb">
               {aiOn
-                ? 'Ketik pertanyaan untuk melihat potongan dokumen yang relevan menurut AI di atas hasil kata kunci.'
-                : 'AI belum diaktifkan pada instalasi ini; hasil di bawah adalah pencarian kata kunci.'}
+                ? 'Ketik pertanyaan; potongan dokumen yang relevan menurut AI tampil di atas hasil.'
+                : 'Pencarian kata kunci pada judul dan isi dokumen.'}
             </p>
           )
         )}

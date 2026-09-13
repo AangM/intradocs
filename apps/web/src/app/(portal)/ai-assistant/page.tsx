@@ -9,7 +9,11 @@ import Link from 'next/link';
 export default async function Assistant({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string | string[]; doc?: string | string[] }>;
+  searchParams: Promise<{
+    q?: string | string[];
+    doc?: string | string[];
+    ask?: string | string[];
+  }>;
 }) {
   const actor = await requireActor();
   const config = getAiConfig();
@@ -17,6 +21,8 @@ export default async function Assistant({
   // person decides when a (slow, local) generation starts.
   const params = await searchParams;
   const initialQuestion = typeof params.q === 'string' ? params.q.slice(0, 2000) : '';
+  // ask=1 comes only from the home hero's "Tanya AI" box, where Enter is the decision.
+  const autoAsk = params.ask === '1' && initialQuestion.trim().length > 0;
   // A document handed over from its page pre-selects the "dokumen yang saya buka" scope;
   // it only takes effect if that document is in the actor's own read history.
   const initialDocumentId = typeof params.doc === 'string' ? params.doc : '';
@@ -34,7 +40,7 @@ export default async function Assistant({
       <div className="pad assistant-page">
         <PageHeading
           title="AI Assistant"
-          subtitle="Jawaban bersumber dokumen resmi sesuai akses Anda."
+          subtitle="Jawaban dari dokumen resmi yang boleh Anda baca, selalu dengan sumbernya."
           actions={
             <span className="pill p-green">
               {config.generation === 'weknora-local' ? 'Retrieval + jawaban' : 'Retrieval'}: lokal
@@ -61,6 +67,7 @@ export default async function Assistant({
           initialConversations={conversations}
           initialQuestion={initialQuestion}
           initialDocumentId={initialDocumentId}
+          autoAsk={autoAsk}
         />
       </div>
     );

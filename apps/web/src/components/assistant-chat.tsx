@@ -74,6 +74,9 @@ async function readError(response: Response): Promise<string> {
   return 'Permintaan gagal.';
 }
 
+/** Citations shown before "Tampilkan n kutipan lagi"; the rest stay one click away. */
+const SOURCES_SHOWN = 3;
+
 export function AssistantChat({
   actorName = '',
   maxQuestionChars,
@@ -85,6 +88,7 @@ export function AssistantChat({
   initialConversations,
   initialQuestion = '',
   initialDocumentId = '',
+  autoAsk = false,
 }: {
   /** Shown as the avatar initials on the person's own messages. */
   actorName?: string;
@@ -99,8 +103,14 @@ export function AssistantChat({
   /** Documents the actor has opened; the "dokumen yang saya buka" scope picks from these. */
   recentDocuments: readonly ScopeDocumentItem[];
   initialConversations: readonly ConversationItem[];
-  /** Pre-filled into the composer (e.g. handed over from search); never auto-sent. */
+  /** Pre-filled into the composer (e.g. handed over from search). */
   initialQuestion?: string;
+  /**
+   * Send initialQuestion once on mount. Only the home hero sets this: there the person
+   * typed a question into a box labelled "Tanya AI" and pressed Enter, which is the
+   * decision to start a (slow, local) generation; a search hand-over still waits.
+   */
+  autoAsk?: boolean;
   /** Pre-selects the documents scope on this one document, if it is in recentDocuments. */
   initialDocumentId?: string;
 }) {
@@ -115,6 +125,8 @@ export function AssistantChat({
   const [conversations, setConversations] = useState<ConversationItem[]>([...initialConversations]);
   const [loadingConversation, setLoadingConversation] = useState<string | null>(null);
   const [copiedTurn, setCopiedTurn] = useState<string | null>(null);
+  // Turns whose full source list is open; the first few citations are always shown.
+  const [openSources, setOpenSources] = useState<ReadonlySet<string>>(() => new Set());
   const handedDocument = recentDocuments.some((d) => d.id === initialDocumentId);
   const [scopeKind, setScopeKind] = useState<ScopeKind>(handedDocument ? 'documents' : 'all');
   const [categoryId, setCategoryId] = useState<string>(categories[0]?.id ?? '');
@@ -165,6 +177,16 @@ export function AssistantChat({
   useEffect(() => {
     threadEnd.current?.scrollIntoView({ block: 'nearest' });
   }, [turns.length, pending]);
+
+  // One auto-send per mount, and the URL is cleaned so a reload does not ask again.
+  const autoAsked = useRef(false);
+  useEffect(() => {
+    if (!autoAsk || autoAsked.current || !initialQuestion.trim()) return;
+    autoAsked.current = true;
+    window.history.replaceState(null, '', '/ai-assistant');
+    void ask(initialQuestion);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only by design
+  }, []);
 
   function currentScope(): RetrievalScope | null {
     if (scopeKind === 'category') {
@@ -441,8 +463,8 @@ export function AssistantChat({
         <p className="callout c-info assistant-note" role="note">
           <Icon name="shield" size={15} />
           <span>
-            Asisten hanya menjawab dari dokumen final-approved yang boleh Anda baca. Cakupan
-            mempersempit, tidak pernah memperluas. Bila tidak ada bukti, ia berkata tidak tahu.
+            Jawaban hanya dari dokumen resmi yang boleh Anda baca. Tanpa sumber, asisten bilang
+            tidak tahu.
           </span>
         </p>
       </aside>
@@ -455,8 +477,8 @@ export function AssistantChat({
             </span>
             <h2>Apa yang ingin Anda ketahui?</h2>
             <p className="sub">
-              Jawaban hanya disusun dari dokumen final-approved yang boleh Anda baca. Tanpa sumber
-              sah, IntraDocs menyatakan tidak tahu.
+              Tanyakan apa saja tentang SOP, panduan, dan kebijakan. Setiap jawaban menyebut dokumen
+              sumbernya.
             </p>
             {external && (
               <p className="callout c-warn" role="note">
@@ -515,7 +537,10 @@ export function AssistantChat({
                         dokumen, {turn.citations.length} kutipan
                       </div>
                       <ol className="srcs-list">
-                        {turn.citations.map((citation, n) => (
+                        {(openSources.has(turn.id)
+                          ? turn.citations
+                          : turn.citations.slice(0, SOURCES_SHOWN)
+                        ).map((citation, n) => (
                           <li className="src-i" key={`${citation.versionId}-${n}`}>
                             <span className="src-n">{n + 1}</span>
                             <span className="src-ic">
@@ -547,6 +572,30 @@ export function AssistantChat({
                           </li>
                         ))}
                       </ol>
+                      {turn.citations.length > SOURCES_SHOWN && (
+                        <button
+                          type="button"
+                          className="srcs-more"
+                          aria-expanded={openSources.has(turn.id)}
+                          onClick={() =>
+                            setOpenSources((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(turn.id)) next.delete(turn.id);
+                              else next.add(turn.id);
+                              return next;
+                            })
+                          }
+                        >
+                          <Icon
+                            name="chev-d"
+                            size={13}
+                            className={openSources.has(turn.id) ? 'flip' : ''}
+                          />
+                          {openSources.has(turn.id)
+                            ? 'Sembunyikan kutipan lainnya'
+                            : `Tampilkan ${turn.citations.length - SOURCES_SHOWN} kutipan lagi`}
+                        </button>
+                      )}
                     </div>
                   )}
                   {/* Built from what is already on screen -- the citations that survived
@@ -607,12 +656,10 @@ export function AssistantChat({
                     <span className="sub tiny turn-stats">
                       {turn.helpful === false ? 'Dicatat sebagai kebutuhan pengetahuan · ' : ''}
                       {turn.citations.length
-                        ? `${new Set(turn.citations.map((c) => c.documentId)).size} dokumen dirujuk · `
+                        ? `${new Set(turn.citations.map((c) => c.documentId)).size} dokumen · `
                         : ''}
-                      cakupan {turn.scopeSize} versi
-                      {turn.rejectedCount > 0
-                        ? ` · ${turn.rejectedCount} kandidat ditolak validasi`
-                        : ''}
+                      dicari di {turn.scopeSize} versi
+                      {turn.rejectedCount > 0 ? ` · ${turn.rejectedCount} kutipan disaring` : ''}
                     </span>
                   </div>
                 </div>
@@ -621,10 +668,8 @@ export function AssistantChat({
           ))}
           {pending && (
             <p className="sub turn-pending">
-              Mengambil kandidat dan memvalidasi izin sumber…
-              {generating
-                ? ' Model bahasa berjalan lokal di CPU, jadi jawaban bisa memakan puluhan detik.'
-                : ''}
+              Mencari di dokumen{generating ? ' dan menyusun jawaban' : ''}…
+              {generating ? ' Model berjalan lokal, biasanya 10–30 detik.' : ''}
             </p>
           )}
           {error && (
@@ -678,15 +723,12 @@ export function AssistantChat({
               }
             }}
             placeholder={
-              turns.length
-                ? 'Pertanyaan lanjutan… (setiap pertanyaan dicari ulang dari dokumen)'
-                : 'Tanyakan sesuatu tentang dokumen yang boleh Anda baca…'
+              turns.length ? 'Tulis pertanyaan lanjutan…' : 'Tanyakan sesuatu tentang dokumen…'
             }
           />
           <footer>
             <span className="sub tiny">
-              {scopeSummary} · jawaban selalu menyertakan sumber · maksimal {maxQuestionChars}{' '}
-              karakter
+              {scopeSummary} · Enter untuk kirim, Shift+Enter baris baru
             </span>
             <button
               className="btn btn-p send"

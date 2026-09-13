@@ -21,7 +21,7 @@ export default async function Notifications() {
     <div className="pad">
       <PageHeading
         title="Notifikasi"
-        subtitle="Maksimal 100 pemberitahuan terbaru milik Anda; dokumen tetap mengikuti izin akses terkini."
+        subtitle="Review yang menunggu Anda dan dokumen yang baru terbit."
       />
       {rows.length ? (
         <section className="card">

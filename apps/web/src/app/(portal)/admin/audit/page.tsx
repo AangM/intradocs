@@ -66,7 +66,7 @@ export default async function Audit() {
     <div className="pad">
       <PageHeading
         title="Audit Log"
-        subtitle="100 event terbaru dalam scope Anda. Isi dokumen, pertanyaan AI, dan credential tidak pernah dicatat."
+        subtitle="Siapa melakukan apa, kapan — 100 aktivitas terbaru dalam cakupan Anda."
       />
       <div className="card">
         {events.length ? (

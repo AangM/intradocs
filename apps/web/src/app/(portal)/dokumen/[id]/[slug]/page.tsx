@@ -119,9 +119,9 @@ export default async function Reader({
           </a>
         ))}
         <div className="local-note">
-          Sumber: {source ? source.name : 'Markdown seed'}
+          Berkas asli: {source ? source.name : 'contoh bawaan'}
           <br />
-          <span>File dan checksum versi disimpan immutable.</span>
+          <span>Setiap versi tersimpan apa adanya dan tidak bisa diubah.</span>
         </div>
       </aside>
       <div className="doc-main">
@@ -191,17 +191,7 @@ export default async function Reader({
                 <strong>Belum dipublikasikan.</strong> Hanya pemilik atau reviewer yang ditugaskan
                 dan memiliki scope yang dapat membukanya.
               </Notice>
-            ) : (
-              <Notice>
-                Dokumen sintetis untuk menguji reader dan hak akses.{' '}
-                {doc.reviewAt && (
-                  <>
-                    Tanggal review contoh: <strong>{formatDate(doc.reviewAt)}</strong>. Pengingat
-                    dalam aplikasi dimulai H−14.
-                  </>
-                )}
-              </Notice>
-            )}
+            ) : null}
             <details className="reader-outline-mobile">
               <summary>Di halaman ini</summary>
               {toc.map((t) => (
@@ -239,7 +229,7 @@ export default async function Reader({
 
             <section className="related-documents">
               <h2 className="h3">Dokumen terkait</h2>
-              <p className="hint">Publikasi aktif dalam kategori yang sama, sesuai akses Anda.</p>
+              <p className="hint">Dokumen lain di kategori ini yang boleh Anda baca.</p>
               {related.length ? (
                 <ul>
                   {related.map((d) => (
@@ -347,9 +337,8 @@ export default async function Reader({
                 <p className="sub tiny">+{versions.length - 4} versi lebih lama di panel versi.</p>
               )}
               <p className="sub tiny">
-                {doc.approvedAt
-                  ? `Versi ini disetujui ${formatDate(doc.approvedAt)}.`
-                  : 'Versi ini belum disetujui.'}
+                {doc.approvedAt ? `Disetujui ${formatDate(doc.approvedAt)}.` : 'Belum disetujui.'}
+                {doc.reviewAt ? ` Ditinjau ulang ${formatDate(doc.reviewAt)}.` : ''}
               </p>
               {versions.length > 1 && (
                 <Link

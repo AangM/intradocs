@@ -18,9 +18,8 @@ export default async function Taxonomy() {
       <TaxonomyEditor {...data} suggestions={suggestions} />
       <TaxonomyRules categories={data.categories} />
       <p className="sub tiny mt20">
-        Maksimal tiga tingkat; dokumen berada pada kategori leaf. Pemindahan kategori terpakai dan
-        penurunan klasifikasi ditolak karena memerlukan review akses terpisah. Kritikal selalu
-        membutuhkan dua tahap.
+        Maksimal tiga tingkat; dokumen selalu berada di kategori paling bawah. Menurunkan
+        klasifikasi memerlukan review akses terpisah.
       </p>
     </div>
   );

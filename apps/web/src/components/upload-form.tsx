@@ -261,24 +261,29 @@ export function UploadForm({
           </li>
         ))}
       </ol>
-      <div className={`callout ${scanner.ready ? 'c-info' : 'c-warn'} upload-scanner`}>
-        <Icon name="shield" />
-        <div>
-          <strong>{scanner.ready ? 'Pemindai tersedia' : 'Pemindai belum tersedia'}</strong>
-          <p>{scanner.message}</p>
-          <p className="hint">
-            Kesiapan bukan hasil scan. Setiap original dan lampiran dipindai sebelum dikonversi.
-            Converter terisolasi diperlukan untuk PDF/Office.
-          </p>
+      {/* Ready: one quiet status line. Not ready: a warning, because nothing can be saved. */}
+      {scanner.ready ? (
+        <p className="upload-scanner-ok sub tiny">
+          <Icon name="shield" size={13} /> Pemindai virus siap · setiap berkas dipindai sebelum
+          disimpan
+        </p>
+      ) : (
+        <div className="callout c-warn upload-scanner">
+          <Icon name="shield" />
+          <div>
+            <strong>Pemindai virus belum tersedia</strong>
+            <p>{scanner.message}</p>
+            <p className="hint">Unggahan ditolak sampai pemindai aktif. Hubungi admin.</p>
+          </div>
+          <button
+            className="btn btn-sm"
+            disabled={checking || busy}
+            onClick={() => void checkScanner()}
+          >
+            {checking ? 'Memeriksa…' : 'Periksa ulang'}
+          </button>
         </div>
-        <button
-          className="btn btn-sm"
-          disabled={checking || busy}
-          onClick={() => void checkScanner()}
-        >
-          {checking ? 'Memeriksa…' : 'Periksa ulang'}
-        </button>
-      </div>
+      )}
       {error && (
         <p role="alert" className="upload-error">
           {error}
@@ -389,14 +394,11 @@ export function UploadForm({
               >
                 <Icon name="plus" size={14} /> Tambah lampiran
               </button>
-              <span className="sub tiny">
-                Opsional, maksimal 4 · ikut dipindai dan masuk canonical gabungan
-              </span>
+              <span className="sub tiny">Opsional, maksimal 4 berkas pendukung</span>
             </div>
             <p className="hint">
-              Hasil canonical gabungan maksimal 2 MiB. PDF pindai, macro, ZIP, format
-              rusak/encrypted, dan hasil yang kehilangan data penting ditolak; tidak ada OCR atau AI
-              yang mengarang isinya.
+              Berkas dengan teks yang bisa dibaca saja: PDF hasil pindai (gambar), makro, ZIP, dan
+              berkas terenkripsi ditolak. Tidak ada OCR.
             </p>
             <div className="upload-actions">
               <button className="btn btn-p" disabled={!file} onClick={() => setStep(2)}>

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './mentor.css';
 import './globals.css';
 import './milestones.css';
+import './theme.css';
 export const metadata: Metadata = {
   title: { default: 'IntraDocs — Knowledge Hub', template: '%s · IntraDocs' },
   description: 'Portal dokumentasi lokal dengan kontrol akses. Build M3, data sintetis.',

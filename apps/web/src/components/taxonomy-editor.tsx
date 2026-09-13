@@ -517,8 +517,8 @@ export function TaxonomyEditor({
               </details>
             )}
             <p className="hint">
-              Label yang digunakan versi immutable tidak boleh diubah namanya atau dihapus. Buat
-              label baru untuk penggantian.
+              Label yang sudah dipakai dokumen tidak bisa diganti nama atau dihapus; buat label baru
+              sebagai gantinya.
             </p>
           </div>
         </section>

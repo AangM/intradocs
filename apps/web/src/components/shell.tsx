@@ -151,14 +151,6 @@ export function Shell({
             IntraDocs<small>Knowledge Hub · Divisi IT</small>
           </span>
         </Link>
-        <nav className="topnav" aria-label="Navigasi utama">
-          <Link href="/help-center" className={pathname === '/help-center' ? 'on' : ''}>
-            Help Center
-          </Link>
-          <Link href="/katalog" className={pathname === '/katalog' ? 'on' : ''}>
-            Dokumentasi
-          </Link>
-        </nav>
         <div className="spacer" />
         <form className="tsearch" action="/search" role="search">
           <button
@@ -183,17 +175,65 @@ export function Shell({
           />
           <kbd className="kbd">⌘K</kbd>
         </form>
-        <span className="pill p-amber local-badge">Lokal · sintetis</span>
-        <div className="who">
-          <span className="avatar">{initials(actor.name)}</span>
-          <span className="who-text">
-            <span className="nm">{actor.name}</span>
-            <span className="rl">{ROLE_LABELS[actor.role]}</span>
-          </span>
-        </div>
-        <button className="btn btn-sm logout" onClick={signOut} disabled={signingOut}>
-          {signingOut ? 'Keluar…' : 'Keluar'}
-        </button>
+        <div className="spacer" />
+        {aiOn && (
+          <Link
+            href="/ai-assistant"
+            className={`btn btn-sm topbar-ask ${pathname === '/ai-assistant' ? 'btn-on' : ''}`}
+            prefetch={false}
+            aria-label="Tanya AI"
+            onClick={() => setOpen(false)}
+          >
+            <Icon name="spark" size={15} />
+            <span>Tanya AI</span>
+          </Link>
+        )}
+        <Link
+          href="/notifikasi"
+          className="icon-btn topbar-bell"
+          aria-label={
+            (counts['/notifikasi'] ?? 0) > 0
+              ? `Notifikasi, ${counts['/notifikasi']} belum dibaca`
+              : 'Notifikasi'
+          }
+          prefetch={false}
+        >
+          <Icon name="bell" size={18} />
+          {(counts['/notifikasi'] ?? 0) > 0 && <span className="dot-badge" />}
+        </Link>
+        <details className="account-menu">
+          <summary aria-label={`Akun: ${actor.name}`}>
+            <span className="avatar">{initials(actor.name)}</span>
+            <span className="who-text">
+              <span className="nm">{actor.name}</span>
+              <span className="rl">{ROLE_LABELS[actor.role]}</span>
+            </span>
+            <Icon name="chev-d" size={14} className="account-caret" />
+          </summary>
+          <div className="account-panel" role="menu">
+            <div className="account-head">
+              <strong>{actor.name}</strong>
+              <span className="sub tiny">
+                {ROLE_LABELS[actor.role]} · {actor.unit}
+              </span>
+              <span className="pill p-amber">Lokal · data sintetis</span>
+            </div>
+            <Link
+              href="/pengaturan"
+              role="menuitem"
+              prefetch={false}
+              onClick={() => setOpen(false)}
+            >
+              <Icon name="settings" size={15} /> Pengaturan & status fitur
+            </Link>
+            <Link href="/katalog?view=favorites" role="menuitem" prefetch={false}>
+              <Icon name="star" size={15} /> Dokumen favorit
+            </Link>
+            <button type="button" role="menuitem" onClick={signOut} disabled={signingOut}>
+              <Icon name="lock" size={15} /> {signingOut ? 'Keluar…' : 'Keluar'}
+            </button>
+          </div>
+        </details>
       </header>
       {error && (
         <p role="alert" className="inline-error">

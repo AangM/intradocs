@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { requireActor } from '@/lib/session';
 import { listCategories, listDocuments } from '@intradocs/db/queries';
-import { formatDate, formatNumber } from '@intradocs/core';
+import { formatDate, formatNumber, formatRelative } from '@intradocs/core';
 import { Icon } from '@/components/icon';
 import { Footer, Empty, documentHref } from '@/components/shared';
 import { mostRead, popularSearches } from '@intradocs/db/discovery';
@@ -33,26 +33,56 @@ export default async function HelpCenter() {
         <div className="hero-in">
           <span className="hero-badge">
             <Icon name="zap" size={14} />
-            {formatNumber(docs.total)} dokumen contoh tersedia sesuai akses Anda
+            {formatNumber(docs.total)} dokumen resmi yang boleh Anda baca
           </span>
           <h1>
             Ada yang bisa kami <em>bantu?</em>
           </h1>
           <p>
-            Cari SOP, panduan aplikasi, dan kebijakan IT dalam satu knowledge base. Mulai dengan
-            dokumen sintetis; jawaban AI selalu menyebut sumbernya.
+            {aiOn
+              ? 'Tanyakan langsung — jawabannya disusun dari dokumen resmi dan selalu menyebut sumbernya.'
+              : 'Cari SOP, panduan aplikasi, dan kebijakan IT dalam satu tempat.'}
           </p>
-          <form className="bigsearch" action="/search" role="search">
-            <Icon name="search" size={22} />
-            <label htmlFor="hero-q" className="sr-only">
-              Apa yang ingin Anda cari?
-            </label>
-            <input id="hero-q" name="q" placeholder='Contoh: "konfigurasi VPN"' maxLength={200} />
-            <button className="go" type="submit">
-              <Icon name="search" size={15} />
-              Cari dokumen
-            </button>
-          </form>
+          {aiOn ? (
+            <form className="bigsearch" action="/ai-assistant" role="search">
+              <input type="hidden" name="ask" value="1" />
+              <Icon name="spark" size={22} />
+              <label htmlFor="hero-q" className="sr-only">
+                Apa yang ingin Anda tanyakan?
+              </label>
+              <input
+                id="hero-q"
+                name="q"
+                placeholder="Contoh: Apakah MFA wajib untuk VPN lab?"
+                maxLength={2000}
+                autoComplete="off"
+              />
+              <button className="go" type="submit">
+                <Icon name="spark" size={15} />
+                Tanya AI
+              </button>
+            </form>
+          ) : (
+            <form className="bigsearch" action="/search" role="search">
+              <Icon name="search" size={22} />
+              <label htmlFor="hero-q" className="sr-only">
+                Apa yang ingin Anda cari?
+              </label>
+              <input id="hero-q" name="q" placeholder='Contoh: "konfigurasi VPN"' maxLength={200} />
+              <button className="go" type="submit">
+                <Icon name="search" size={15} />
+                Cari dokumen
+              </button>
+            </form>
+          )}
+          {aiOn && (
+            <p className="hero-alt">
+              Hanya ingin mencari kata di dokumen?{' '}
+              <Link href="/search" prefetch={false}>
+                Buka pencarian dokumen
+              </Link>
+            </p>
+          )}
           <div className="sugg">
             {/* Measured topics once enough distinct people have searched them and found
                 something; the curated list stands in while the log is too small to be
@@ -78,19 +108,23 @@ export default async function HelpCenter() {
           <div className="hero-stats">
             <div className="hs">
               <div className="n">{formatNumber(docs.total)}</div>
-              <div className="l">Dokumen aktif terlihat</div>
+              <div className="l">Dokumen resmi</div>
             </div>
             <div className="hs">
               <div className="n">{categories.length}</div>
-              <div className="l">Kategori dalam scope</div>
+              <div className="l">Kategori</div>
             </div>
             <div className="hs">
-              <div className="n">MD</div>
-              <div className="l">Format canonical</div>
+              <div className="n">
+                {docs.items[0] ? formatRelative(docs.items[0].updatedAt) : '—'}
+              </div>
+              <div className="l">Pembaruan terakhir</div>
             </div>
             <div className="hs">
-              <div className="n">{aiOn ? 'Lokal' : 'Off'}</div>
-              <div className="l">{aiOn ? 'AI · tanpa request cloud' : 'AI · belum diaktifkan'}</div>
+              <div className="n">{aiOn ? 'Aktif' : 'Nonaktif'}</div>
+              <div className="l">
+                {aiOn ? 'AI Assistant · berjalan di mesin ini' : 'AI Assistant'}
+              </div>
             </div>
           </div>
         </div>
@@ -104,10 +138,7 @@ export default async function HelpCenter() {
                 Bacaan wajib
                 {pendingReading > 0 ? ` (${pendingReading} belum dikonfirmasi)` : ''}
               </h2>
-              <p className="d">
-                Ditetapkan admin untuk kategori dalam scope Anda; konfirmasi mencatat versi yang
-                Anda baca
-              </p>
+              <p className="d">Dokumen yang perlu Anda baca dan konfirmasi</p>
             </div>
           </div>
           <div className="card">
@@ -134,7 +165,7 @@ export default async function HelpCenter() {
               <Icon name="grid" size={21} />
               Jelajahi berdasarkan kategori
             </h2>
-            <p className="d">Knowledge dikelompokkan per domain agar mudah ditemukan tim</p>
+            <p className="d">Telusuri dokumen per bidang</p>
           </div>
           <Link href="/katalog">
             Lihat semua dokumen <Icon name="arrow-r" size={14} />
@@ -155,7 +186,9 @@ export default async function HelpCenter() {
               <p className="d">{c.description}</p>
               <div className="m">
                 <span>{formatNumber(c.documentCount)} dokumen</span>
-                <span className="pill p-grey">Sesuai akses</span>
+                <span className="cat-go">
+                  Buka <Icon name="arrow-r" size={13} />
+                </span>
               </div>
             </Link>
           ))}
@@ -168,9 +201,7 @@ export default async function HelpCenter() {
               <Icon name="book" size={21} />
               Mulai membaca
             </h2>
-            <p className="d">
-              Pilihan dari dokumen yang tersedia untuk akun Anda, bukan peringkat popularitas
-            </p>
+            <p className="d">Dokumen yang bisa Anda buka sekarang</p>
           </div>
           <Link href="/katalog">
             Buka katalog <Icon name="arrow-r" size={14} />
@@ -208,31 +239,31 @@ export default async function HelpCenter() {
                   : 'AI ASSISTANT · AKTIF · HANYA SUMBER'
                 : 'AI ASSISTANT · BELUM AKTIF'}
             </span>
-            <h3 style={{ marginTop: 11 }}>Tanya dengan mudah. Tetap dekat dengan sumber.</h3>
+            <h3 style={{ marginTop: 11 }}>Tanya apa saja — jawabannya dari dokumen resmi.</h3>
             <p>
               {aiOn
                 ? aiGenerates
-                  ? 'Jawaban disusun hanya dari dokumen final-approved yang boleh Anda baca, dengan kutipan yang bisa dibuka. Setiap sumber divalidasi ulang ke IntraDocs pada setiap permintaan; tanpa sumber sah, asisten menyatakan tidak tahu.'
-                  : 'Asisten mengembalikan sumber yang relevan dan boleh Anda baca, dengan kutipan yang bisa dibuka — tanpa menyusun jawaban bebas. Tanpa sumber sah, asisten menyatakan tidak tahu.'
-                : 'Jawaban berbasis sumber, kutipan yang dapat dibuka, dan akses yang mengikuti akun Anda tersedia setelah operator mengaktifkan AI lokal. Belum ada model, biaya AI, atau pertanyaan yang dikirim dari build ini.'}
+                  ? 'Setiap jawaban menyebut dokumen dan bagian yang menjadi sumbernya, dan bisa dibuka satu klik. Kalau tidak ada dokumennya, asisten bilang tidak tahu.'
+                  : 'Asisten menunjukkan bagian dokumen yang relevan dan boleh Anda baca. Kalau tidak ada, ia bilang tidak tahu.'
+                : 'AI belum diaktifkan pada instalasi ini. Gunakan pencarian untuk menemukan dokumen.'}
             </p>
             <Link className="btn-w" href="/ai-assistant">
               {aiOn ? 'Buka AI Assistant' : 'Lihat status AI'} <Icon name="arrow-r" size={14} />
             </Link>
           </div>
           <div className="ai-mini z">
-            <div className="q">Bagaimana konfigurasi VPN?</div>
+            <div className="q">Apakah MFA wajib untuk VPN lab?</div>
             <div className="a">
               {aiOn
-                ? 'Sumber yang boleh Anda baca dikutip dengan tautan ke bagian yang tepat; pertanyaan di luar cakupan dokumen dijawab "tidak tahu".'
-                : 'AI belum aktif. Untuk saat ini, temukan panduan melalui pencarian dan baca sumbernya langsung.'}
+                ? 'Ya. Profil VPN laboratorium mensyaratkan akun uji dan MFA saat masuk — lihat Konfigurasi VPN, bagian “Langkah konfigurasi”.'
+                : 'AI belum aktif. Temukan panduan lewat pencarian dan baca sumbernya langsung.'}
             </div>
             <div className="src">
-              <span>Tanpa jawaban tanpa sumber</span>
+              <span>Konfigurasi VPN · v1.0</span>
               <span>
                 {aiOn && ai.generationLocation === 'external'
-                  ? 'Provider eksternal (diakui operator)'
-                  : 'Tanpa request cloud'}
+                  ? 'Provider eksternal'
+                  : 'Berjalan di mesin ini'}
               </span>
             </div>
           </div>
@@ -245,7 +276,7 @@ export default async function HelpCenter() {
               <Icon name="check-c" size={21} />
               Dokumen terbaru
             </h2>
-            <p className="d">Versi contoh published, diurutkan berdasarkan waktu pembuatan versi</p>
+            <p className="d">Baru disetujui dan diterbitkan</p>
           </div>
         </div>
         <div className="card">

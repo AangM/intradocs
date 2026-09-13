@@ -3,7 +3,7 @@ import { listCategories } from '@intradocs/db/queries';
 import { requireActor } from '@/lib/session';
 import { listUsers } from '@intradocs/db/queries';
 import { ROLES, ROLE_LABELS, hasCapability, initials, type Role } from '@intradocs/core';
-import { PageHeading, Notice } from '@/components/shared';
+import { PageHeading } from '@/components/shared';
 import { Icon } from '@/components/icon';
 import { UserStatus } from '@/components/user-status';
 import { InviteUser } from '@/components/invite-user';
@@ -92,11 +92,6 @@ export default async function Users() {
           </div>
         </div>
       </div>
-      <Notice>
-        <strong>Scope + klasifikasi tetap berlaku.</strong> Bahkan Super Admin tidak otomatis
-        membaca Terbatas/Rahasia. Matriks berikut menunjukkan akses yang benar-benar diberlakukan;
-        bukan janji fitur yang belum tersedia.
-      </Notice>
       <section className="card mb">
         <div className="card-h">
           <Icon name="lock" />
@@ -271,9 +266,8 @@ export default async function Users() {
         </div>
       </section>
       <p className="sub tiny mt20">
-        Menonaktifkan akun memblokir pembacaan data di database dan mencabut session. Akun sendiri
-        tidak dapat dinonaktifkan; karena pelaku harus admin aktif, tindakan ini tidak dapat
-        menghapus admin aktif terakhir.
+        Akun yang dinonaktifkan langsung keluar dan tidak bisa membaca apa pun. Akun sendiri dan
+        admin aktif terakhir tidak bisa dinonaktifkan.
       </p>
     </div>
   );

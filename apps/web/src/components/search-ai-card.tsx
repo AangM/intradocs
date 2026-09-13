@@ -71,7 +71,7 @@ export function SearchAiCard({ query, categoryId }: { query: string; categoryId:
         Sumber yang relevan menurut AI
         <span className="pill p-green">retrieval lokal</span>
       </div>
-      {state.kind === 'pending' && <p className="sub">Mencari potongan dokumen yang relevan…</p>}
+      {state.kind === 'pending' && <p className="sub">Mencari bagian dokumen yang relevan…</p>}
       {state.kind === 'error' && (
         <p className="callout c-warn" role="alert">
           <Icon name="alert" size={16} />
@@ -80,8 +80,8 @@ export function SearchAiCard({ query, categoryId }: { query: string; categoryId:
       )}
       {state.kind === 'ok' && state.data.citations.length === 0 && (
         <p className="sub">
-          Tidak ada potongan dokumen dalam cakupan akses Anda yang cukup relevan dengan pertanyaan
-          ini. Hasil lexical di bawah tetap ditampilkan.
+          Tidak ada bagian dokumen yang cukup relevan dengan pertanyaan ini. Hasil pencarian kata
+          tetap ditampilkan di bawah.
         </p>
       )}
       {state.kind === 'ok' && state.data.citations.length > 0 && (
@@ -105,16 +105,20 @@ export function SearchAiCard({ query, categoryId }: { query: string; categoryId:
                 </li>
               ))}
           </ol>
-          <p className="sub tiny" style={{ marginTop: 10 }}>
-            {state.data.scope} versi aktif dalam cakupan
-            {state.data.rejected > 0
-              ? ` · ${state.data.rejected} kandidat ditolak validasi (izin atau teks buatan mesin)`
-              : ''}
-            {' · '}
-            <Link href={`/ai-assistant?q=${encodeURIComponent(query)}`}>
-              Minta jawaban tersusun di AI Assistant
+          <div className="search-ai-foot">
+            <span className="sub tiny">
+              Dicari di {state.data.scope} versi
+              {state.data.rejected > 0 ? ` · ${state.data.rejected} kutipan disaring` : ''}
+            </span>
+            <Link
+              href={`/ai-assistant?q=${encodeURIComponent(query)}`}
+              prefetch={false}
+              className="btn btn-sm"
+            >
+              <Icon name="spark" size={13} />
+              Minta jawaban tersusun
             </Link>
-          </p>
+          </div>
         </>
       )}
     </section>

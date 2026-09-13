@@ -33,7 +33,7 @@ export default async function AccessRequests() {
     <div className="pad">
       <PageHeading
         title="Permintaan Akses"
-        subtitle="Ajukan akses ke materi Terbatas atau Rahasia pada kategori yang sudah Anda lihat. Setiap keputusan tercatat beserta alasannya."
+        subtitle="Minta akses ke dokumen Terbatas atau Rahasia; keputusannya tercatat."
       />
       {isAdmin && (
         <section className="card">
