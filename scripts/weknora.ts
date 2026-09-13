@@ -790,6 +790,22 @@ async function autotag(): Promise<void> {
 }
 
 const MAX_COMPLETION_TOKENS = 1024;
+/**
+ * Ollama's default context is 4096 tokens and WeKnora never sets num_ctx. With the
+ * system prompt, five turns of history and eight passages that window overflows, and
+ * Ollama then drops the *oldest* tokens -- the system prompt and the grounding rules --
+ * silently. 8192 keeps everything; the KV cache costs well under a gigabyte of VRAM
+ * for a 3B model.
+ */
+const NUM_CTX = 8192;
+/**
+ * Ollama's default repeat_penalty (1.1) and the 1.15 first used here penalise tokens
+ * that already appear in the window -- including the passages the model is supposed to
+ * copy from. Measured: "Backup belum dianggap berhasil sebelum ..." came back without
+ * "belum", the opposite meaning. A grounded assistant must be free to repeat its
+ * sources verbatim; runaway answers are bounded by num_predict instead.
+ */
+const REPEAT_PENALTY = 1.02;
 
 /**
  * Reranker weights, one command: `pnpm weknora:rerank-weights`.
@@ -988,7 +1004,11 @@ async function generationModel(): Promise<void> {
     body: JSON.stringify({
       model: derived,
       from: base,
-      parameters: { num_predict: MAX_COMPLETION_TOKENS, repeat_penalty: 1.15 },
+      parameters: {
+        num_predict: MAX_COMPLETION_TOKENS,
+        repeat_penalty: REPEAT_PENALTY,
+        num_ctx: NUM_CTX,
+      },
       stream: false,
     }),
     signal: AbortSignal.timeout(120_000),
@@ -1007,7 +1027,11 @@ async function generationModel(): Promise<void> {
     .map((line) => line.trim().split(/\s+/).join(' '));
   if (!parameters.includes(`num_predict ${MAX_COMPLETION_TOKENS}`))
     throw new Error(`Ollama tidak menyimpan num_predict pada ${derived}; jawaban tidak dibatasi.`);
-  console.log(`Model Ollama ${derived} siap (num_predict=${MAX_COMPLETION_TOKENS}).`);
+  if (!parameters.includes(`num_ctx ${NUM_CTX}`))
+    throw new Error(`Ollama tidak menyimpan num_ctx pada ${derived}; konteks akan terpotong.`);
+  console.log(
+    `Model Ollama ${derived} siap (num_predict=${MAX_COMPLETION_TOKENS}, num_ctx=${NUM_CTX}, repeat_penalty=${REPEAT_PENALTY}).`,
+  );
 
   const client = new WeknoraClient(ai.weknora);
   let model = (await client.listModels()).find(
@@ -1065,9 +1089,13 @@ async function pinAgent(): Promise<void> {
       system_prompt: [
         'Anda adalah asisten IntraDocs, portal dokumen internal.',
         'Aturan utama: jawab HANYA dengan fakta yang tertulis di materi referensi permintaan ini. Boleh merangkum, mengurutkan, atau menerjemahkan isinya. Dilarang menambahkan pengetahuan umum, saran umum, atau langkah yang tidak tertulis di materi — termasuk saran seperti "hubungi tim IT" bila materi tidak menyebutnya.',
-        `Bila materi tidak memuat jawabannya, tulis persis kalimat ini sebagai jawaban: "${MODEL_DECLINE_SENTENCE}" Boleh ditambah satu kalimat tentang apa yang memang dibahas materi, lalu berhenti.`,
-        'Untuk pertanyaan lanjutan, pakai riwayat percakapan hanya untuk memahami maksud pertanyaan; faktanya tetap hanya dari materi.',
-        'Bahasa Indonesia, ringkas, langsung ke isi; tanpa kalimat pembuka atau penutup.',
+        'Jawab selengkap yang materi izinkan: sertakan semua langkah, syarat, angka, nama bagian, dan pengecualian yang tertulis. Gunakan daftar bernomor untuk langkah dan daftar poin untuk syarat atau pemeriksaan. Jangan meringkas menjadi satu kalimat bila materi memuat lebih dari itu.',
+        'Salin kata-kata penting persis seperti di materi — terutama negasi (belum, tidak, bukan, jangan), angka, durasi, dan nama — karena satu kata yang hilang membalik maknanya.',
+        'Baris komentar "<!-- intradocs ... -->", baris "Sumber: IntraDocs ...", dan catatan "DATA SINTETIS ..." di awal materi adalah metadata, bukan isi: abaikan, dan jangan jadikan alasan untuk menolak menjawab.',
+        'Mulai jawaban dengan apa yang materi katakan tentang pertanyaan itu. Bila materi menjawab sebagian, jawab bagian itu lalu sebutkan apa yang tidak dibahas. Bila materi menyebut syaratnya secara tidak langsung (misalnya "belum dianggap berhasil sebelum X"), itu adalah jawabannya: sampaikan sebagai "berhasil setelah X".',
+        `Hanya bila materi sama sekali tidak menyinggung topik yang ditanyakan, jawab dengan kalimat ini saja: "${MODEL_DECLINE_SENTENCE}" Jangan pernah memulai jawaban dengan kalimat itu lalu mengutip materi — bila Anda punya kutipan yang relevan, itu jawabannya.`,
+        'Untuk pertanyaan lanjutan, pakai riwayat percakapan hanya untuk memahami maksud pertanyaan; faktanya tetap hanya dari materi. Bila diminta menjelaskan lebih lengkap, uraikan bagian materi yang belum disampaikan.',
+        'Bahasa Indonesia yang jelas, tanpa basa-basi pembuka. Boleh menutup dengan satu kalimat yang menunjuk bagian dokumen mana yang perlu dibaca untuk detailnya.',
       ].join(String.fromCharCode(10)),
       context_template_id: 'default_context',
       // The per-turn wrapper. WeKnora's default puts the question first and the sources
@@ -1083,7 +1111,7 @@ async function pinAgent(): Promise<void> {
         '',
         'Pertanyaan: {{query}}',
         '',
-        'Jawab pertanyaan itu dari materi referensi di atas, dalam bahasa Indonesia. Riwayat percakapan hanya untuk memahami maksud pertanyaan, bukan sumber fakta.',
+        'Jawab pertanyaan itu selengkap mungkin dari materi referensi di atas, dalam bahasa Indonesia, dengan kata-kata penting (negasi, angka, nama) disalin persis. Riwayat percakapan hanya untuk memahami maksud pertanyaan, bukan sumber fakta.',
         '',
         'Current time: {{current_time}} {{current_week}}',
       ].join(String.fromCharCode(10)),
@@ -1127,7 +1155,9 @@ async function pinAgent(): Promise<void> {
       embedding_top_k: rerankModelId ? 20 : 10,
       keyword_threshold: 0.3,
       vector_threshold: 0.5,
-      rerank_top_k: 6,
+      // Eight passages instead of six: answers were one line long because the model saw
+      // one or two chunks of a document; completeness needs the neighbouring sections.
+      rerank_top_k: 8,
       // bge-reranker-v2-m3 (int8) on this Indonesian corpus scores a passage that answers
       // directly at 0.3-0.7 and an unrelated one below 0.01, so the gap is wide but the
       // usual 0.3 sits at its edge (a13's answering chunk: 0.32-0.35). Below the threshold

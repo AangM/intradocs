@@ -11,6 +11,8 @@ import { Pool } from 'pg';
 import { ROOT, loadLocalEnv, localAdminUrl, reportFailure } from './shared.ts';
 import { GOLD, GOLD_COUNTS, type GoldQuestion } from '../tests/rag/gold-questions.ts';
 import { NO_DIRECT_ANSWER_MESSAGE } from '../packages/core/src/rag-messages.ts';
+import { readAiConfig } from '../packages/core/src/ai-config.ts';
+import { WeknoraClient } from '../packages/core/src/weknora.ts';
 import type { DemoAccount } from './seed.ts';
 
 interface Outcome {
@@ -34,6 +36,7 @@ async function main(): Promise<void> {
   const chat = process.argv.includes('--chat');
   const base = process.env.APP_URL!;
   const admin = new Pool({ connectionString: localAdminUrl(), max: 1 });
+  const runStarted = new Date();
   const accounts = JSON.parse(
     await readFile(path.join(ROOT, 'var/demo-accounts.json'), 'utf8'),
   ) as DemoAccount[];
@@ -82,7 +85,9 @@ async function main(): Promise<void> {
     };
     const citations = body.citations ?? [];
     const fellBack =
-      chat && citations.length > 0 && (body.answer ?? '').trim() === NO_DIRECT_ANSWER_MESSAGE;
+      chat &&
+      citations.length > 0 &&
+      (body.answer ?? '').trim().startsWith(NO_DIRECT_ANSWER_MESSAGE);
     anchored += citations.filter((c) => c.anchor).length;
     citedTotal += citations.length;
     // Rank by first appearance, deduplicated: several chunks of one document are one hit.
@@ -100,6 +105,20 @@ async function main(): Promise<void> {
       fellBack,
       ms,
     });
+  }
+  // Forty gold questions would otherwise sit in the demo accounts' assistant history
+  // after every run. The WeKnora sessions behind them are deleted by the app path only
+  // through the API, so they are swept here too; nothing else references them.
+  const gone = await admin.query(
+    'DELETE FROM app.ai_conversations WHERE created_at >= $1 AND user_id = ANY($2::text[]) RETURNING weknora_session_id',
+    [runStarted, [...new Set(GOLD.map((q) => q.actor))]],
+  );
+  const ai = readAiConfig(process.env);
+  if (chat && ai.weknora) {
+    const client = new WeknoraClient(ai.weknora);
+    for (const row of gone.rows as Array<{ weknora_session_id: string | null }>)
+      if (row.weknora_session_id)
+        await client.deleteSession(row.weknora_session_id).catch(() => undefined);
   }
   await admin.end();
 

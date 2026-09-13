@@ -19,6 +19,8 @@ import {
   parseChatBody,
   parseQuestion,
   isContinuation,
+  classifyIntent,
+  salvageDecline,
   ABSTAIN_MESSAGE,
   NO_DIRECT_ANSWER_MESSAGE,
   MODEL_DECLINE_SENTENCE,
@@ -463,6 +465,15 @@ test("WeKnora's fixed fallback is never shown next to sources as if it were an a
     assert.equal(declined.fellBack, true, decline);
     assert.equal(declined.answer, NO_DIRECT_ANSWER_MESSAGE);
   }
+  // What the model says after declining is kept as the material's own account: the 3B
+  // model often declines and then quotes the sentence that answers.
+  const kept = resolveGeneratedAnswer(
+    `${MODEL_DECLINE_SENTENCE} Dokumen tersebut menjelaskan bahwa backup belum dianggap berhasil sebelum hasil restore dapat diverifikasi.`,
+  );
+  assert.equal(kept.fellBack, true);
+  assert.match(kept.remainder, /^Dokumen tersebut menjelaskan bahwa backup belum/);
+  assert.equal(resolveGeneratedAnswer(`${MODEL_DECLINE_SENTENCE} Terima kasih.`).remainder, '');
+  assert.equal(resolveGeneratedAnswer(ABSTAIN_MESSAGE).remainder, '');
   // ...but a sentence that merely contains the words is an answer.
   const near = resolveGeneratedAnswer(
     'Bagian "Jika koneksi gagal" tidak membahas MFA, hanya kode kesalahan.',
@@ -568,4 +579,57 @@ test('a follow-up that names nothing is a continuation; one that names a subject
     'jelaskan lebih lengkap tentang setiap langkah konfigurasi VPN pada perangkat uji laboratorium',
   ])
     assert.equal(isContinuation(q), false, q || '(empty)');
+});
+
+test('messages about the assistant or the catalogue are routed by intent; content questions are not', () => {
+  const cases: Array<[string, ReturnType<typeof classifyIntent>]> = [
+    ['Halo', 'greeting'],
+    ['selamat pagi!', 'greeting'],
+    ['Terima kasih', 'thanks'],
+    ['oke sip', 'thanks'],
+    ['Kamu bisa apa?', 'capabilities'],
+    ['apa yang bisa kamu lakukan', 'capabilities'],
+    ['Apa ada dokumen lain yang menarik?', 'catalog'],
+    ['dokumen apa saja yang ada?', 'catalog'],
+    ['ada panduan lain tentang VPN?', 'catalog'],
+    ['rekomendasi bacaan dong', 'catalog'],
+    ['Dokumen apa saja yang bisa saya baca?', 'catalog'],
+    ['ada berapa dokumen di sini', 'catalog'],
+    // Content questions, including ones that mention documents, go through the gate.
+    ['Dokumen apa yang mengatur retensi backup?', null],
+    ['Untuk dataset apa saja kebijakan backup ini berlaku?', null],
+    ['Apa konvensi penamaan branch untuk satu irisan fitur?', null],
+    ['Apa yang wajib dicantumkan saat mengajukan review perubahan?', null],
+    ['Apa saja langkah konfigurasi VPN?', null],
+    ['Berapa harga saham perusahaan hari ini?', null],
+    ['Kalau perangkat authenticator-nya hilang, apa yang harus dilakukan?', null],
+    ['Jelaskan lebih lengkap.', null],
+    ['Halo, apakah MFA wajib untuk VPN laboratorium?', null],
+  ];
+  for (const [q, want] of cases) assert.equal(classifyIntent(q), want, q);
+});
+
+test('a decline that goes on to quote the answer is salvaged; one that only describes the passages is not', () => {
+  const vpn = salvageDecline(
+    'Hostname apa yang dipakai untuk verifikasi koneksi VPN?',
+    'Namun, dokumen tersebut menyebutkan untuk melakukan verifikasi koneksi VPN menggunakan hostname dokumentasi, bukan alamat server produksi: ping vpn.example.test',
+  );
+  assert.match(vpn ?? '', /^Dokumen tersebut menyebutkan/);
+  const branch = salvageDecline(
+    'Branch mana yang dipakai untuk perubahan yang sudah direview?',
+    'Materi menyebutkan bahwa branch `main` digunakan untuk perubahan yang sudah direview.',
+  );
+  assert.match(branch ?? '', /branch `main`/);
+  assert.equal(
+    salvageDecline(
+      'Kalau perangkat authenticator-nya hilang, apa yang harus dilakukan?',
+      'Materi referensi membahas proses pemasangan agent pada server laboratorium, prasyaratnya, dan verifikasi metrik perangkat uji.',
+    ),
+    null,
+  );
+  assert.equal(salvageDecline('Kenapa?', 'Materi membahas backup dan retensi data.'), null);
+  assert.equal(
+    salvageDecline('Apa nomor kontrak vendor jaringan yang berlaku?', 'Tidak ada.'),
+    null,
+  );
 });

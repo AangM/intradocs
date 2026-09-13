@@ -32,6 +32,10 @@ interface Turn {
   hiddenCitations: number;
   /** The owner's "membantu" vote; null until cast. */
   helpful: boolean | null;
+  /** Documents worth opening next (catalogue answers, abstentions); live turns only. */
+  related?: Array<{ documentId: string; title: string; categoryName: string; href: string }>;
+  /** Questions the person can ask next; live turns only. */
+  suggestions?: string[];
 }
 
 export interface ConversationItem {
@@ -247,6 +251,8 @@ export function AssistantChat({
         citations: body.citations,
         rejectedCount: body.rejectedCount,
         scopeSize: body.scopeSize,
+        related: body.related ?? [],
+        suggestions: body.suggestions ?? [],
       };
       setTurns((list) => [...list, turn]);
       setQuestion('');
@@ -581,9 +587,29 @@ export function AssistantChat({
                         {turn.abstained && !turn.answer && (
                           <p className="a-text a-abstain">
                             <Icon name="help" size={15} />
-                            Tidak ada dokumen yang boleh Anda baca yang membahas ini, jadi saya
-                            tidak menjawab.
+                            {turn.related?.length
+                              ? 'Tidak ada dokumen yang membahas ini secara langsung. Yang paling dekat ada di bawah — atau coba salah satu pertanyaan berikut.'
+                              : 'Tidak ada dokumen yang boleh Anda baca yang membahas ini, jadi saya tidak menjawab. Coba kata lain, atau tanyakan "dokumen apa saja yang ada?".'}
                           </p>
+                        )}
+                        {(turn.related?.length ?? 0) > 0 && (
+                          <div className="src-row">
+                            <span className="src-lbl">
+                              {turn.abstained ? 'Mungkin terkait' : 'Dokumen'}
+                            </span>
+                            {turn.related!.map((d) => (
+                              <Link
+                                key={d.documentId}
+                                href={d.href}
+                                prefetch={false}
+                                className="src-chip"
+                                title={`${d.title} · ${d.categoryName}`}
+                              >
+                                <Icon name="book" size={13} />
+                                <span className="src-t">{d.title}</span>
+                              </Link>
+                            ))}
+                          </div>
                         )}
                         {docs.length > 0 && (
                           <div className="src-row">
@@ -638,6 +664,24 @@ export function AssistantChat({
                               </li>
                             ))}
                           </ol>
+                        )}
+                        {(turn.suggestions?.length ?? 0) > 0 && !pending && (
+                          <div className="sugg-row" aria-label="Pertanyaan lanjutan">
+                            {turn.suggestions!.map((q) => (
+                              <button
+                                key={q}
+                                type="button"
+                                className="sugg-chip"
+                                onClick={() => {
+                                  setQuestion(q);
+                                  void ask(q);
+                                }}
+                              >
+                                <Icon name="spark" size={12} />
+                                {q}
+                              </button>
+                            ))}
+                          </div>
                         )}
                         {/* One vote per answer, on the stored turn. An unhelpful vote also
                             counts as a knowledge-gap signal, like a search that found nothing.

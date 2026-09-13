@@ -71,11 +71,26 @@ export function stripQuestionTail(text) {
   return questions.every(isQuestion) ? head : text;
 }
 
-/** WeKnora's request, as TEI wants it. */
+/**
+ * WeKnora indexes the summary it generated at ingest as a chunk of its own, headed
+ * "# Summary". A summary is a small model's paraphrase, and it paraphrases wrong: the
+ * VPN runbook's "Masuk menggunakan akun uji dan MFA" became "verifikasi dua faktor (MFA)
+ * jika diperlukan", the summary chunk outranked the real text, and the answering model
+ * concluded MFA was optional. The summary stays useful as an editor's draft (§17); it
+ * is never evidence. Such a passage is scored 0 here so the threshold drops it, and the
+ * reranker sees only the document's own words.
+ */
+export function isGeneratedSummary(text) {
+  // The chunk is stored as "# Summary\n..."; the passage WeKnora hands the reranker has
+  // the heading marker stripped ("Summary\n..."), so the marker is optional here.
+  return /^\s*(?:#+\s*)?summary\s*\n/i.test(text);
+}
+
+/** WeKnora's request, as TEI wants it. Summary chunks are sent as empty texts. */
 export function toTeiBody(query, documents) {
   return {
     query,
-    texts: documents.map(stripQuestionTail),
+    texts: documents.map((d) => (isGeneratedSummary(d) ? '' : stripQuestionTail(d))),
     // truncate: inputs longer than TEI's window are cut, never rejected.
     raw_scores: false,
     truncate: true,
@@ -89,7 +104,8 @@ export function toWeknoraResults(scored, documents) {
     .filter((r) => Number.isInteger(r?.index) && r.index >= 0 && r.index < documents.length)
     .map((r) => ({
       index: r.index,
-      relevance_score: typeof r.score === 'number' ? r.score : 0,
+      relevance_score:
+        isGeneratedSummary(documents[r.index]) || typeof r.score !== 'number' ? 0 : r.score,
       document: { text: documents[r.index] },
     }))
     .sort((a, b) => b.relevance_score - a.relevance_score);

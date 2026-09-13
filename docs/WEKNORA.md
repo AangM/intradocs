@@ -1233,3 +1233,82 @@ kini juga mengenali kalimat pembuka itu (`MODEL_DECLINE_PATTERN`) dan menampilka
 `NO_DIRECT_ANSWER_MESSAGE` yang sama dengan fallback WeKnora — satu kalimat pembaca, sumber
 terdekat tetap tercantum di bawahnya. Kolom `rag:eval` yang dulu "fallback WeKnora" kini
 "tanpa jawaban" dan mencakup keduanya.
+
+## 25. Keandalan jawaban: ringkasan hasil ingest bukan bukti, dan asisten yang bisa diajak bicara
+
+Keluhan yang memicu bagian ini: "apa ada dokumen lain yang menarik?" dijawab "tidak ada
+sumber"; jawaban pertanyaan templat satu kalimat dan kurang lengkap; MFA di VPN dijawab
+"tidak disebutkan secara langsung … MFA jika diperlukan" padahal dokumennya berbunyi "Masuk
+menggunakan akun uji dan MFA". Yang ditemukan, dari yang paling berpengaruh:
+
+**Chunk `# Summary` buatan ingest ikut menjadi bukti model.** WeKnora mengindeks ringkasan
+yang dibuatnya saat ingest (§17) sebagai chunk tersendiri, dan ringkasan itu adalah parafrase
+model kecil: "verifikasi dua faktor (MFA) jika diperlukan" — kata "jika diperlukan" tidak ada
+di dokumen mana pun. Chunk ringkasan itu **mengungguli teks aslinya** di reranker (0,95 vs 0,93)
+dan model penjawab mempercayainya. Sitasi IntraDocs sendiri sudah menolak chunk seperti itu
+(tidak bisa dilokasikan di Markdown asli → "kutipan disaring"), tetapi jalur _jawaban_ WeKnora
+tetap menerimanya. Perbaikan di shim reranker (`isGeneratedSummary`): passage yang diawali
+"Summary" (penanda `#` sudah dibuang WeKnora sebelum rerank) dikirim kosong ke TEI dan diberi
+skor 0, sehingga ambang membuangnya. Ringkasan tetap berguna sebagai draf editor; ia tidak
+pernah menjadi bukti. Sesudahnya: "MFA dibutuhkan … terlihat pada langkah ke-3". Tes:
+`tests/unit/rerank-shim.test.ts`.
+
+**Jendela konteks Ollama 4096 dan repeat penalty.** WeKnora tidak pernah mengirim `num_ctx`,
+jadi Ollama memakai bawaan 4096 token; prompt sistem + 5 giliran riwayat + 8 passage
+melampauinya dan Ollama membuang token _tertua_ — prompt sistem dan aturan grounding — tanpa
+peringatan. Model turunan kini dibuat dengan `num_ctx 8192` (VRAM 2,16 → 2,4 GB). Dan
+`repeat_penalty 1.15` menghukum token yang sudah muncul di jendela — termasuk kata-kata di
+passage yang justru harus disalin: "Backup **belum** dianggap berhasil sebelum …" kembali tanpa
+"belum", makna terbalik. Kini 1,02; jawaban yang lari tetap dibatasi `num_predict`.
+
+**Prompt: lengkap, bukan ringkas.** Aturan "ringkas, langsung ke isi" menghasilkan satu
+kalimat untuk pertanyaan yang materinya berisi empat langkah. Prompt kini meminta jawaban
+selengkap materi (daftar bernomor untuk langkah, poin untuk syarat), menyalin negasi/angka/
+nama persis, mengabaikan header provenance (`<!-- intradocs … -->`, "Sumber: IntraDocs …",
+"DATA SINTETIS …") sebagai metadata, menjawab sebagian bila materi menjawab sebagian, dan
+menulis kalimat penolakan **hanya** bila materi sama sekali tidak menyinggung topiknya.
+`rerank_top_k` 6 → 8. Hasil: "Bagaimana cara konfigurasi VPN?" kini empat langkah bernomor +
+verifikasi + apa yang dilakukan bila gagal.
+
+**Kalimat penolakan sebagai refleks.** Setelah prompt meminta jawaban lengkap, model 3B
+justru sering membuka dengan kalimat penolakan lalu mengutip jawabannya: "Dokumen … tidak
+membahas hal ini. Namun, dokumen tersebut menyebutkan … `ping vpn.example.test`" — eval
+mencatat 7/20 pertanyaan terjawab sebagai "tanpa jawaban". Tiga lapis mengatasinya:
+
+- Prompt: "Mulai jawaban dengan apa yang materi katakan … Jangan pernah memulai jawaban
+  dengan kalimat penolakan lalu mengutip materi — bila Anda punya kutipan yang relevan, itu
+  jawabannya." Kalimat penolakan hanya untuk materi yang sama sekali tidak menyinggung topik.
+- `resolveGeneratedAnswer` mengembalikan `remainder` (teks setelah kalimat penolakan), dan
+  `salvageDecline()` (core, diuji unit) menjadikannya jawaban bila ia berbagi ≥ 2 kata isi
+  dengan pertanyaan ("Namun," di depan dibuang). "Materi referensi membahas pemasangan
+  agent…" untuk pertanyaan authenticator hilang tidak lolos (1 kata) dan tetap penolakan.
+- Penolakan yang tetap penolakan disusun sebagai "Tidak ada bagian dokumen yang menjawab …
+  secara langsung" + "Yang disebutkan materi: …" (bila ada) + kutipan verbatim passage
+  terdekat (`nearestCitation`: tumpang tindih kata dengan pertanyaan, passage bagian lebih
+  diutamakan daripada kepala dokumen; tanpa tumpang tindih sama sekali, tidak ada kutipan).
+  Untuk "kapan backup dianggap berhasil?" — inferensi "belum berhasil sebelum X" → "setelah
+  X" yang tidak selalu ditarik model — pembaca melihat kalimat "Backup belum dianggap
+  berhasil sebelum hasil restore dapat diverifikasi." di dalam chat, bukan disuruh membaca
+  semua dokumen.
+
+**Asisten yang bisa diajak bicara — tanpa model.** `classifyIntent()` (core/rag) mengenali
+sapaan, terima kasih, "kamu bisa apa?", dan pertanyaan tentang katalog ("apa ada dokumen lain
+yang menarik?", "dokumen apa saja yang ada?", "ada panduan lain tentang VPN?"). Semuanya
+dijawab deterministik dari data yang sudah disaring RLS — daftar dokumen (`relatedDocuments`,
+indeks leksikal yang sama dengan pencarian tetapi **tanpa** menulis `search_events`) atau
+kalimat tetap — sehingga tidak ada model yang bisa mengarang di jalur ini. Pertanyaan isi yang
+menyebut kata "dokumen" ("dokumen apa yang mengatur retensi?") sengaja tidak ditangkap.
+
+**Setiap giliran menawarkan langkah berikutnya.** `related` (dokumen terdekat, saat abstain
+dan pada jawaban katalog) dan `suggestions` (pertanyaan hasil ingest untuk dokumen yang
+dikutip, dirapikan `tidyQuestion` dari "… sesuai petunjuk di dokumen ini?") ikut di respons
+chat dan dirender sebagai chip. Keduanya tidak disimpan bersama giliran; teks jawaban sudah
+menyebut judulnya.
+
+`rag:eval --chat` sesudah semuanya: 20/20 recall · 8/10 abstain · 0 bocor · p50 1,8 s (dari
+3–8 s: konteks tidak lagi terpotong dan passage ringkasan tidak ikut) · "tanpa jawaban" 12/40,
+lima di antaranya pertanyaan terjawab (a07, a09, a14, a17, a19) yang kini datang bersama
+kutipan passage terdekat, sisanya pertanyaan tanpa bukti atau lintas izin yang memang harus
+ditolak. Tes: `tests/unit/rag.test.ts` (`classifyIntent`, `salvageDecline`, `remainder`),
+`tests/unit/rerank-shim.test.ts` (`isGeneratedSummary`), tes HTTP dan e2e asisten tidak
+berubah dan tetap hijau. `rag:eval` kini menghapus percakapan yang dibuatnya.

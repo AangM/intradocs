@@ -11,7 +11,7 @@ export const ABSTAIN_MESSAGE =
  * IntraDocs' gate had passed some passages. Said as exactly that, next to the sources.
  */
 export const NO_DIRECT_ANSWER_MESSAGE =
-  'Tidak ada bagian dokumen yang menjawab pertanyaan ini secara langsung, jadi tidak ada jawaban yang disusun. Sumber terdekat yang boleh Anda baca tercantum di bawah.';
+  'Tidak ada bagian dokumen yang menjawab pertanyaan ini secara langsung, jadi saya tidak menyusun jawaban sendiri.';
 
 /**
  * The sentence the pinned agent's prompt tells the model to write when the passages it

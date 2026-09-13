@@ -4,7 +4,12 @@
 // relevance_score}]} out -- with indexes into the ORIGINAL documents. See WEKNORA.md §17.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { stripQuestionTail, toTeiBody, toWeknoraResults } from '../../scripts/rerank-shim.mjs';
+import {
+  stripQuestionTail,
+  toTeiBody,
+  toWeknoraResults,
+  isGeneratedSummary,
+} from '../../scripts/rerank-shim.mjs';
 
 test("WeKnora's generated-question paragraph is dropped before scoring, real text is kept", () => {
   // getEnrichedPassage appends "q1; q2" as the last paragraph of every passage.
@@ -52,4 +57,32 @@ test("TEI's reply becomes WeKnora's shape, best first, indexed into the original
   ]);
   // Anything that is not an array is a 502 upstream, not an empty rerank.
   assert.equal(toWeknoraResults({ error: 'x' }, documents), null);
+});
+
+test('a generated "# Summary" chunk is never evidence: sent empty, scored zero', () => {
+  const summary = '# Summary\nMasukkan akun uji dan verifikasi dua faktor (MFA) jika diperlukan.';
+  const real = '## Langkah konfigurasi\n3. Masuk menggunakan akun uji dan MFA.';
+  assert.equal(isGeneratedSummary(summary), true);
+  assert.equal(
+    isGeneratedSummary('Summary\nKonfigurasi VPN dilakukan dengan cara yang sama.'),
+    true,
+  );
+  assert.equal(isGeneratedSummary(real), false);
+  assert.equal(isGeneratedSummary('Ringkasan: # Summary bukan di awal'), false);
+  const body = toTeiBody('MFA?', [summary, real]);
+  assert.deepEqual(body.texts, ['', real]);
+  const results = toWeknoraResults(
+    [
+      { index: 0, score: 0.9 },
+      { index: 1, score: 0.4 },
+    ],
+    [summary, real],
+  );
+  assert.deepEqual(
+    results!.map((r) => [r.index, r.relevance_score]),
+    [
+      [1, 0.4],
+      [0, 0],
+    ],
+  );
 });

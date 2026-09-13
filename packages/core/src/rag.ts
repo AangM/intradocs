@@ -452,6 +452,84 @@ export function isContinuation(question: string): boolean {
 }
 
 /**
+ * Messages that are about the assistant or the catalogue rather than about a document's
+ * content. They never reach retrieval: the answer is composed from the catalogue the
+ * person may read (RLS) or is a fixed sentence, so "apa ada dokumen lain yang menarik?"
+ * gets a list instead of "tidak ada sumber". Content questions return null and go
+ * through the gate as before; a question that names a document AND asks about its
+ * content ("dokumen apa yang mengatur retensi?") is deliberately not matched.
+ */
+export type AssistantIntent = 'greeting' | 'thanks' | 'capabilities' | 'catalog';
+
+export function classifyIntent(question: string): AssistantIntent | null {
+  const q = question
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s?]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const words = q.replace(/\?/g, '').split(' ').filter(Boolean);
+  if (words.length === 0) return null;
+  if (
+    words.length <= 12 &&
+    /\b(bisa apa|apa yang (bisa|dapat) (kamu|anda|kau|lu)( lakukan| bantu)?|kamu siapa|siapa kamu|apa itu intradocs|cara (pakai|memakai|menggunakan) (asisten|kamu|ini)|bagaimana (cara )?bertanya|(fitur|kemampuan) (apa|kamu|anda|asisten)|kamu bisa|bantuan)\b/.test(
+      q,
+    )
+  )
+    return 'capabilities';
+  if (
+    words.length <= 4 &&
+    /^(halo|hai|hi|hello|hey|selamat (pagi|siang|sore|malam)|pagi|siang|sore|malam|assalamualaikum|permisi|tes|test)\b/.test(
+      q,
+    )
+  )
+    return 'greeting';
+  if (
+    words.length <= 6 &&
+    /^(terima kasih|makasih|thanks|thank you|thx|oke|ok|sip|mantap|baik|siap|noted)\b/.test(q)
+  )
+    return 'thanks';
+  // The document must be the thing asked about -- "dokumen apa saja", "ada panduan
+  // lain", "rekomendasi bacaan" -- not merely mentioned ("kebijakan backup ini berlaku
+  // untuk dataset apa saja?" is a content question about one policy).
+  const DOC = '(?:dokumen|doc|docs|panduan|sop|artikel|materi|topik|bacaan|referensi)\\w*';
+  const catalog = [
+    `^(?:apa|ada|adakah|apakah|punya|tolong|coba|bisa|mohon)?\\s*(?:ada\\s+)?${DOC}\\s+(?:lain|lainnya|apa saja|apa aja|menarik|tersedia|terbaru|populer|yang (?:lain|menarik|tersedia|ada|bisa|boleh|perlu|harus|terbaru|populer|paling))`,
+    `\\b(?:rekomendasi|rekomendasikan|sarankan|saran|daftar|list|semua|seluruh)\\s+${DOC}`,
+    `\\b${DOC}\\s+(?:apa saja|apa aja)\\s+yang\\s+(?:ada|tersedia|bisa|boleh)`,
+    `\\b(?:apa|mana)\\s+(?:saja\\s+)?yang\\s+(?:bisa|boleh|dapat|perlu|harus)\\s+(?:saya|aku)\\s+baca`,
+    `\\b(?:ada|berapa)\\s+(?:berapa\\s+)?${DOC}`,
+  ];
+  if (words.length <= 14 && catalog.some((p) => new RegExp(p, 'u').test(q))) return 'catalog';
+  return null;
+}
+
+/**
+ * A 3B model often opens with the decline sentence and then quotes the very passage
+ * that answers ("Dokumen ... tidak membahas hal ini. Namun, dokumen tersebut menyebutkan
+ * ... ping vpn.example.test"). When that continuation shares enough of the question's
+ * own words, it IS the answer and is returned as such (leading "Namun," trimmed);
+ * otherwise -- the continuation merely describes what the passages are about -- null,
+ * and the caller keeps the honest "no direct answer" framing.
+ */
+export function salvageDecline(question: string, remainder: string): string | null {
+  const content = (t: string) =>
+    new Set(
+      t
+        .toLowerCase()
+        .split(/[^\p{L}\p{N}]+/u)
+        .filter((w) => w.length >= 4 && !CONTINUATION_WORDS.has(w)),
+    );
+  const asked = [...content(question)];
+  if (asked.length === 0 || remainder.length < 40) return null;
+  const said = content(remainder);
+  const overlap = asked.filter((w) => said.has(w)).length;
+  if (overlap < 2 && overlap < asked.length) return null;
+  return remainder
+    .replace(/^(?:namun|tetapi|akan tetapi|meskipun demikian|meski begitu)\s*,?\s*/iu, '')
+    .replace(/^\p{Ll}/u, (c) => c.toUpperCase());
+}
+
+/**
  * What a question is asked against. `all` is every active version the actor may read;
  * the other two NARROW that set -- a category the actor can see, or documents the actor
  * has opened. A scope never widens anything: the IDs are filtered through the same
@@ -530,15 +608,34 @@ export {
  *    thresholds, or the reranker when one is on -- kept no chunk. Shown verbatim it would
  *    contradict the source list under it.
  *  - The model's own decline, which the pinned prompt asks for when the passages do not
- *    contain the answer. The small model paraphrases it and sometimes keeps writing about
- *    what the passages do cover; the opening sentence is the whole signal.
+ *    contain the answer. The small model paraphrases it and then often keeps writing
+ *    about what the passages do say -- frequently the very sentence that answers
+ *    ("...belum dianggap berhasil sebelum hasil restore dapat diverifikasi, namun tidak
+ *    menyebutkan kapan tepatnya"). That continuation comes back as `remainder`, so the
+ *    caller can show it as what the material does say rather than throw it away.
  * Any other text is passed through untouched.
  */
-export function resolveGeneratedAnswer(text: string): { answer: string; fellBack: boolean } {
+export function resolveGeneratedAnswer(text: string): {
+  answer: string;
+  fellBack: boolean;
+  /** What the model wrote after its decline sentence, when anything; never a fixed fallback's. */
+  remainder: string;
+} {
   const trimmed = text.trim();
-  if (trimmed === ABSTAIN_MESSAGE || MODEL_DECLINE_PATTERN.test(trimmed))
-    return { answer: NO_DIRECT_ANSWER_MESSAGE, fellBack: true };
-  return { answer: text, fellBack: false };
+  if (trimmed === ABSTAIN_MESSAGE)
+    return { answer: NO_DIRECT_ANSWER_MESSAGE, fellBack: true, remainder: '' };
+  if (MODEL_DECLINE_PATTERN.test(trimmed)) {
+    // The decline sentence ends at its first period; the rest is the model's account of
+    // the material. A remainder that only restates the decline is dropped.
+    const end = trimmed.search(/[.!]\s|[.!]$/);
+    const remainder = end >= 0 ? trimmed.slice(end + 1).trim() : '';
+    return {
+      answer: NO_DIRECT_ANSWER_MESSAGE,
+      fellBack: true,
+      remainder: remainder.length >= 40 && !MODEL_DECLINE_PATTERN.test(remainder) ? remainder : '',
+    };
+  }
+  return { answer: text, fellBack: false, remainder: '' };
 }
 
 /* ------------------------------------------------------------------ *

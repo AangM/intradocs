@@ -542,6 +542,39 @@
   color: var(--ink-2);
 }
 
+/* Follow-up suggestions under an answer */
+.sugg-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sugg-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px dashed rgba(59, 108, 246, 0.35);
+  background: rgba(59, 108, 246, 0.04);
+  color: var(--accent-ink);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.16s var(--ease),
+    border-color 0.16s var(--ease);
+}
+.sugg-chip svg {
+  flex: none;
+}
+.sugg-chip:hover {
+  border-style: solid;
+  background: rgba(59, 108, 246, 0.1);
+}
+
 /* Actions under an answer */
 .turn-actions {
   display: flex;

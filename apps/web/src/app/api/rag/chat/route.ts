@@ -22,6 +22,8 @@ export async function POST(request: Request) {
       citations: result.citations,
       rejectedCount: result.rejectedCount,
       scopeSize: result.scopeSize,
+      related: result.related,
+      suggestions: result.suggestions,
     };
   });
 }

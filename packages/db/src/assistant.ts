@@ -409,3 +409,64 @@ export async function deleteConversation(
     return { deleted: r.rowCount === 1, sessionId: r.rows[0]?.weknora_session_id ?? null };
   });
 }
+
+export interface RelatedDocument {
+  documentId: string;
+  slug: string;
+  title: string;
+  summary: string;
+  categoryName: string;
+  /** The WeKnora knowledge id of the current version, when it is indexed. */
+  knowledgeId: string | null;
+}
+
+/**
+ * Documents the actor may read whose title, summary or indexed text matches the
+ * question, best first -- what the assistant offers next to an abstention, and what a
+ * catalogue question ("ada dokumen lain tentang VPN?") lists. Same lexical index as the
+ * search page, but this is not a search: nothing is written to app.search_events.
+ * With an empty query it lists the newest published documents instead.
+ */
+export async function relatedDocuments(
+  actorId: string,
+  query: string,
+  limit = 5,
+): Promise<RelatedDocument[]> {
+  return withActor(actorId, async ({ client }) => {
+    const q = query
+      .replace(/[?!.,;:"']/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const { rows } = await client.query<{
+      id: string;
+      slug: string;
+      title: string;
+      summary: string;
+      category_name: string;
+      knowledge_id: string | null;
+    }>(
+      `SELECT d.id,d.slug,v.title,v.summary,c.name AS category_name,e.knowledge_id
+         FROM app.documents d
+         JOIN app.document_versions v ON v.id=d.current_version_id
+         JOIN app.categories c ON c.id=v.category_id
+         LEFT JOIN app.rag_index_entries e ON e.version_id=v.id
+         LEFT JOIN LATERAL(SELECT max(ts_rank(ch.search_vector,websearch_to_tsquery('simple',$1))) AS rank
+                             FROM app.lexical_chunks ch
+                            WHERE $1<>'' AND ch.version_id=v.id AND ch.search_vector@@websearch_to_tsquery('simple',$1)) hit ON true
+        WHERE app.is_active_version(v.id)
+          AND ($1='' OR position(lower($1) in lower(v.title||' '||v.summary))>0 OR hit.rank IS NOT NULL)
+        ORDER BY (CASE WHEN $1<>'' AND position(lower($1) in lower(v.title))>0 THEN 1 ELSE 0 END) DESC,
+                 coalesce(hit.rank,0) DESC, v.created_at DESC
+        LIMIT $2`,
+      [q, limit],
+    );
+    return rows.map((r) => ({
+      documentId: r.id,
+      slug: r.slug,
+      title: r.title,
+      summary: r.summary,
+      categoryName: r.category_name,
+      knowledgeId: r.knowledge_id,
+    }));
+  });
+}

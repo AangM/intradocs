@@ -184,3 +184,24 @@ Bukti: `var/chat-shots.mts` (desktop 1440 dan 390 px: pending, utas dua giliran,
 terbuka, laci ponsel, rel terlipat, dialog role), `tests/e2e` rag + portal 14/14. Riwayat
 percakapan akun demo siti dibersihkan dari 93 pertanyaan sisa tes; `tests/e2e/rag.spec.ts`
 kini menghapus percakapannya sendiri di `afterAll`.
+
+## Delta U11 — asisten yang menjawab lebih penuh dan tidak buntu (September 2026)
+
+Bukan perubahan visual besar; yang berubah adalah _apa_ yang ditampilkan di gelembung
+jawaban, dan itu diputuskan di server (docs/WEKNORA.md §25):
+
+- Sapaan, "kamu bisa apa?", terima kasih, dan pertanyaan katalog ("apa ada dokumen lain yang
+  menarik?") dijawab tanpa model, dari daftar dokumen yang boleh dibaca — bukan "tidak ada
+  sumber".
+- Setiap jawaban membawa **chip pertanyaan lanjutan** (pertanyaan hasil ingest untuk dokumen
+  yang dikutip, dirapikan) — sekali klik langsung ditanyakan — dan, pada abstain atau jawaban
+  katalog, **chip "Mungkin terkait" / "Dokumen"** yang membuka reader.
+- Penolakan model tidak lagi satu kalimat kosong: "Yang disebutkan materi: …" bila model
+  sempat mengutip, dan **kutipan verbatim passage terdekat** sebagai blok kutip. Teks abstain
+  murni menyarankan kata lain atau "dokumen apa saja yang ada?".
+- Jawaban pertanyaan templat kini berupa langkah bernomor dan daftar syarat, bukan satu
+  kalimat (prompt "lengkap", 8 passage, `num_ctx` 8192, repeat penalty 1,02, chunk ringkasan
+  bukan bukti).
+
+Bukti: `var/chat-shots2.mts` (katalog, penolakan dengan kutipan dan chip), `rag:eval --chat`
+dan tes di §25.
