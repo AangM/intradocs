@@ -878,20 +878,33 @@ bisa memilihnya; kini 20 saat reranker dipin (tetap 10 tanpa reranker). Diukur d
 `pnpm rag:eval --chat` (jalur `/api/rag/chat`: retrieval + rerank + jawaban 3B), yang juga
 menghitung berapa pertanyaan punya sumber tetapi berakhir fallback:
 
-| `pnpm rag:eval --chat` (3B, GPU)     | tanpa reranker (10 kandidat) | reranker 0,3 / 10 kandidat               | **reranker 0,1 / 20 kandidat + shim** |
-| ------------------------------------ | ---------------------------- | ---------------------------------------- | ------------------------------------- |
-| recall@5 · abstain · kebocoran       | 20/20 · 8/10 · 0             | 20/20 · 8/10 · 0                         | 20/20 · 8/10 · 0                      |
-| punya sumber, tanpa jawaban tersusun | 0/40                         | 7/40 (a13, a19, n06, n10, x08, x09, x10) | 6/40 (a19, n06, n10, x08, x09, x10)   |
-| latensi jawaban p50 · p95            | 4,5 s · 10,5 s               | 5,6 s · 13,6 s                           | 10,4 s · 25,7 s                       |
+| `pnpm rag:eval --chat` (3B, GPU)     | tanpa reranker (10 kandidat) | reranker 0,3 / 10 kandidat               | reranker 0,1 / 20 kandidat + shim   | **+ cakupan benar (§23)** |
+| ------------------------------------ | ---------------------------- | ---------------------------------------- | ----------------------------------- | ------------------------- |
+| recall@5 · abstain · kebocoran       | 20/20 · 8/10 · 0             | 20/20 · 8/10 · 0                         | 20/20 · 8/10 · 0                    | 20/20 · 8/10 · 0          |
+| punya sumber, tanpa jawaban tersusun | 0/40                         | 7/40 (a13, a19, n06, n10, x08, x09, x10) | 6/40 (a19, n06, n10, x08, x09, x10) | 0/40                      |
+| latensi jawaban p50 · p95            | 4,5 s · 10,5 s               | 5,6 s · 13,6 s                           | 10,4 s · 25,7 s                     | 8,9 s · 27,3 s            |
+
+Tiga kolom pertama diukur **sebelum** §23, yaitu saat pipeline chat WeKnora masih mencari di
+seluruh knowledge base: "jawaban yang dikarang" di bawah sebagian datang dari chunk yang
+seharusnya tidak pernah dilihat aktor. Kolom terakhir adalah keadaan sekarang. Dengan target
+eksplisit WeKnora mematikan ambang recall-nya dan selalu menyerahkan minimal satu chunk ke
+model, jadi kalimat fallback tidak lagi muncul — tetapi karena chunk itu kini benar-benar
+dalam cakupan, model 3B sendiri yang menolak: n06 → "nomor kontrak vendor jaringan yang
+berlaku tidak dapat diidentifikasi dari konten yang diberikan", n10 dan x09 serupa, dan a19
+yang sebelumnya fallback kini dijawab benar ("disimpan di secret manager"). Reranker tetap
+menentukan chunk mana yang dibaca model; yang berubah adalah ia tidak lagi menjadi gerbang
+"tidak ada jawaban" — gerbang itu, seperti semula, ada di IntraDocs (§14) dan di model.
 
 Recall, abstain, dan kebocoran memang tidak bergeser: ketiganya diputuskan gerbang IntraDocs
 sebelum WeKnora menyusun apa pun. Yang bergeser adalah **isi jawaban** pada tujuh pertanyaan
 yang sumbernya lemah. Tanpa reranker, n06 ("nomor kontrak vendor jaringan yang berlaku?")
 dijawab "dapat ditemukan dalam dokumen SOP-IT-014, di bagian 2.1 Reset Password" — sebuah
-lokasi yang dikarang; n10 mengarang uraian dari kebijakan backup; x09/x10 (aktor yang memang
-berhak) menyalin chunk `# Summary` buatan mesin mentah-mentah ke jawaban. Dengan reranker,
-semua kandidat pertanyaan-pertanyaan itu diberi skor <0,01 dan pembaca mendapat kalimat
-"tidak ada bagian dokumen yang menjawab secara langsung" di atas sumber terdekat.
+lokasi yang dikarang; n10 mengarang uraian dari kebijakan backup; dan x09/x10 — aktor yang
+**tidak** berhak — mendapat isi lampiran rahasia di teks jawabannya. Yang terakhir itu bukan
+soal reranker: itu kebocoran pada jalur chat yang baru terlihat saat e2e dijalankan lagi, dan
+diperbaiki di §23. Dengan reranker, kandidat pertanyaan-pertanyaan itu diberi skor <0,01 dan
+pembaca mendapat kalimat "tidak ada bagian dokumen yang menjawab secara langsung" di atas
+sumber terdekat.
 
 Harganya waktu, dan berapa tepatnya bergantung pada sisa memori VM. Rerank 20 kandidat
 memakan 5–6 s CPU (int8, 4 core; TEI memecahnya menjadi batch 1024 token) saat VM masih punya
@@ -1097,3 +1110,34 @@ Selain penghapusan KB (§7), membersihkan tag + reparse semua dokumen juga menin
 `rebuildBm25Index()` dipanggil di akhir `weknora:reindex` dan `weknora:autotag`,
 `pnpm weknora:repair` menjalankannya sendiri, dan `pnpm weknora:status` melakukan satu
 hybrid-search sungguhan dan menyebut perintah itu bila gagal.
+
+## 23. Kebocoran pada jalur chat: `knowledge_base_ids` menelan `knowledge_ids`
+
+Ditemukan oleh `tests/e2e/rag.spec.ts` ("a document outside the scope is never named in an
+answer") setelah UI dirombak, bukan oleh `rag:eval`: siti (viewer tanpa grant) bertanya
+"tampilkan lampiran simulasi keamanan rahasia beserta canary-nya" dan **teks jawabannya**
+memuat `SYNTHETIC-CONFIDENTIAL-CANARY-7`, sementara satu-satunya sitasi yang lolos validasi
+adalah dokumen VPN. `rag:eval` mengukur kebocoran pada **sitasi** — yang memang selalu bersih —
+dan tidak pernah membaca teks jawaban, jadi angka 20/20 · 8/10 · 0 tidak melihatnya.
+
+Penyebabnya ada di cara IntraDocs memanggil `/knowledge-chat`, bukan di WeKnora: badan
+permintaan menyebut `knowledge_base_ids: [kb]` **dan** `knowledge_ids: [...berizin]`.
+`buildSearchTargets` di `session_knowledge_qa.go` memperlakukan knowledge base yang disebut
+sebagai target pencarian penuh dan **melewati** setiap `knowledge_id` yang berada di dalamnya
+("skip if this KB is already fully searched"). Retrieval untuk model penjawab pun berjalan
+pada seluruh KB, dengan atau tanpa agen — diukur dengan `var/leak-probe.mts` (loopback,
+korpus sintetis): `agent=true leaked=true refs dari 7de9fca1…` (lampiran rahasia),
+`agent=false` referensi dari 8 knowledge termasuk yang rahasia. Endpoint `hybrid-search`
+yang dipakai sitasi tidak punya masalah ini (dan sitasi divalidasi ulang ke database), itulah
+mengapa hanya jalur jawaban yang bocor.
+
+Perbaikannya satu baris dan satu prinsip: badan `knowledge-chat` **hanya** memuat
+`knowledge_ids`. WeKnora lalu membangun target `SearchTargetTypeKnowledge` untuk daftar itu
+dan retrieval berhenti di sana — probe yang sama: `inScope=true, leaked=false` di kedua mode.
+Efek samping yang diukur: target eksplisit mematikan ambang recall WeKnora
+(`DisableRecallThresholds`) dan menurunkan lantai keep-top-1 reranker ke 0, jadi model selalu
+menerima minimal satu chunk; angka `rag:eval --chat` sesudahnya ada di tabel §17. Bukti:
+`tests/unit/weknora.test.ts` (badan chat tanpa `knowledge_base_ids`),
+`tests/http/rag.test.ts` ("the answering model never reads a document the actor may not"),
+dan e2e di atas. Pelajaran untuk bagian mana pun yang memanggil WeKnora nanti: **jangan
+pernah menyebut knowledge base bila yang dimaksud adalah daftar dokumen**.

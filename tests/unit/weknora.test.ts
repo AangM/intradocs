@@ -88,8 +88,12 @@ test('chat pins agent mode, web search and the knowledge scope off the client', 
   const body = JSON.parse(String(calls[0]!.init.body)) as Record<string, unknown>;
   assert.equal(body.agent_enabled, false);
   assert.equal(body.web_search_enabled, false);
-  assert.deepEqual(body.knowledge_base_ids, [config.knowledgeBaseId]);
   assert.deepEqual(body.knowledge_ids, ['k-1']);
+  // Naming the knowledge base as well would turn it into a full-KB search target and
+  // WeKnora would drop the knowledge_ids ("skip if this KB is already fully searched"):
+  // the model would then read chunks the actor may not see. Measured: a confidential
+  // canary reached a viewer's answer that way. Retrieval scope is the id list alone.
+  assert.equal(body.knowledge_base_ids, undefined);
   assert.equal(body.mcp_service_ids, undefined);
   assert.equal(body.skill_names, undefined);
 });

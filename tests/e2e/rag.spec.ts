@@ -73,7 +73,7 @@ test('an off-topic question yields sources without a fabricated answer', async (
   test.setTimeout(ANSWER_TIMEOUT + 60000);
   await ask(page, 'Berapa harga saham dan target dividen perusahaan tahun depan?');
   await page.waitForTimeout(SETTLE);
-  const result = await page.locator('.rag-result').innerText();
+  const result = await page.locator('.turn-a').last().innerText();
   // With generation off the product never writes prose: it either abstains or lists the
   // documents behind the match. What it must never do is answer a question the corpus
   // cannot support. Weak-but-admissible matches are a relevance limitation, not a claim.

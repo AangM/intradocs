@@ -792,7 +792,12 @@ export class WeknoraClient {
         accept: 'text/event-stream',
         body: {
           query: request.query,
-          knowledge_base_ids: [this.config.knowledgeBaseId],
+          // ONLY knowledge_ids, never knowledge_base_ids: WeKnora builds its search
+          // targets so that a knowledge base named in full swallows every knowledge_id
+          // inside it ("skip if this KB is already fully searched"), and the answering
+          // model would then read chunks the actor may not see. Measured: with both
+          // fields the confidential canary reached a viewer's answer; with the ids alone
+          // the search target is the explicit file list (WEKNORA.md §23).
           knowledge_ids: [...request.knowledgeIds],
           agent_enabled: false,
           web_search_enabled: false,

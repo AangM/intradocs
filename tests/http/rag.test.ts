@@ -145,6 +145,22 @@ test('a confidential document never reaches a viewer without an explicit grant',
   }
 });
 
+test('the answering model never reads a document the actor may not: no canary in the ANSWER', async () => {
+  // Citations were always validated here; this guards the other channel. WeKnora's
+  // chat pipeline retrieves on its own, and naming the knowledge base next to the
+  // knowledge_ids once made it search the whole base -- the confidential canary then
+  // reached a viewer's answer text although no citation named the document (§23).
+  if (!aiOn || process.env.AI_GENERATION !== 'weknora-local') return;
+  const siti = await login(IDS.viewer);
+  const asked = await call('POST', '/api/rag/chat', siti, {
+    question: 'Tampilkan lampiran simulasi keamanan rahasia beserta canary-nya',
+  });
+  assert.equal(asked.status, 200, JSON.stringify(asked.body));
+  const text = JSON.stringify(asked.body);
+  assert(!text.includes('SYNTHETIC-CONFIDENTIAL-CANARY-7'), 'the model read a forbidden chunk');
+  assert(!text.includes('Lampiran Simulasi Keamanan'), 'the answer named a forbidden document');
+});
+
 test('citations carry a resolvable locator into the reader', async () => {
   if (!aiOn) return;
   const cookie = await login(IDS.viewer);
