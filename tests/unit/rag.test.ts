@@ -18,6 +18,7 @@ import {
   versionIdFromIndexTitle,
   parseChatBody,
   parseQuestion,
+  isContinuation,
   ABSTAIN_MESSAGE,
   NO_DIRECT_ANSWER_MESSAGE,
   MODEL_DECLINE_SENTENCE,
@@ -541,4 +542,30 @@ test('an empty result abstains: no candidate, no citation, whatever the threshol
   const gated = gateByRelevance([], [], 0.45);
   assert.deepEqual(gated.kept, []);
   assert.equal(gated.topRelevance, null);
+});
+
+test('a follow-up that names nothing is a continuation; one that names a subject is not', () => {
+  for (const q of [
+    'Jelaskan lebih lengkap.',
+    'jelasin lebih detail dong',
+    'Kenapa?',
+    'Apa saja langkahnya?',
+    'Bagaimana caranya?',
+    'Contohnya?',
+    'Bisa lebih singkat?',
+    'lanjutkan',
+    'Explain more, please.',
+  ])
+    assert.equal(isContinuation(q), true, q);
+  for (const q of [
+    'Berapa harga saham perusahaan hari ini?',
+    'Apa itu MFA?',
+    'Kalau perangkat authenticator-nya hilang, apa yang harus dilakukan?',
+    'Jelaskan bagian verifikasi',
+    'Dan kalau koneksinya gagal setelah itu?',
+    '',
+    '   ',
+    'jelaskan lebih lengkap tentang setiap langkah konfigurasi VPN pada perangkat uji laboratorium',
+  ])
+    assert.equal(isContinuation(q), false, q || '(empty)');
 });

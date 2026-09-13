@@ -411,6 +411,47 @@ export function parseQuestion(value: unknown, maxChars: number): string {
 }
 
 /**
+ * Words a follow-up can be made of without naming anything: pronouns, connectives,
+ * "more / in detail / why / how / again" and their Indonesian everyday spellings. A
+ * question built only from these ("jelaskan lebih lengkap", "kenapa?", "apa saja
+ * langkahnya?") carries no subject of its own, so retrieval on it alone finds nothing
+ * and the assistant would abstain in the middle of a conversation about something it
+ * had just answered. Anything else ("berapa harga saham?") names a subject and must
+ * stand on its own -- inheriting the previous sources there would turn an honest
+ * abstention into an answer built from the wrong documents.
+ */
+const CONTINUATION_WORDS = new Set(
+  (
+    'jelaskan jelasin terangkan uraikan rincikan rinci sebutkan elaborasi lebih lengkap detail ' +
+    'detil jelas panjang singkat ringkas ringkasnya intinya lanjut lanjutkan lanjutannya terus ' +
+    'teruskan kenapa mengapa bagaimana gimana caranya cara langkah langkahnya tahapan tahapannya ' +
+    'contoh contohnya misalnya maksud maksudnya artinya berarti apa apakah kah saja aja yang itu ' +
+    'ini tadi sebelumnya barusan tersebut nya dan lalu kemudian selanjutnya berikutnya lagi ulangi ' +
+    'ulang sekali tolong mohon coba bisa boleh bisakah bolehkah ya iya tidak bukan kok dong sih ' +
+    'deh nih ok oke baik jadi untuk dengan di ke dari pada secara tentang soal mengenai semua ' +
+    'semuanya seluruhnya poin poinnya bagian bagiannya versi versinya sederhana simpel bahasa ' +
+    'awam kalau jika kalo bila gitu begitu gini begini yg dgn tsb ' +
+    'explain elaborate more detail details why how what that this it again continue please ' +
+    'summarize summary shorter longer example examples steps'
+  ).split(' '),
+);
+
+/**
+ * True when a question is only a continuation of the previous turn -- see
+ * CONTINUATION_WORDS. Bounded at eight words: a longer question is saying something.
+ */
+export function isContinuation(question: string): boolean {
+  const words = question
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w.replace(/-?nya$/u, '').replace(/-/g, ''))
+    .filter(Boolean);
+  return words.length > 0 && words.length <= 8 && words.every((w) => CONTINUATION_WORDS.has(w));
+}
+
+/**
  * What a question is asked against. `all` is every active version the actor may read;
  * the other two NARROW that set -- a category the actor can see, or documents the actor
  * has opened. A scope never widens anything: the IDs are filtered through the same

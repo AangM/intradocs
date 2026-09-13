@@ -286,11 +286,26 @@ test('history belongs to its owner and loses citations when access does', async 
     assert.equal(second.status, 200, JSON.stringify(second.body));
     assert.equal(second.body.conversationId, conversationId);
     assert.equal(second.body.abstained, true);
+    // A follow-up that names nothing ("jelaskan lebih lengkap") is answered from the
+    // sources of the previous question in this conversation -- still the VPN runbook,
+    // still this person's permissions -- instead of abstaining mid-conversation.
+    const third = await call('POST', '/api/rag/chat', siti, {
+      question: 'Jelaskan lebih lengkap.',
+      conversationId,
+    });
+    assert.equal(third.status, 200, JSON.stringify(third.body));
+    assert.equal(third.body.abstained, false);
+    assert(
+      (third.body.citations as Array<{ documentTitle: string }>).some((c) =>
+        /VPN/.test(c.documentTitle),
+      ),
+      'the continuation must cite the VPN runbook',
+    );
 
     const listed = await call('GET', '/api/rag/conversations', siti);
     assert(
       (listed.body.conversations as Array<{ id: string; turns: number }>).some(
-        (c) => c.id === conversationId && c.turns === 2,
+        (c) => c.id === conversationId && c.turns === 3,
       ),
     );
     const read = await call('GET', `/api/rag/conversations/${conversationId}`, siti);
@@ -300,7 +315,7 @@ test('history belongs to its owner and loses citations when access does', async 
       hiddenCitations: number;
       answer: string;
     }>;
-    assert.equal(turns.length, 2);
+    assert.equal(turns.length, 3);
     assert.equal(turns[0]!.hiddenCitations, 0);
 
     // Even a super admin does not see someone else's questions, and cannot append.

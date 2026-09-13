@@ -37,16 +37,7 @@ export default async function Assistant({
       listConversations(actor.id),
     ]);
     return (
-      <div className="pad assistant-page">
-        <PageHeading
-          title="AI Assistant"
-          subtitle="Jawaban dari dokumen resmi yang boleh Anda baca, selalu dengan sumbernya."
-          actions={
-            <span className="pill p-green">
-              {config.generation === 'weknora-local' ? 'Retrieval + jawaban' : 'Retrieval'}: lokal
-            </span>
-          }
-        />
+      <div className="chat-page">
         <AssistantChat
           actorName={actor.name}
           maxQuestionChars={config.weknora.maxQuestionChars}

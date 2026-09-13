@@ -13,6 +13,7 @@ import {
   validateRetrieval,
   ABSTAIN_MESSAGE,
   resolveGeneratedAnswer,
+  isContinuation,
   type Citation,
   type RawHit,
   type RetrievalScope,
@@ -179,16 +180,28 @@ export async function answerQuestion(
   // deleted before anything else happens this turn, even if this turn abstains).
   const context = conversationId
     ? await conversationContext(actor.id, conversationId)
-    : { sessionId: null, staleSessionId: null };
+    : { sessionId: null, staleSessionId: null, previousQuestion: null };
   if (conversationId && context.staleSessionId) {
     await setConversationSession(actor.id, conversationId, null);
     await new WeknoraClient(weknora).deleteSession(context.staleSessionId).catch(() => undefined);
   }
-  // Retrieval is on this question alone, every turn. Widening a follow-up with the
-  // previous question was tried and dropped: it made "berapa harga saham?" after a VPN
-  // question inherit the VPN sources, and the abstention on questions the corpus cannot
-  // answer is worth more than the odd follow-up that finds nothing on its own.
-  const retrieval = await retrieve(actor, question, within);
+  // Retrieval is on this question alone, every turn -- with one narrow exception. A
+  // follow-up made only of continuation words ("jelaskan lebih lengkap", "kenapa?")
+  // names nothing: on its own it either abstains mid-conversation or, worse, matches
+  // whichever documents happen to contain "jelaskan" and "lengkap" and gets an answer
+  // about those. For that shape the retrieval runs on the previous question of the same
+  // conversation (the last one answered from sources) instead -- same scope, same gate,
+  // this person's permissions right now -- so the model elaborates on what it just
+  // answered; if that finds nothing any more, the turn abstains rather than falling
+  // back to the word-matches. Blindly concatenating the previous question was tried and
+  // dropped: it made "berapa harga saham?" inherit the VPN sources and stop abstaining.
+  const continuation =
+    !!context.previousQuestion && context.previousQuestion !== question && isContinuation(question);
+  const retrieval = await retrieve(
+    actor,
+    continuation ? (context.previousQuestion as string) : question,
+    within,
+  );
   const mode: ChatResult['mode'] =
     config.generation === 'weknora-local' ? 'generated' : 'evidence-only';
   const shape = { mode, scopeSize: retrieval.scopeSize, rejectedCount: retrieval.rejectedCount };

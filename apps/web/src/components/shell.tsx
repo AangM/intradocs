@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { hasCapability, initials, ROLE_LABELS, type Actor, type Capability } from '@intradocs/core';
 import type { Category } from '@intradocs/db/queries';
 import { Icon } from './icon';
@@ -76,6 +76,35 @@ const navigation: Array<{
     group: 'manage',
   },
 ];
+// The desktop rail state lives in localStorage and is read through an external store,
+// so the server renders expanded, the client corrects itself on hydration, and no
+// effect has to set state. Storage may be unavailable (private mode): then the rail
+// is simply not remembered.
+const SIDE_KEY = 'intradocs.side';
+const SIDE_EVENT = 'intradocs:side';
+function readSide(): boolean {
+  try {
+    return window.localStorage.getItem(SIDE_KEY) === 'collapsed';
+  } catch {
+    return false;
+  }
+}
+function writeSide(collapsed: boolean) {
+  try {
+    window.localStorage.setItem(SIDE_KEY, collapsed ? 'collapsed' : 'expanded');
+  } catch {
+    // Not remembered; the event below still flips it for this page.
+  }
+  window.dispatchEvent(new Event(SIDE_EVENT));
+}
+function subscribeSide(onChange: () => void) {
+  window.addEventListener(SIDE_EVENT, onChange);
+  window.addEventListener('storage', onChange);
+  return () => {
+    window.removeEventListener(SIDE_EVENT, onChange);
+    window.removeEventListener('storage', onChange);
+  };
+}
 export function Shell({
   actor,
   categories,
@@ -92,8 +121,12 @@ export function Shell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const params = useSearchParams();
   const router = useRouter();
+  // Two sidebar states: `open` is the phone drawer (closed on navigation, Escape or the
+  // backdrop); `collapsed` is the desktop rail, remembered per browser.
   const [open, setOpen] = useState(false);
+  const collapsed = useSyncExternalStore(subscribeSide, readSide, () => false);
   const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState('');
   const reader = pathname.startsWith('/dokumen/');
@@ -108,6 +141,24 @@ export function Shell({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+  function toggleSide() {
+    if (window.matchMedia('(max-width: 720px)').matches) {
+      setOpen((v) => !v);
+      return;
+    }
+    writeSide(!collapsed);
+  }
+  // A nav entry is "on" when its path matches and every query parameter it names is
+  // present; the plain catalogue entry is on only when no view/status/category is set,
+  // so "Favorit" and "Draft saya" do not light up "Katalog Dokumen" as well.
+  function isOn(href: string): boolean {
+    const [path, query = ''] = href.split('?');
+    if (pathname !== path && !pathname.startsWith(`${path}/`)) return false;
+    if (query) return [...new URLSearchParams(query)].every(([k, v]) => params.get(k) === v);
+    if (path === '/katalog')
+      return !params.has('view') && !params.has('status') && !params.has('category');
+    return true;
+  }
   async function signOut() {
     setSigningOut(true);
     setError('');
@@ -127,18 +178,21 @@ export function Shell({
   }
   const allowed = navigation.filter((n) => !n.capability || hasCapability(actor, n.capability));
   return (
-    <div className={`app live-app ${open ? 'nav-open' : ''}`}>
+    <div
+      className={`app live-app ${open ? 'nav-open' : ''} ${collapsed && !reader ? 'side-collapsed' : ''}`}
+    >
       <a className="skip-link" href="#main-content">
         Lewati navigasi
       </a>
       <header className="topbar">
         {!reader && (
           <button
-            className="icon-btn mobile-menu"
-            aria-label="Buka navigasi"
+            className="icon-btn side-toggle"
+            aria-label={open ? 'Tutup menu' : collapsed ? 'Tampilkan menu' : 'Sembunyikan menu'}
+            title={collapsed ? 'Tampilkan menu' : 'Sembunyikan menu'}
             aria-expanded={open}
             aria-controls="side-menu"
-            onClick={() => setOpen(!open)}
+            onClick={toggleSide}
           >
             <Icon name="list" />
           </button>
@@ -241,8 +295,27 @@ export function Shell({
         </p>
       )}
       <div className="body">
+        {!reader && open && (
+          <button
+            type="button"
+            className="side-backdrop"
+            aria-label="Tutup menu"
+            onClick={() => setOpen(false)}
+          />
+        )}
         {!reader && (
           <aside className="side" id="side-menu">
+            <div className="side-head">
+              <span className="side-lbl">Menu</span>
+              <button
+                type="button"
+                className="icon-btn side-close"
+                aria-label="Tutup menu"
+                onClick={() => setOpen(false)}
+              >
+                <Icon name="x" size={16} />
+              </button>
+            </div>
             <nav aria-label="Menu portal">
               {(['knowledge', 'manage'] as const).map((group) => {
                 const links = allowed.filter((n) => n.group === group);
@@ -256,12 +329,13 @@ export function Shell({
                         key={n.href}
                         href={n.href}
                         prefetch={false}
-                        aria-current={pathname === n.href ? 'page' : undefined}
-                        className={`nav-i ${pathname === n.href ? 'on' : ''}`}
+                        aria-current={isOn(n.href) ? 'page' : undefined}
+                        className={`nav-i ${isOn(n.href) ? 'on' : ''}`}
+                        title={collapsed ? n.label : undefined}
                         onClick={() => setOpen(false)}
                       >
                         <Icon name={n.icon} size={17} />
-                        {n.label}
+                        <span className="nav-lbl">{n.label}</span>
                         {(counts[n.href] ?? 0) > 0 && (
                           <span
                             className={`cnt ${n.href === '/admin/approval' ? '' : 'grey'}`}
@@ -281,20 +355,24 @@ export function Shell({
                   key={c.id}
                   href={`/katalog?category=${c.id}`}
                   prefetch={false}
-                  className="nav-i category-nav"
+                  className={`nav-i category-nav ${isOn(`/katalog?category=${c.id}`) ? 'on' : ''}`}
+                  aria-current={isOn(`/katalog?category=${c.id}`) ? 'page' : undefined}
+                  title={collapsed ? c.name : undefined}
                   onClick={() => setOpen(false)}
                 >
                   <span className={`category-dot tone-${c.color}`} />
-                  <span>{c.name}</span>
+                  <span className="nav-lbl">{c.name}</span>
                 </Link>
               ))}
               <div className="sidebar-bottom">
                 <Link
                   href="/pengaturan"
                   className={`nav-i ${pathname === '/pengaturan' ? 'on' : ''}`}
+                  title={collapsed ? 'Pengaturan' : undefined}
+                  onClick={() => setOpen(false)}
                 >
                   <Icon name="settings" size={17} />
-                  Pengaturan
+                  <span className="nav-lbl">Pengaturan</span>
                 </Link>
                 <div className="local-note">
                   <span className="status-dot" />

@@ -341,7 +341,9 @@ export async function voteTurn(
  * the conversation has none yet, and null (with the old id in `staleSessionId`) when an
  * earlier turn cites a version the owner can no longer read -- then the model's history
  * would carry text from a document that is now out of reach, so the caller discards it
- * and starts a fresh session.
+ * and starts a fresh session. `previousQuestion` is the question of the last turn that
+ * was answered from sources, for a follow-up that carries no subject of its own
+ * (isContinuation in core/rag).
  */
 export async function conversationContext(
   actorId: string,
@@ -350,13 +352,14 @@ export async function conversationContext(
   sessionId: string | null;
   /** The session that must be discarded because an earlier citation became unreadable. */
   staleSessionId: string | null;
+  previousQuestion: string | null;
 }> {
   return withActor(actorId, async ({ client }) => {
     const head = await client.query<{ weknora_session_id: string | null }>(
       'SELECT weknora_session_id FROM app.ai_conversations WHERE id=$1',
       [conversationId],
     );
-    if (!head.rows[0]) return { sessionId: null, staleSessionId: null };
+    if (!head.rows[0]) return { sessionId: null, staleSessionId: null, previousQuestion: null };
     const hidden = await client.query<{ n: string }>(
       `SELECT count(*) AS n FROM app.ai_turns t
         WHERE t.conversation_id=$1
@@ -365,9 +368,19 @@ export async function conversationContext(
                                    WHERE x.turn_id=t.id AND app.can_read_version(v.id))`,
       [conversationId],
     );
+    // The last turn that was actually answered from sources: "jelaskan lebih lengkap"
+    // refers to that, not to an abstained question in between.
+    const previous = await client.query<{ question: string }>(
+      'SELECT question FROM app.ai_turns WHERE conversation_id=$1 AND citation_count>0 ORDER BY created_at DESC,id DESC LIMIT 1',
+      [conversationId],
+    );
     const stale = Number(hidden.rows[0]?.n ?? 0) > 0;
     const current = head.rows[0].weknora_session_id;
-    return { sessionId: stale ? null : current, staleSessionId: stale ? current : null };
+    return {
+      sessionId: stale ? null : current,
+      staleSessionId: stale ? current : null,
+      previousQuestion: previous.rows[0]?.question ?? null,
+    };
   });
 }
 

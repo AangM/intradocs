@@ -85,6 +85,38 @@ select:disabled {
 .mobile-menu {
   display: none;
 }
+/* Sidebar toggle in the topbar: on a desktop it collapses the sidebar into an icon
+   rail, on a phone it opens the drawer (shell.tsx decides by viewport). */
+.side-toggle {
+  flex: none;
+}
+.side-head {
+  display: none;
+}
+.side-backdrop {
+  display: none;
+}
+.side-collapsed .side {
+  width: 64px;
+  flex-basis: 64px;
+  padding: 14px 8px;
+}
+.side-collapsed .nav-lbl,
+.side-collapsed .side-lbl,
+.side-collapsed .local-note,
+.side-collapsed .nav-i .cnt {
+  display: none;
+}
+.side-collapsed .nav-i {
+  justify-content: center;
+  padding: 10px 0;
+}
+.side-collapsed .nav-i.on .cnt {
+  display: none;
+}
+.side-collapsed .category-nav {
+  min-height: 32px;
+}
 .side nav {
   display: flex;
   min-height: 100%;
@@ -1046,16 +1078,51 @@ select:disabled {
   .body {
     flex-direction: column;
   }
-  .side {
-    display: none;
-    width: 100%;
-    flex: 0 0 auto;
-    max-height: 50dvh;
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
+  /* The sidebar is a drawer over the page: slides in from the left, closes on the
+     backdrop, the X, Escape, or any navigation. The rail state does not apply here. */
+  .side,
+  .side-collapsed .side {
+    position: fixed;
+    top: 56px;
+    left: 0;
+    bottom: 0;
+    z-index: 45;
+    width: min(300px, 86vw);
+    flex: none;
+    padding: 10px 10px 16px;
+    border-right: 1px solid var(--line);
+    transform: translateX(-102%);
+    transition: transform 0.22s ease;
+    overflow-y: auto;
   }
   .nav-open .side {
+    transform: none;
+    box-shadow: 0 24px 60px -20px rgba(11, 18, 32, 0.35);
+  }
+  .side-backdrop {
     display: block;
+    position: fixed;
+    inset: 56px 0 0 0;
+    z-index: 44;
+    border: 0;
+    padding: 0;
+    background: rgba(11, 18, 32, 0.28);
+  }
+  .side-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 4px 6px;
+  }
+  .side-collapsed .nav-lbl,
+  .side-collapsed .side-lbl,
+  .side-collapsed .local-note,
+  .side-collapsed .nav-i .cnt {
+    display: revert;
+  }
+  .side-collapsed .nav-i {
+    justify-content: flex-start;
+    padding: revert;
   }
   .mobile-menu {
     display: grid;

@@ -601,3 +601,216 @@ tbody tr:hover td {
   flex-wrap: wrap;
   margin-top: 12px;
 }
+
+/* ---------- Sidebar: phone drawer and desktop rail ---------- */
+@media (max-width: 720px) {
+  .side {
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: saturate(160%) blur(22px);
+    -webkit-backdrop-filter: saturate(160%) blur(22px);
+  }
+  .side-backdrop {
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+  }
+}
+.side-collapsed .side {
+  transition: width 0.18s var(--ease);
+}
+.side-collapsed .category-nav .category-dot {
+  width: 10px;
+  height: 10px;
+}
+
+/* ---------- Native selects and dropdown menus ---------- */
+select.inp,
+select.sort-select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 32px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%235b6577' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  background-color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+}
+select.inp:hover,
+select.sort-select:hover {
+  border-color: rgba(59, 108, 246, 0.35);
+}
+.fchip-menu,
+.account-panel,
+.invite-card {
+  background: var(--glass-strong);
+  backdrop-filter: saturate(160%) blur(18px);
+  -webkit-backdrop-filter: saturate(160%) blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 14px;
+  box-shadow: var(--sh-lg);
+}
+.fchip-menu a {
+  border-radius: 9px;
+  transition: background 0.14s var(--ease);
+}
+.fchip-menu a:hover {
+  background: rgba(59, 108, 246, 0.08);
+}
+
+/* ---------- Glass dialog (native <dialog>) ---------- */
+dialog.glass-dialog {
+  /* The global reset zeroes margins; a dialog centres itself with margin:auto. */
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 18px;
+  background: var(--glass-strong);
+  backdrop-filter: saturate(160%) blur(22px);
+  -webkit-backdrop-filter: saturate(160%) blur(22px);
+  box-shadow: var(--sh-lg);
+  color: var(--ink);
+}
+dialog.glass-dialog::backdrop {
+  background: rgba(11, 18, 32, 0.28);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+.dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid var(--line-2);
+}
+.dialog-head h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.dialog-body {
+  display: grid;
+  gap: 14px;
+  padding: 16px 18px;
+}
+.dialog-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 18px 16px;
+}
+.choice-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.choice {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: rgba(255, 255, 255, 0.8);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition:
+    background 0.14s var(--ease),
+    border-color 0.14s var(--ease),
+    color 0.14s var(--ease);
+}
+.choice input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.choice:has(input:checked) {
+  background: rgba(59, 108, 246, 0.12);
+  border-color: rgba(59, 108, 246, 0.4);
+  color: var(--accent-ink);
+}
+.choice:has(input:focus-visible) {
+  box-shadow: 0 0 0 4px rgba(59, 108, 246, 0.2);
+}
+.choice:has(input:disabled) {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.field-lbl {
+  display: grid;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--ink-2);
+}
+/* Disclosure summaries (details) read as buttons, not as raw text with a triangle. */
+.source-evidence > summary,
+.editor-tools > summary,
+.version-history > summary,
+.withdraw-panel > summary,
+.reader-outline-mobile > summary,
+.taxonomy-layout details > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: rgba(255, 255, 255, 0.8);
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--ink-2);
+  cursor: pointer;
+  list-style: none;
+  min-height: 0;
+  transition:
+    background 0.14s var(--ease),
+    border-color 0.14s var(--ease);
+}
+.source-evidence > summary::-webkit-details-marker,
+.editor-tools > summary::-webkit-details-marker,
+.version-history > summary::-webkit-details-marker,
+.withdraw-panel > summary::-webkit-details-marker,
+.reader-outline-mobile > summary::-webkit-details-marker,
+.taxonomy-layout details > summary::-webkit-details-marker {
+  display: none;
+}
+.source-evidence > summary::before,
+.editor-tools > summary::before,
+.version-history > summary::before,
+.withdraw-panel > summary::before,
+.reader-outline-mobile > summary::before,
+.taxonomy-layout details > summary::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-right: 1.8px solid currentColor;
+  border-bottom: 1.8px solid currentColor;
+  transform: rotate(-45deg);
+  margin-right: 2px;
+  transition: transform 0.16s var(--ease);
+}
+.source-evidence[open] > summary::before,
+.editor-tools[open] > summary::before,
+.version-history[open] > summary::before,
+.withdraw-panel[open] > summary::before,
+.reader-outline-mobile[open] > summary::before,
+.taxonomy-layout details[open] > summary::before {
+  transform: rotate(45deg);
+}
+.source-evidence > summary:hover,
+.editor-tools > summary:hover,
+.version-history > summary:hover,
+.withdraw-panel > summary:hover,
+.reader-outline-mobile > summary:hover,
+.taxonomy-layout details > summary:hover {
+  border-color: rgba(59, 108, 246, 0.35);
+  background: rgba(59, 108, 246, 0.06);
+}

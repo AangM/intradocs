@@ -1,7 +1,13 @@
 'use client';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ROLES, ROLE_LABELS, type Role } from '@intradocs/core';
+import { Icon } from './icon';
+/**
+ * Role and category scope for one account, edited in a native <dialog>: it floats above
+ * the (horizontally scrolling) table instead of unfolding inside a cell, closes on
+ * Escape and on the backdrop, and needs no positioning code.
+ */
 export function UserAssignment({
   id,
   initialRole,
@@ -24,6 +30,7 @@ export function UserAssignment({
     [selected, setSelected] = useState(categoryIds),
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
+  const dialog = useRef<HTMLDialogElement | null>(null);
   const router = useRouter();
   async function save() {
     setBusy(true);
@@ -36,6 +43,7 @@ export function UserAssignment({
       });
       const v = await r.json();
       if (!r.ok) throw new Error(v.error ?? 'Perubahan ditolak.');
+      dialog.current?.close();
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Tidak dapat menyimpan.');
@@ -46,62 +54,113 @@ export function UserAssignment({
   if (own) return <span className="sub">Akun sendiri — penugasan dikunci</span>;
   if (!superAdmin && ['super_admin', 'knowledge_admin'].includes(initialRole))
     return <span className="sub">Hanya Super Admin</span>;
+  const roles = ROLES.filter((r) => superAdmin || !['super_admin', 'knowledge_admin'].includes(r));
   return (
-    <details className="assignment-editor">
-      <summary>Edit penugasan</summary>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          void save();
+    <>
+      <button
+        type="button"
+        className="btn btn-sm"
+        onClick={() => {
+          setError('');
+          dialog.current?.showModal();
         }}
       >
-        <fieldset disabled={busy} className="workflow-fields">
-          <label>
-            Role
-            <select className="inp" value={role} onChange={(e) => setRole(e.target.value as Role)}>
-              {ROLES.filter(
-                (r) => superAdmin || !['super_admin', 'knowledge_admin'].includes(r),
-              ).map((r) => (
-                <option key={r} value={r}>
-                  {ROLE_LABELS[r]}
-                </option>
-              ))}
-            </select>
-          </label>
-          {superAdmin && (
-            <label className="upload-check">
-              <input type="checkbox" checked={all} onChange={(e) => setAll(e.target.checked)} />
-              Semua kategori
+        <Icon name="edit" size={13} />
+        Edit penugasan
+      </button>
+      <dialog
+        ref={dialog}
+        className="glass-dialog"
+        aria-labelledby={`assign-${id}`}
+        onClick={(e) => {
+          // A click on the backdrop lands on the dialog element itself.
+          if (e.target === e.currentTarget) dialog.current?.close();
+        }}
+      >
+        <form
+          method="dialog"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void save();
+          }}
+        >
+          <div className="dialog-head">
+            <h3 id={`assign-${id}`}>Role & cakupan</h3>
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label="Tutup"
+              onClick={() => dialog.current?.close()}
+            >
+              <Icon name="x" size={16} />
+            </button>
+          </div>
+          <fieldset disabled={busy} className="dialog-body">
+            <label className="field-lbl">
+              Role
+              <select
+                className="inp"
+                value={role}
+                onChange={(e) => setRole(e.target.value as Role)}
+              >
+                {roles.map((r) => (
+                  <option key={r} value={r}>
+                    {ROLE_LABELS[r]}
+                  </option>
+                ))}
+              </select>
             </label>
-          )}
-          <fieldset disabled={all}>
-            <legend>Scope kategori</legend>
-            {categories.map((c) => (
-              <label className="upload-check" key={c.id}>
-                <input
-                  type="checkbox"
-                  checked={selected.includes(c.id)}
-                  onChange={(e) =>
-                    setSelected((a) =>
-                      e.target.checked ? [...a, c.id] : a.filter((x) => x !== c.id),
-                    )
-                  }
-                />
-                {c.name}
-              </label>
-            ))}
+            <div className="field-lbl">
+              Cakupan kategori
+              <div className="choice-grid" role="group" aria-label="Cakupan kategori">
+                {superAdmin && (
+                  <label className="choice">
+                    <input
+                      type="checkbox"
+                      checked={all}
+                      onChange={(e) => setAll(e.target.checked)}
+                    />
+                    <Icon name="layers" size={13} />
+                    Semua kategori
+                  </label>
+                )}
+                {categories.map((c) => (
+                  <label className="choice" key={c.id}>
+                    <input
+                      type="checkbox"
+                      disabled={all}
+                      checked={all || selected.includes(c.id)}
+                      onChange={(e) =>
+                        setSelected((a) =>
+                          e.target.checked ? [...a, c.id] : a.filter((x) => x !== c.id),
+                        )
+                      }
+                    />
+                    {c.name}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <p className="hint">
+              Berlaku pada permintaan berikutnya. Dokumen Terbatas/Rahasia tetap butuh grant
+              tersendiri.
+            </p>
+            {error && (
+              <p role="alert" className="inline-error">
+                {error}
+              </p>
+            )}
           </fieldset>
-          <p className="hint">
-            Perubahan izin berlaku pada request berikutnya; tidak memberi grant sensitif otomatis.
-          </p>
-          <button className="btn btn-p">Simpan penugasan</button>
-        </fieldset>
-      </form>
-      {error && (
-        <p role="alert" className="inline-error">
-          {error}
-        </p>
-      )}
-    </details>
+          <div className="dialog-foot">
+            <button type="button" className="btn" onClick={() => dialog.current?.close()}>
+              Batal
+            </button>
+            <button type="submit" className="btn btn-p" disabled={busy}>
+              {busy ? 'Menyimpan…' : 'Simpan'}
+            </button>
+          </div>
+        </form>
+      </dialog>
+    </>
   );
 }

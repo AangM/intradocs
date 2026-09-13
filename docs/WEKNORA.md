@@ -1172,11 +1172,27 @@ tidak bertahan sebagai konteks model. Bukti: tes "history belongs to its owner a
 citations when access does" kini juga memeriksa `weknora_session_id` sebelum dan sesudah grant
 dicabut.
 
-**Pelebaran retrieval dicoba dan dibatalkan.** Versi pertama menggabungkan pertanyaan
-sebelumnya ke retrieval bila pertanyaan lanjutan sendiri tidak menemukan apa-apa. Itu membuat
-"berapa harga saham?" setelah pertanyaan VPN mewarisi sumber VPN dan tidak abstain — tes
-riwayat gagal di `abstained === true`. Abstain pada pertanyaan yang memang tidak dijawab
-korpus lebih berharga daripada pertanyaan lanjutan sesekali yang tidak menemukan apa-apa.
+**Pertanyaan lanjutan tanpa subjek ("jelaskan lebih lengkap").** Konteks di model saja tidak
+cukup: gerbang retrieval IntraDocs berjalan _sebelum_ model, pada teks pertanyaan itu sendiri.
+"Jelaskan lebih lengkap" tidak menyebut apa pun, jadi ia abstain di tengah percakapan — atau,
+lebih buruk, cocok dengan dokumen mana pun yang kebetulan memuat kata "jelaskan" dan
+"lengkap" lalu dijawab tentang dokumen itu (terlihat di tangkapan layar: jawaban tentang
+kebijakan backup setelah pertanyaan MFA). Dua percobaan dan yang dipakai:
+
+- _Dibatalkan_: menggabungkan pertanyaan sebelumnya ke retrieval bila pertanyaan lanjutan
+  tidak menemukan apa-apa. "Berapa harga saham?" setelah VPN mewarisi sumber VPN dan berhenti
+  abstain — tes riwayat gagal di `abstained === true`.
+- _Dipakai_: `isContinuation()` di `packages/core/src/rag.ts` — deterministik, tanpa model.
+  Pertanyaan ≤ 8 kata yang **seluruh** katanya ada di daftar kata sambung/kata ganti/kata
+  "lebih-detail-kenapa-bagaimana" (Indonesia sehari-hari + Inggris) dianggap lanjutan;
+  satu kata isi saja ("saham", "MFA", "authenticator") membuatnya berdiri sendiri. Untuk
+  lanjutan, retrieval dijalankan pada **pertanyaan terakhir yang terjawab dari sumber** di
+  percakapan itu (`conversationContext.previousQuestion`, `citation_count > 0`) — cakupan,
+  gerbang, dan izin yang sama, saat ini — sehingga model, yang juga membaca riwayat sesi,
+  menguraikan apa yang barusan dijawabnya. Bila retrieval itu kini kosong, giliran abstain;
+  tidak ada fallback ke pencocokan kata. Bukti: tes unit `isContinuation` dan tes HTTP riwayat
+  (giliran ketiga "Jelaskan lebih lengkap." mengutip runbook VPN setelah giliran "harga
+  saham" yang abstain).
 
 **Prompt sistem dan template konteks.** Dengan riwayat aktif, prompt bawaan WeKnora
 (`default_kb`, "berikan langkah berikutnya yang berguna bila materi kurang") membuat model

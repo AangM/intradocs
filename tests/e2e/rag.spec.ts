@@ -28,6 +28,13 @@ test.beforeAll(async () => {
   account = accounts.find((a) => a.id === IDS.viewer)!;
 });
 test.afterAll(async () => {
+  // The questions asked here would otherwise pile up in siti's history on the demo
+  // machine; the WeKnora sessions behind them are cheap and are swept by the app when
+  // the rows go (the cascade drops the id; nothing else references it).
+  await db.query(
+    "DELETE FROM app.ai_conversations WHERE user_id=$1 AND created_at > now() - interval '1 hour'",
+    [IDS.viewer],
+  );
   await db.end();
 });
 test.beforeEach(async ({ page }) => {

@@ -137,3 +137,41 @@ sendiri, dan dibatasi agar tetap bisa dicabut: satu berkas, tanpa mengubah struk
 
 Bukti: `pnpm ui:shots` (desktop 1440 dan `SHOT_W=390`) dijalankan ulang setelah delta ini; tidak
 ada perbandingan piksel dengan mockup untuk lapisan glass karena memang sengaja berbeda.
+
+## Delta U10 — asisten sebagai aplikasi chat, sidebar yang bisa ditutup, dialog (September 2026)
+
+Setelah U09 pengguna meminta asisten yang "setara UI WeKnora / gitdoc / Claude / GPT", sidebar
+yang bisa ditutup dan menyorot halaman aktif, serta dropdown yang tidak mentah. Rujukan yang
+dipilih: **pola Claude/ChatGPT** (rel riwayat kiri, utas tengah maksimum 780 px, composer
+menempel di bawah), dengan **chip sumber ala Perplexity** di bawah setiap jawaban — bukan
+layar S09 mockup yang menaruh enam kartu kutipan penuh di bawah jawaban. Struktur S09 mentor
+(riwayat/cakupan kiri, pesan, composer) tetap dikenali; yang berubah adalah proporsi dan
+kepadatan.
+
+- **`apps/web/src/app/chat.css`** (dimuat setelah theme.css): halaman asisten setinggi
+  viewport, rel riwayat 272 px, utas menggulir sendiri, composer glass berbentuk pil dengan
+  chip cakupan dan tombol kirim bulat, sapaan pertama ("Halo, Andi. Ada yang bisa saya
+  bantu?") dengan empat kartu pemantik. Pertanyaan pengguna sebagai gelembung kanan, jawaban
+  dalam kartu glass dengan avatar spark; **sumber sebagai chip per dokumen** (`×n` bila
+  beberapa kutipan) dan "Lihat n kutipan" membuka daftar kutipan lengkap. Aksi jawaban jadi
+  ikon dengan tooltip. Di ponsel rel riwayat menjadi laci (checkbox CSS, tanpa JS).
+- **Sidebar portal**: entri dengan query (`/katalog?view=favorites`, `?status=mine`,
+  `?category=`) kini menyala sesuai `useSearchParams` — "Favorit" dan kategori tidak pernah
+  menyorot sebelumnya. Tombol ☰ di topbar: di desktop **melipat sidebar menjadi rel ikon**
+  (diingat di `localStorage`, ikon dengan `title`), di ponsel membuka **laci** dengan latar
+  gelap; menutup lewat latar, tombol ×, Escape, atau navigasi. Struktur di globals.css,
+  tampilan di theme.css.
+- **Edit penugasan role** (S08): `<details>` yang mengembang di dalam sel tabel diganti
+  `<dialog>` native glass (terpusat, Escape/latar menutup): pilihan role sebagai select
+  bertema, cakupan kategori sebagai chip pilihan.
+- **Select dan disclosure**: semua `select.inp` memakai chevron sendiri (appearance none);
+  menu chip filter, panel akun, dan kartu undangan memakai permukaan glass; `summary` dari
+  `source-evidence`, `editor-tools`, `version-history`, `withdraw-panel`, dan editor
+  taksonomi tampil sebagai tombol pil dengan caret berputar, bukan teks dengan segitiga.
+- **Konteks pertanyaan lanjutan** ("jelaskan lebih lengkap"): bukan UI — lihat
+  docs/WEKNORA.md §24.
+
+Bukti: `var/chat-shots.mts` (desktop 1440 dan 390 px: pending, utas dua giliran, kutipan
+terbuka, laci ponsel, rel terlipat, dialog role), `tests/e2e` rag + portal 14/14. Riwayat
+percakapan akun demo siti dibersihkan dari 93 pertanyaan sisa tes; `tests/e2e/rag.spec.ts`
+kini menghapus percakapannya sendiri di `afterAll`.
