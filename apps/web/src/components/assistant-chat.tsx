@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { answerToMarkdown } from '@intradocs/core/answer-export';
 import type { RetrievalScope } from '@intradocs/core/rag';
 import { Icon } from './icon';
+import { initials } from '@intradocs/core';
 import { AnswerText } from './answer-text';
 
 export interface AssistantCitation {
@@ -74,6 +75,7 @@ async function readError(response: Response): Promise<string> {
 }
 
 export function AssistantChat({
+  actorName = '',
   maxQuestionChars,
   generating = false,
   external = false,
@@ -84,6 +86,8 @@ export function AssistantChat({
   initialQuestion = '',
   initialDocumentId = '',
 }: {
+  /** Shown as the avatar initials on the person's own messages. */
+  actorName?: string;
   maxQuestionChars: number;
   generating?: boolean;
   /** Answers are composed by a provider on the internet, not on this machine. */
@@ -100,6 +104,7 @@ export function AssistantChat({
   /** Pre-selects the documents scope on this one document, if it is in recentDocuments. */
   initialDocumentId?: string;
 }) {
+  const actorInitials = initials(actorName || 'Anda');
   const fieldId = useId();
   const scopeId = useId();
   const [question, setQuestion] = useState(initialQuestion);
@@ -467,120 +472,149 @@ export function AssistantChat({
         )}
 
         <div className="assistant-thread" aria-live="polite" aria-busy={pending}>
-          {turns.map((turn, index) => (
+          {turns.map((turn) => (
             <article className="turn" key={turn.id}>
-              <div className="turn-q">
-                <span className="turn-who">Anda</span>
-                <p>{turn.question}</p>
-                <span className="sub tiny">{describeScope(turn.scope, categories)}</span>
+              <div className="msg msg-q">
+                <span className="avatar msg-avatar">{actorInitials}</span>
+                <div className="msg-body">
+                  <div className="msg-who">Anda</div>
+                  <p className="msg-text">{turn.question}</p>
+                  <span className="sub tiny">{describeScope(turn.scope, categories)}</span>
+                </div>
               </div>
-              <div className="turn-a">
-                <span className="turn-who">IntraDocs AI</span>
-                {turn.hiddenCitations > 0 && (
-                  <p className="callout c-warn" role="note">
-                    <Icon name="lock" size={15} />
-                    <span>
-                      {turn.hiddenCitations} sumber jawaban ini tidak lagi boleh Anda baca, jadi
-                      teks jawabannya disembunyikan. Ajukan pertanyaannya lagi untuk jawaban dari
-                      sumber yang berlaku sekarang.
-                    </span>
-                  </p>
-                )}
-                {turn.answer && (
-                  <div className="rag-answer">
-                    <AnswerText text={turn.answer} />
-                  </div>
-                )}
-                {turn.abstained && !turn.answer && (
-                  <p className="rag-answer">
-                    Tidak ada sumber resmi dalam cakupan akses Anda yang menjawab pertanyaan ini.
-                  </p>
-                )}
-                {turn.citations.length > 0 && (
-                  <>
-                    <h3 className="rag-sources-title">Sumber ({turn.citations.length})</h3>
-                    <ol className="rag-sources">
-                      {turn.citations.map((citation, n) => (
-                        <li key={`${citation.versionId}-${n}`}>
-                          <Link href={citation.href} prefetch={false} className="document-title">
-                            {citation.documentTitle}
-                          </Link>
-                          <div className="sub tiny">
-                            {citation.categoryName} · v{citation.versionLabel} ·{' '}
-                            {CLASSIFICATION_LABELS[citation.classification] ??
-                              citation.classification}
-                            {citation.heading ? ` · ${citation.heading}` : ''}
-                          </div>
-                          <p className="rag-snippet">{citation.snippet}</p>
-                        </li>
-                      ))}
-                    </ol>
-                  </>
-                )}
-                <p className="sub tiny">
-                  Cakupan retrieval: {turn.scopeSize} versi aktif yang boleh Anda baca.
-                  {turn.rejectedCount > 0
-                    ? ` ${turn.rejectedCount} kandidat ditolak validasi (izin atau teks buatan mesin).`
-                    : ''}
-                </p>
-                {/* Built from what is already on screen -- the citations that survived
-                    validation -- so exporting opens no path to anything else. */}
-                {(turn.answer || turn.citations.length > 0) && (
-                  <div className="rag-export">
-                    <button
-                      type="button"
-                      className="btn btn-sm"
-                      onClick={() => {
-                        void navigator.clipboard
-                          ?.writeText(markdown(turn))
-                          .then(() => setCopiedTurn(turn.id))
-                          .catch(() => setCopiedTurn(null));
-                      }}
-                    >
-                      <Icon name="file" size={14} />
-                      {copiedTurn === turn.id ? 'Tersalin' : 'Salin sebagai Markdown'}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-sm"
-                      onClick={() => download(markdown(turn), turn.question)}
-                    >
-                      <Icon name="download" size={14} />
-                      Unduh .md
-                    </button>
-                    {index === turns.length - 1 && (
-                      <span className="sub tiny">
-                        Tautan sumber tetap mengarah ke IntraDocs dan tetap memeriksa izin saat
-                        dibuka.
+              <div className="msg msg-a">
+                <span className="msg-avatar msg-ai">
+                  <Icon name="spark" size={15} />
+                </span>
+                <div className="msg-body turn-a">
+                  <div className="msg-who">IntraDocs AI</div>
+                  {turn.hiddenCitations > 0 && (
+                    <p className="callout c-warn" role="note">
+                      <Icon name="lock" size={15} />
+                      <span>
+                        {turn.hiddenCitations} sumber jawaban ini tidak lagi boleh Anda baca, jadi
+                        teks jawabannya disembunyikan. Ajukan pertanyaannya lagi untuk jawaban dari
+                        sumber yang berlaku sekarang.
                       </span>
-                    )}
-                  </div>
-                )}
-                {/* One vote per answer, on the stored turn. An unhelpful vote also counts as
-                    a knowledge-gap signal, like a search that found nothing. */}
-                <div className="turn-vote" role="group" aria-label="Apakah jawaban ini membantu?">
-                  <span className="sub tiny">Membantu?</span>
-                  <button
-                    type="button"
-                    className={`btn btn-sm${turn.helpful === true ? ' btn-p' : ''}`}
-                    aria-pressed={turn.helpful === true}
-                    onClick={() => void vote(turn.id, true)}
-                  >
-                    <Icon name="thumb" size={13} />
-                    Ya
-                  </button>
-                  <button
-                    type="button"
-                    className={`btn btn-sm${turn.helpful === false ? ' btn-p' : ''}`}
-                    aria-pressed={turn.helpful === false}
-                    onClick={() => void vote(turn.id, false)}
-                  >
-                    <Icon name="thumb" size={13} className="flip" />
-                    Tidak
-                  </button>
-                  {turn.helpful === false && (
-                    <span className="sub tiny">Dicatat sebagai kebutuhan pengetahuan.</span>
+                    </p>
                   )}
+                  {turn.answer && (
+                    <div className="rag-answer">
+                      <AnswerText text={turn.answer} />
+                    </div>
+                  )}
+                  {turn.abstained && !turn.answer && (
+                    <p className="rag-answer">
+                      Tidak ada sumber resmi dalam cakupan akses Anda yang menjawab pertanyaan ini.
+                    </p>
+                  )}
+                  {turn.citations.length > 0 && (
+                    <div className="srcs">
+                      <div className="srcs-h">
+                        Sumber jawaban — {new Set(turn.citations.map((c) => c.documentId)).size}{' '}
+                        dokumen, {turn.citations.length} kutipan
+                      </div>
+                      <ol className="srcs-list">
+                        {turn.citations.map((citation, n) => (
+                          <li className="src-i" key={`${citation.versionId}-${n}`}>
+                            <span className="src-n">{n + 1}</span>
+                            <span className="src-ic">
+                              <Icon name="file" size={15} />
+                            </span>
+                            <div className="src-body">
+                              <Link href={citation.href} prefetch={false} className="src-t">
+                                {citation.documentTitle}
+                              </Link>
+                              <div className="src-m">
+                                {citation.heading ? `Bagian “${citation.heading}” · ` : ''}v
+                                {citation.versionLabel} · {citation.categoryName} ·{' '}
+                                {CLASSIFICATION_LABELS[citation.classification] ??
+                                  citation.classification}
+                              </div>
+                              <p className="rag-snippet">{citation.snippet}</p>
+                            </div>
+                            <span className="pill p-green src-ok">
+                              <Icon name="check" size={11} /> Divalidasi
+                            </span>
+                            <Link
+                              href={citation.href}
+                              prefetch={false}
+                              className="src-go"
+                              aria-label={`Buka ${citation.documentTitle}`}
+                            >
+                              <Icon name="arrow-r" size={14} />
+                            </Link>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  )}
+                  {/* Built from what is already on screen -- the citations that survived
+                    validation -- so exporting opens no path to anything else. */}
+                  {/* One vote per answer, on the stored turn. An unhelpful vote also counts as
+                    a knowledge-gap signal, like a search that found nothing. Export is built
+                    from what is already on screen -- the validated citations -- so it opens
+                    no path to anything else. */}
+                  <div
+                    className="turn-actions"
+                    role="group"
+                    aria-label="Tindakan untuk jawaban ini"
+                  >
+                    <button
+                      type="button"
+                      className={`btn btn-sm${turn.helpful === true ? ' btn-on' : ''}`}
+                      aria-pressed={turn.helpful === true}
+                      onClick={() => void vote(turn.id, true)}
+                    >
+                      <Icon name="thumb" size={13} />
+                      Membantu
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn btn-sm${turn.helpful === false ? ' btn-on' : ''}`}
+                      aria-pressed={turn.helpful === false}
+                      aria-label="Tidak membantu"
+                      title="Tidak membantu"
+                      onClick={() => void vote(turn.id, false)}
+                    >
+                      <Icon name="thumb" size={13} className="flip" />
+                    </button>
+                    {(turn.answer || turn.citations.length > 0) && (
+                      <>
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          onClick={() => {
+                            void navigator.clipboard
+                              ?.writeText(markdown(turn))
+                              .then(() => setCopiedTurn(turn.id))
+                              .catch(() => setCopiedTurn(null));
+                          }}
+                        >
+                          <Icon name="link" size={13} />
+                          {copiedTurn === turn.id ? 'Tersalin' : 'Salin Markdown'}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          onClick={() => download(markdown(turn), turn.question)}
+                        >
+                          <Icon name="download" size={13} />
+                          Ekspor jawaban
+                        </button>
+                      </>
+                    )}
+                    <span className="sub tiny turn-stats">
+                      {turn.helpful === false ? 'Dicatat sebagai kebutuhan pengetahuan · ' : ''}
+                      {turn.citations.length
+                        ? `${new Set(turn.citations.map((c) => c.documentId)).size} dokumen dirujuk · `
+                        : ''}
+                      cakupan {turn.scopeSize} versi
+                      {turn.rejectedCount > 0
+                        ? ` · ${turn.rejectedCount} kandidat ditolak validasi`
+                        : ''}
+                    </span>
+                  </div>
                 </div>
               </div>
             </article>
@@ -651,12 +685,17 @@ export function AssistantChat({
           />
           <footer>
             <span className="sub tiny">
-              {scopeSummary} · sumber divalidasi ulang pada setiap permintaan · maksimal{' '}
-              {maxQuestionChars} karakter.
+              {scopeSummary} · jawaban selalu menyertakan sumber · maksimal {maxQuestionChars}{' '}
+              karakter
             </span>
-            <button className="btn btn-p" type="submit" disabled={pending || !question.trim()}>
+            <button
+              className="btn btn-p send"
+              type="submit"
+              disabled={pending || !question.trim()}
+              aria-label={pending ? 'Mencari…' : 'Kirim pertanyaan'}
+              title={pending ? 'Mencari…' : 'Kirim (Enter)'}
+            >
               <Icon name="arrow-r" size={16} />
-              {pending ? 'Mencari…' : 'Kirim'}
             </button>
           </footer>
         </form>

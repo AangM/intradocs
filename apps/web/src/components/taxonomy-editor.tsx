@@ -1,7 +1,12 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { TaxonomyCategory, TaxonomyLabel, TaxonomySuggestions } from '@intradocs/db/taxonomy';
+import type {
+  TaxonomyCategory,
+  TaxonomyLabel,
+  TaxonomyMeta,
+  TaxonomySuggestions,
+} from '@intradocs/db/taxonomy';
 import { Icon } from './icon';
 import { CLASSIFICATION_LABELS, type Classification } from '@intradocs/core';
 const empty: TaxonomyCategory = {
@@ -18,15 +23,30 @@ const empty: TaxonomyCategory = {
 export function TaxonomyEditor({
   categories,
   labels,
+  meta,
   suggestions,
 }: {
   categories: TaxonomyCategory[];
   labels: TaxonomyLabel[];
+  meta: TaxonomyMeta;
   suggestions: TaxonomySuggestions;
 }) {
   const router = useRouter();
   const [category, setCategory] = useState(empty),
     [tighten, setTighten] = useState(false);
+  // Forms open on demand (mockup S07: "+ Kategori Baru", "+ Label baru"); the tree and
+  // the chips are what the page is about.
+  const [categoryForm, setCategoryForm] = useState(false),
+    [labelForm, setLabelForm] = useState(false);
+  const openCategory = (c: TaxonomyCategory) => {
+    setCategory(c);
+    setTighten(false);
+    setCategoryForm(true);
+  };
+  const openLabel = (l: TaxonomyLabel) => {
+    setLabel(l);
+    setLabelForm(true);
+  };
   const [dragging, setDragging] = useState<string | null>(null),
     [dropTarget, setDropTarget] = useState<string | null>(null);
   const [label, setLabel] = useState<TaxonomyLabel>({
@@ -54,7 +74,9 @@ export function TaxonomyEditor({
       setMessage('Perubahan disimpan dan diaudit.');
       setCategory(empty);
       setTighten(false);
+      setCategoryForm(false);
       setLabel({ ...label, id: '', name: '', revision: 0 });
+      setLabelForm(false);
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Koneksi gagal.');
@@ -119,21 +141,13 @@ export function TaxonomyEditor({
       <div className="taxonomy-layout">
         <section className="card">
           <div className="card-h">
-            <h2 className="h3">Pohon Kategori</h2>
-            <button
-              className="btn btn-sm"
-              onClick={() => {
-                setCategory(empty);
-                setTighten(false);
-              }}
-            >
-              Tambah kategori
+            <Icon name="folder" size={17} />
+            <h2 className="h3">Struktur kategori</h2>
+            <span className="sub tiny ml-auto">Seret atau ↑↓ untuk mengubah urutan</span>
+            <button className="btn btn-sm btn-p" onClick={() => openCategory(empty)}>
+              <Icon name="plus" size={14} /> Kategori baru
             </button>
           </div>
-          <p className="sub tiny taxonomy-hint">
-            Seret sebuah kategori ke kategori setingkat untuk mengubah urutannya. Memindahkan induk
-            tetap lewat form di bawah.
-          </p>
           <ul className="taxonomy-tree">
             {categories.map((c) => (
               <li
@@ -204,142 +218,162 @@ export function TaxonomyEditor({
                     );
                   })()}
                 </span>
-                <button
-                  className="taxonomy-select"
-                  onClick={() => {
-                    setCategory(c);
-                    setTighten(false);
-                  }}
-                >
+                <span className={`cat-ic tone-${meta.categories[c.id]?.color ?? 'blue'}`}>
+                  <Icon name={meta.categories[c.id]?.icon || 'folder'} size={15} />
+                </span>
+                <button className="taxonomy-select" onClick={() => openCategory(c)}>
                   <strong>{c.name}</strong>
                   <span className="sub">
                     {CLASSIFICATION_LABELS[c.minimumClassification as Classification]} ·{' '}
                     {c.approvalSteps} tahap · review {c.reviewDays} hari
                   </span>
                 </button>
+                <span className="taxonomy-meta">
+                  <span className="pill p-grey">{meta.categories[c.id]?.documents ?? 0} dok</span>
+                  {(meta.categories[c.id]?.children ?? 0) > 0 && (
+                    <span className="pill p-blue">
+                      {meta.categories[c.id]!.children} sub-kategori
+                    </span>
+                  )}
+                  {c.minimumClassification !== 'internal' &&
+                    c.minimumClassification !== 'public' && (
+                      <span className="pill p-red">
+                        <Icon name="lock" size={11} /> Akses terbatas
+                      </span>
+                    )}
+                </span>
               </li>
             ))}
           </ul>
-          <form
-            className="card-b workflow-fields"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void save('/api/taxonomy/categories', {
-                ...category,
-                id: category.id || null,
-                confirmTightening: tighten,
-              });
-            }}
-          >
-            <h3>{category.id ? 'Edit kategori' : 'Kategori baru'}</h3>
-            <fieldset disabled={busy} className="workflow-fields">
-              <label>
-                Nama kategori
-                <input
-                  className="inp"
-                  required
-                  minLength={3}
-                  maxLength={100}
-                  value={category.name}
-                  onChange={(e) => setCategory({ ...category, name: e.target.value })}
-                />
-              </label>
-              <label>
-                Induk kategori
-                <select
-                  className="inp"
-                  value={category.parentId ?? ''}
-                  onChange={(e) => setCategory({ ...category, parentId: e.target.value || null })}
-                >
-                  <option value="">Tanpa induk (scope global)</option>
-                  {categories
-                    .filter((c) => c.id !== category.id)
-                    .map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                </select>
-              </label>
-              <label>
-                Deskripsi
-                <textarea
-                  className="inp"
-                  maxLength={500}
-                  value={category.description}
-                  onChange={(e) => setCategory({ ...category, description: e.target.value })}
-                />
-              </label>
-              <div className="grid g2">
-                <label>
-                  Klasifikasi minimum
-                  <select
-                    className="inp"
-                    value={category.minimumClassification}
-                    onChange={(e) =>
-                      setCategory({ ...category, minimumClassification: e.target.value })
-                    }
-                  >
-                    {Object.entries(CLASSIFICATION_LABELS).map(([v, l]) => (
-                      <option key={v} value={v}>
-                        {l}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Tahap persetujuan
-                  <select
-                    className="inp"
-                    value={category.approvalSteps}
-                    onChange={(e) =>
-                      setCategory({ ...category, approvalSteps: Number(e.target.value) })
-                    }
-                  >
-                    <option value={1}>Satu tahap</option>
-                    <option value={2}>Dua tahap</option>
-                  </select>
-                </label>
-                <label>
-                  Review berkala (hari)
-                  <input
-                    type="number"
-                    className="inp"
-                    min={1}
-                    max={3650}
-                    value={category.reviewDays}
-                    onChange={(e) =>
-                      setCategory({ ...category, reviewDays: Number(e.target.value) })
-                    }
-                  />
-                </label>
-                <label>
-                  Urutan
-                  <input
-                    type="number"
-                    className="inp"
-                    min={0}
-                    max={10000}
-                    value={category.position}
-                    onChange={(e) => setCategory({ ...category, position: Number(e.target.value) })}
-                  />
-                </label>
+          {categoryForm && (
+            <form
+              className="card-b workflow-fields taxonomy-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void save('/api/taxonomy/categories', {
+                  ...category,
+                  id: category.id || null,
+                  confirmTightening: tighten,
+                });
+              }}
+            >
+              <div className="row" style={{ justifyContent: 'space-between' }}>
+                <h3>{category.id ? `Edit kategori: ${category.name}` : 'Kategori baru'}</h3>
+                <button type="button" className="btn btn-sm" onClick={() => setCategoryForm(false)}>
+                  Tutup
+                </button>
               </div>
-              <label className="upload-check">
-                <input
-                  type="checkbox"
-                  checked={tighten}
-                  onChange={(e) => setTighten(e.target.checked)}
-                />
-                <span>
-                  Saya mengonfirmasi pengetatan akses/approval. Pembaca yang tidak lagi berizin
-                  langsung kehilangan akses.
-                </span>
-              </label>
-              <button className="btn btn-p">Simpan kategori</button>
-            </fieldset>
-          </form>
-          {category.id && (
+              <fieldset disabled={busy} className="workflow-fields">
+                <label>
+                  Nama kategori
+                  <input
+                    className="inp"
+                    required
+                    minLength={3}
+                    maxLength={100}
+                    value={category.name}
+                    onChange={(e) => setCategory({ ...category, name: e.target.value })}
+                  />
+                </label>
+                <label>
+                  Induk kategori
+                  <select
+                    className="inp"
+                    value={category.parentId ?? ''}
+                    onChange={(e) => setCategory({ ...category, parentId: e.target.value || null })}
+                  >
+                    <option value="">Tanpa induk (scope global)</option>
+                    {categories
+                      .filter((c) => c.id !== category.id)
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                <label>
+                  Deskripsi
+                  <textarea
+                    className="inp"
+                    maxLength={500}
+                    value={category.description}
+                    onChange={(e) => setCategory({ ...category, description: e.target.value })}
+                  />
+                </label>
+                <div className="grid g2">
+                  <label>
+                    Klasifikasi minimum
+                    <select
+                      className="inp"
+                      value={category.minimumClassification}
+                      onChange={(e) =>
+                        setCategory({ ...category, minimumClassification: e.target.value })
+                      }
+                    >
+                      {Object.entries(CLASSIFICATION_LABELS).map(([v, l]) => (
+                        <option key={v} value={v}>
+                          {l}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Tahap persetujuan
+                    <select
+                      className="inp"
+                      value={category.approvalSteps}
+                      onChange={(e) =>
+                        setCategory({ ...category, approvalSteps: Number(e.target.value) })
+                      }
+                    >
+                      <option value={1}>Satu tahap</option>
+                      <option value={2}>Dua tahap</option>
+                    </select>
+                  </label>
+                  <label>
+                    Review berkala (hari)
+                    <input
+                      type="number"
+                      className="inp"
+                      min={1}
+                      max={3650}
+                      value={category.reviewDays}
+                      onChange={(e) =>
+                        setCategory({ ...category, reviewDays: Number(e.target.value) })
+                      }
+                    />
+                  </label>
+                  <label>
+                    Urutan
+                    <input
+                      type="number"
+                      className="inp"
+                      min={0}
+                      max={10000}
+                      value={category.position}
+                      onChange={(e) =>
+                        setCategory({ ...category, position: Number(e.target.value) })
+                      }
+                    />
+                  </label>
+                </div>
+                <label className="upload-check">
+                  <input
+                    type="checkbox"
+                    checked={tighten}
+                    onChange={(e) => setTighten(e.target.checked)}
+                  />
+                  <span>
+                    Saya mengonfirmasi pengetatan akses/approval. Pembaca yang tidak lagi berizin
+                    langsung kehilangan akses.
+                  </span>
+                </label>
+                <button className="btn btn-p">Simpan kategori</button>
+              </fieldset>
+            </form>
+          )}
+          {categoryForm && category.id && (
             <details className="card-b">
               <summary>Hapus kategori kosong</summary>
               <p>Ditolak bila masih memiliki anak, dokumen, label, versi, atau upload.</p>
@@ -361,11 +395,20 @@ export function TaxonomyEditor({
         </section>
         <section className="card">
           <div className="card-h">
+            <Icon name="tag" size={17} style={{ color: 'var(--violet)' }} />
             <h2 className="h3">Label</h2>
-            <a className="btn btn-sm" href="/api/taxonomy/export">
+            <span className="sub tiny">{labels.length} label</span>
+            <a className="btn btn-sm ml-auto" href="/api/taxonomy/export">
               <Icon name="download" size={14} />
               Ekspor taksonomi
             </a>
+            <button
+              className="btn btn-sm"
+              type="button"
+              onClick={() => openLabel({ ...label, id: '', name: '', revision: 0 })}
+            >
+              <Icon name="plus" size={14} /> Label baru
+            </button>
           </div>
           <div className="card-b">
             <TaxonomyHygiene
@@ -379,76 +422,89 @@ export function TaxonomyEditor({
             />
             <div className="label-list">
               {labels.map((l) => (
-                <button className={`tag tone-${l.color}`} key={l.id} onClick={() => setLabel(l)}>
-                  {l.name} · {categories.find((c) => c.id === l.categoryId)?.name}
+                <button
+                  className={`tag label-chip tone-${l.color} ${label.id === l.id ? 'tag-on' : ''}`}
+                  key={l.id}
+                  onClick={() => openLabel(l)}
+                  title={`${l.name} · ${categories.find((c) => c.id === l.categoryId)?.name ?? ''}`}
+                >
+                  <i className="category-dot" />
+                  {l.name}
+                  <span className="n">{meta.labels[l.id]?.usedBy ?? 0}</span>
                 </button>
               ))}
             </div>
-            <form
-              className="workflow-fields"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void save('/api/taxonomy/labels', {
-                  ...label,
-                  id: label.id || null,
-                  remove: false,
-                });
-              }}
-            >
-              <h3>{label.id ? 'Edit label' : 'Label baru'}</h3>
-              <fieldset disabled={busy} className="workflow-fields">
-                <label>
-                  Kategori label
-                  <select
-                    className="inp"
-                    required
-                    disabled={!!label.id}
-                    value={label.categoryId}
-                    onChange={(e) => setLabel({ ...label, categoryId: e.target.value })}
-                  >
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Nama label
-                  <input
-                    className="inp"
-                    required
-                    minLength={3}
-                    maxLength={32}
-                    value={label.name}
-                    onChange={(e) => setLabel({ ...label, name: e.target.value })}
-                  />
-                </label>
-                <label>
-                  Warna
-                  <select
-                    className="inp"
-                    value={label.color}
-                    onChange={(e) => setLabel({ ...label, color: e.target.value })}
-                  >
-                    {['blue', 'green', 'amber', 'red', 'violet', 'grey'].map((c) => (
-                      <option key={c}>{c}</option>
-                    ))}
-                  </select>
-                </label>
-                <div className="row wrap">
-                  <button className="btn btn-p">Simpan label</button>
-                  <button
-                    className="btn"
-                    type="button"
-                    onClick={() => setLabel({ ...label, id: '', name: '', revision: 0 })}
-                  >
-                    Label baru
+            {labelForm && (
+              <form
+                className="workflow-fields taxonomy-form"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void save('/api/taxonomy/labels', {
+                    ...label,
+                    id: label.id || null,
+                    remove: false,
+                  });
+                }}
+              >
+                <div className="row" style={{ justifyContent: 'space-between' }}>
+                  <h3>{label.id ? `Edit label: ${label.name}` : 'Label baru'}</h3>
+                  <button type="button" className="btn btn-sm" onClick={() => setLabelForm(false)}>
+                    Tutup
                   </button>
                 </div>
-              </fieldset>
-            </form>
-            {label.id && (
+                {label.id && (
+                  <p className="sub tiny">
+                    Dipakai {meta.labels[label.id]?.usedBy ?? 0} versi aktif di{' '}
+                    {categories.find((c) => c.id === label.categoryId)?.name}.
+                  </p>
+                )}
+                <fieldset disabled={busy} className="workflow-fields">
+                  <label>
+                    Kategori label
+                    <select
+                      className="inp"
+                      required
+                      disabled={!!label.id}
+                      value={label.categoryId}
+                      onChange={(e) => setLabel({ ...label, categoryId: e.target.value })}
+                    >
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Nama label
+                    <input
+                      className="inp"
+                      required
+                      minLength={3}
+                      maxLength={32}
+                      value={label.name}
+                      onChange={(e) => setLabel({ ...label, name: e.target.value })}
+                    />
+                  </label>
+                  <label>
+                    Warna
+                    <select
+                      className="inp"
+                      value={label.color}
+                      onChange={(e) => setLabel({ ...label, color: e.target.value })}
+                    >
+                      {['blue', 'green', 'amber', 'red', 'violet', 'grey'].map((c) => (
+                        <option key={c}>{c}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="row wrap">
+                    <button className="btn btn-p">Simpan label</button>
+                  </div>
+                </fieldset>
+              </form>
+            )}
+            {labelForm && label.id && (
               <details>
                 <summary>Hapus label tidak terpakai</summary>
                 <button

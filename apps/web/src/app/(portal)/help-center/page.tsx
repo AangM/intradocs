@@ -274,13 +274,18 @@ export default async function HelpCenter() {
         <div className="card">
           {popular.length ? (
             popular.map((d, i) => (
-              <article className="notification-row" key={d.id}>
+              <Link
+                className="mostread mostread-row"
+                key={d.id}
+                href={documentHref(d)}
+                prefetch={false}
+              >
                 <span className="rank">{i + 1}</span>
-                <Link href={documentHref(d)} prefetch={false}>
-                  {d.title}
-                </Link>
-                <span className="sub">{d.reads} baca</span>
-              </article>
+                <div>
+                  <h3 className="t">{d.title}</h3>
+                  <div className="m">{d.reads} kali dibaca dalam 30 hari</div>
+                </div>
+              </Link>
             ))
           ) : (
             <Empty title="Belum ada aktivitas baca">

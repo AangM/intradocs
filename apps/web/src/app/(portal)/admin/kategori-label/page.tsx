@@ -1,6 +1,6 @@
 import { requireActor } from '@/lib/session';
 import { taxonomyData, taxonomySuggestions } from '@intradocs/db/taxonomy';
-import { PageHeading, Notice } from '@/components/shared';
+import { PageHeading } from '@/components/shared';
 import { TaxonomyEditor } from '@/components/taxonomy-editor';
 import { TaxonomyRules } from '@/components/taxonomy-rules';
 export default async function Taxonomy() {
@@ -13,15 +13,15 @@ export default async function Taxonomy() {
     <div className="pad">
       <PageHeading
         title="Kategori & Label"
-        subtitle="Taksonomi, urutan, klasifikasi minimum, dan aturan review dalam scope Anda."
+        subtitle={`Taksonomi knowledge base — ${data.categories.length} kategori dan ${data.labels.length} label aktif dalam scope Anda`}
       />
-      <Notice>
+      <TaxonomyEditor {...data} suggestions={suggestions} />
+      <TaxonomyRules categories={data.categories} />
+      <p className="sub tiny mt20">
         Maksimal tiga tingkat; dokumen berada pada kategori leaf. Pemindahan kategori terpakai dan
         penurunan klasifikasi ditolak karena memerlukan review akses terpisah. Kritikal selalu
         membutuhkan dua tahap.
-      </Notice>
-      <TaxonomyEditor {...data} suggestions={suggestions} />
-      <TaxonomyRules categories={data.categories} />
+      </p>
     </div>
   );
 }

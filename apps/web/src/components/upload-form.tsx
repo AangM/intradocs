@@ -18,6 +18,18 @@ export type RevisionInput = {
   classification: Classification;
 };
 const steps = ['Pilih sumber', 'Metadata', 'Proses & simpan', 'Tinjau hasil'];
+const FT_BY_EXT: Record<string, [string, string]> = {
+  md: ['md', 'MD'],
+  txt: ['txt', 'TXT'],
+  pdf: ['pdf', 'PDF'],
+  docx: ['doc', 'DOC'],
+  xlsx: ['xls', 'XLS'],
+};
+const ftClass = (name: string) =>
+  FT_BY_EXT[name.split('.').pop()?.toLowerCase() ?? '']?.[0] ?? 'txt';
+const ftLabel = (name: string) =>
+  FT_BY_EXT[name.split('.').pop()?.toLowerCase() ?? '']?.[1] ?? 'FILE';
+
 export function UploadForm({
   categories,
   ownerName,
@@ -56,6 +68,7 @@ export function UploadForm({
     [result, setResult] = useState<Result | null>(null),
     [dragging, setDragging] = useState(false);
   const input = useRef<HTMLInputElement>(null),
+    attachmentInput = useRef<HTMLInputElement>(null),
     requestId = useRef<string | null>(null),
     selection = useRef(0),
     controller = useRef<AbortController | null>(null);
@@ -312,25 +325,74 @@ export function UploadForm({
             </div>
             {file && (
               <div className="file-row">
-                <Icon name="file" />
-                <strong>{file.name}</strong>
-                <span className="sub">{(file.size / 1024).toFixed(1)} KiB · belum dipindai</span>
+                <span className={`ft ft-${ftClass(file.name)}`}>{ftLabel(file.name)}</span>
+                <div className="upload-file-info">
+                  <strong>{file.name}</strong>
+                  <div className="sub tiny">
+                    {(file.size / 1024).toFixed(1)} KiB · sumber utama · dipindai saat disimpan
+                  </div>
+                </div>
+                <span className="pill p-blue">Siap</span>
+                <button
+                  type="button"
+                  className="btn-icon"
+                  aria-label="Hapus berkas utama"
+                  onClick={() => {
+                    setFile(null);
+                    if (input.current) input.current.value = '';
+                  }}
+                >
+                  <Icon name="x" size={14} />
+                </button>
               </div>
             )}
-            <label className="attachment-picker">
-              Lampiran (opsional, maksimal 4)
+            {attachments.map((a, i) => (
+              <div className="file-row" key={`${a.name}-${i}`}>
+                <span className={`ft ft-${ftClass(a.name)}`}>{ftLabel(a.name)}</span>
+                <div className="upload-file-info">
+                  <strong>{a.name}</strong>
+                  <div className="sub tiny">
+                    {(a.size / 1024).toFixed(1)} KiB · lampiran {i + 1} · dipindai bersama sumber
+                    utama
+                  </div>
+                </div>
+                <span className="pill p-grey">Lampiran</span>
+                <button
+                  type="button"
+                  className="btn-icon"
+                  aria-label={`Hapus lampiran ${a.name}`}
+                  onClick={() => {
+                    changed();
+                    setAttachments(attachments.filter((_, j) => j !== i));
+                  }}
+                >
+                  <Icon name="x" size={14} />
+                </button>
+              </div>
+            ))}
+            <div className="attachment-picker">
               <input
+                id="attachment-files"
+                ref={attachmentInput}
                 type="file"
+                hidden
                 multiple
                 accept=".md,.txt,.pdf,.docx,.xlsx"
+                aria-label="Lampiran"
                 onChange={(e) => chooseAttachments(e.target.files)}
               />
-            </label>
-            {attachments.map((a, i) => (
-              <p className="sub" key={i}>
-                {i + 1}. {a.name} · {(a.size / 1024).toFixed(1)} KiB
-              </p>
-            ))}
+              <button
+                type="button"
+                className="btn btn-sm"
+                disabled={attachments.length >= 4}
+                onClick={() => attachmentInput.current?.click()}
+              >
+                <Icon name="plus" size={14} /> Tambah lampiran
+              </button>
+              <span className="sub tiny">
+                Opsional, maksimal 4 · ikut dipindai dan masuk canonical gabungan
+              </span>
+            </div>
             <p className="hint">
               Hasil canonical gabungan maksimal 2 MiB. PDF pindai, macro, ZIP, format
               rusak/encrypted, dan hasil yang kehilangan data penting ditolak; tidak ada OCR atau AI

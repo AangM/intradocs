@@ -16,37 +16,52 @@ export function TaxonomyRules({ categories }: { categories: TaxonomyCategory[] }
     <section className="card mt20" aria-label="Aturan yang berlaku">
       <div className="card-h">
         <Icon name="shield" size={17} />
-        <h2 className="h3">Aturan yang berlaku</h2>
+        <h2 className="h3">Aturan otomatis</h2>
+        <span className="pill p-green ml-auto">{4 + perCategory.length} aturan aktif</span>
       </div>
-      <div className="card-b">
-        <ul className="rules-list">
-          <li>
-            <strong>Dokumen berlabel Kritikal</strong> selalu memerlukan persetujuan dua tahap, apa
-            pun pengaturan kategorinya.
-          </li>
-          <li>
-            <strong>Klasifikasi minimum kategori</strong> tidak bisa diturunkan tanpa review akses
-            terpisah; dokumen Terbatas/Rahasia hanya terbaca lewat grant per dokumen.
-          </li>
-          <li>
-            <strong>Pengingat review</strong> dimulai H−14 sebelum tanggal review kategori; dokumen
-            yang lewat tanggal ditandai kedaluwarsa dan dikeluarkan dari index AI.
-          </li>
-          <li>
-            <strong>Label dari AI</strong> hanya diusulkan, disaring kosakata kategori, dan tidak
-            pernah diterapkan otomatis — perubahan label lewat revisi yang direview.
-          </li>
-          {perCategory.map((c) => (
-            <li key={c.id}>
-              <strong>{c.name}</strong>: minimum{' '}
+      <div className="card-b rules">
+        {[
+          <>
+            Dokumen berlabel <strong>Kritikal</strong> → wajib persetujuan 2 tahap, apa pun
+            pengaturan kategorinya
+          </>,
+          <>
+            <strong>Klasifikasi minimum kategori</strong> tidak bisa diturunkan tanpa review akses;
+            Terbatas/Rahasia hanya terbaca lewat grant per dokumen
+          </>,
+          <>
+            Dokumen lewat tanggal review → status <strong>Kedaluwarsa</strong>, keluar dari index
+            AI; pengingat mulai H−14
+          </>,
+          <>
+            <strong>Label dari AI</strong> hanya diusulkan dan disaring kosakata kategori — tidak
+            pernah diterapkan otomatis
+          </>,
+        ].map((rule, i) => (
+          <div className="rule-row" key={i}>
+            <span className="ck y" aria-hidden="true">
+              <Icon name="check" size={12} />
+            </span>
+            <span className="rule-t">{rule}</span>
+            <span className="sub tiny">di kode</span>
+          </div>
+        ))}
+        {perCategory.map((c) => (
+          <div className="rule-row" key={c.id}>
+            <span className="ck y" aria-hidden="true">
+              <Icon name="check" size={12} />
+            </span>
+            <span className="rule-t">
+              Kategori <strong>{c.name}</strong> → minimum{' '}
               {CLASSIFICATION_LABELS[c.minimumClassification as Classification]}, {c.approvalSteps}{' '}
-              tahap persetujuan, review tiap {c.reviewDays} hari.
-            </li>
-          ))}
-        </ul>
-        <p className="sub tiny">
-          Aturan per kategori diubah lewat form kategori di atas; empat aturan pertama ditetapkan di
-          kode dan tidak dapat dimatikan dari UI.
+              tahap persetujuan, review tiap {c.reviewDays} hari
+            </span>
+            <span className="sub tiny">per kategori</span>
+          </div>
+        ))}
+        <p className="hint">
+          Aturan per kategori diubah lewat form kategori; yang bertanda “di kode” tidak dapat
+          dimatikan dari UI. Ini ringkasan yang berlaku, bukan rule builder.
         </p>
       </div>
     </section>

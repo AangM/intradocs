@@ -19,14 +19,40 @@ export type TaxonomyLabel = {
   color: string;
   revision: number;
 };
+/** Display-only facts next to the editable fields: what the tree shows, never what it posts. */
+export type TaxonomyMeta = {
+  categories: Record<string, { icon: string; color: string; documents: number; children: number }>;
+  labels: Record<string, { usedBy: number }>;
+};
 export async function taxonomyData(
   actorId: string,
-): Promise<{ categories: TaxonomyCategory[]; labels: TaxonomyLabel[] }> {
+): Promise<{ categories: TaxonomyCategory[]; labels: TaxonomyLabel[]; meta: TaxonomyMeta }> {
   return withActor(actorId, async ({ client }) => {
-    const categories = (await client.query('SELECT * FROM app.categories ORDER BY position,name'))
-      .rows;
-    const labels = (await client.query('SELECT * FROM app.labels ORDER BY name')).rows;
+    const categories = (
+      await client.query(
+        `SELECT c.*,
+                (SELECT count(*) FROM app.documents d WHERE d.category_id=c.id AND app.is_active_version(d.current_version_id))::int AS documents,
+                (SELECT count(*) FROM app.categories k WHERE k.parent_id=c.id)::int AS children
+           FROM app.categories c ORDER BY c.position,c.name`,
+      )
+    ).rows;
+    const labels = (
+      await client.query(
+        `SELECT l.*,(SELECT count(*) FROM app.documents d JOIN app.document_versions v ON v.id=d.current_version_id WHERE app.is_active_version(v.id) AND v.category_id=l.category_id AND l.name=ANY(v.labels))::int AS used_by
+           FROM app.labels l ORDER BY l.name`,
+      )
+    ).rows;
+    const meta: TaxonomyMeta = { categories: {}, labels: {} };
+    for (const c of categories)
+      meta.categories[c.id] = {
+        icon: c.icon,
+        color: c.color,
+        documents: c.documents,
+        children: c.children,
+      };
+    for (const l of labels) meta.labels[l.id] = { usedBy: l.used_by };
     return {
+      meta,
       categories: categories.map((c) => ({
         id: c.id,
         parentId: c.parent_id,

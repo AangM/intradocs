@@ -42,6 +42,7 @@ export default async function Assistant({
           }
         />
         <AssistantChat
+          actorName={actor.name}
           maxQuestionChars={config.weknora.maxQuestionChars}
           generating={config.generation === 'weknora-local'}
           external={config.generationLocation === 'external'}

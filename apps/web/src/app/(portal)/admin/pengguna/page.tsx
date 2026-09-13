@@ -48,7 +48,7 @@ export default async function Users() {
         title="Pengguna & Kontrol Akses (RBAC)"
         subtitle={`${users.filter((u) => u.active).length} pengguna aktif terlihat · 5 role bawaan · identitas lokal`}
         actions={
-          <>
+          <div className="row invite-row">
             <button
               className="btn"
               disabled
@@ -57,18 +57,16 @@ export default async function Users() {
               <Icon name="refresh" size={16} />
               Sinkron SSO
             </button>
-          </>
+            <InviteUser
+              categories={categories.map((c) => ({ id: c.id, name: c.name }))}
+              invitations={invitations}
+              defaultUnit={actor.unit}
+              canPickUnit={actor.role === 'super_admin'}
+              canScopeAll={actor.role === 'super_admin'}
+            />
+          </div>
         }
       />
-      <div className="invite-row">
-        <InviteUser
-          categories={categories.map((c) => ({ id: c.id, name: c.name }))}
-          invitations={invitations}
-          defaultUnit={actor.unit}
-          canPickUnit={actor.role === 'super_admin'}
-          canScopeAll={actor.role === 'super_admin'}
-        />
-      </div>
       <div className="grid g3 rbac-cards mb">
         {ROLES.map((role) => (
           <div key={role} className={`role-card tone-${detail[role].color}`}>
@@ -103,6 +101,11 @@ export default async function Users() {
         <div className="card-h">
           <Icon name="lock" />
           <h2 className="h3">Matriks izin</h2>
+          <div className="matrix-legend ml-auto" aria-hidden="true">
+            <span className="permission-yes">Diizinkan</span>
+            <span className="permission-limited">Terbatas scope/grant</span>
+            <span className="permission-no">Tidak</span>
+          </div>
         </div>
         <div
           className="table-scroll"
@@ -177,11 +180,11 @@ export default async function Users() {
               </tr>
               <tr>
                 <td>Upload / review</td>
-                <td>Dalam scope / ditugaskan</td>
-                <td>Dalam scope / ditugaskan</td>
-                <td>Dalam scope / ditugaskan</td>
-                <td>Milik sendiri / tidak</td>
-                <td>Tidak / tidak</td>
+                <td className="permission-limited">Dalam scope / ditugaskan</td>
+                <td className="permission-limited">Dalam scope / ditugaskan</td>
+                <td className="permission-limited">Dalam scope / ditugaskan</td>
+                <td className="permission-limited">Milik sendiri / tidak review</td>
+                <td className="permission-no">Tidak</td>
               </tr>
             </tbody>
           </table>

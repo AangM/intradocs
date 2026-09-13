@@ -148,9 +148,17 @@ export async function dashboardData(actorId: string, days = 30, unit: string | n
         [unit],
       )
     ).rows[0];
+    // Two series per day, both from the audit trail: document reads and questions to the
+    // assistant (retrieval, answer or abstention -- one event per question).
     const activity = (
-      await client.query<{ day: string; reads: number }>(
-        `SELECT to_char(a.created_at AT TIME ZONE 'Asia/Jakarta','YYYY-MM-DD') AS day,count(*)::int AS reads FROM app.audit_events a WHERE a.action='document.read' AND a.created_at>=now()-make_interval(days=>$1) AND ($2::text IS NULL OR EXISTS(SELECT 1 FROM app.documents d JOIN app.profiles p ON p.id=d.owner_id WHERE d.id=a.document_id AND p.unit=$2)) GROUP BY 1 ORDER BY 1`,
+      await client.query<{ day: string; reads: number; asks: number }>(
+        `SELECT to_char(a.created_at AT TIME ZONE 'Asia/Jakarta','YYYY-MM-DD') AS day,
+                count(*) FILTER(WHERE a.action='document.read')::int AS reads,
+                count(*) FILTER(WHERE a.action IN ('rag.retrieval','rag.chat','rag.abstained'))::int AS asks
+           FROM app.audit_events a
+          WHERE a.action IN ('document.read','rag.retrieval','rag.chat','rag.abstained') AND a.created_at>=now()-make_interval(days=>$1)
+            AND ($2::text IS NULL OR (a.action='document.read' AND EXISTS(SELECT 1 FROM app.documents d JOIN app.profiles p ON p.id=d.owner_id WHERE d.id=a.document_id AND p.unit=$2)) OR (a.action<>'document.read' AND EXISTS(SELECT 1 FROM app.profiles p WHERE p.id=a.actor_id AND p.unit=$2)))
+          GROUP BY 1 ORDER BY 1`,
         [days, unit],
       )
     ).rows;
@@ -180,6 +188,19 @@ export async function dashboardData(actorId: string, days = 30, unit: string | n
     const latest = (
       await client.query<{ id: string; slug: string; title: string; format: string }>(
         `SELECT d.id,d.slug,v.title,v.source_format AS format FROM app.documents d JOIN app.document_versions v ON v.id=d.current_version_id WHERE app.is_active_version(v.id) AND v.approved_at>=now()-make_interval(days=>$1) AND ($2::text IS NULL OR EXISTS(SELECT 1 FROM app.profiles p WHERE p.id=d.owner_id AND p.unit=$2)) ORDER BY v.approved_at DESC,d.id LIMIT 5`,
+        [days, unit],
+      )
+    ).rows;
+    // Most-searched terms under the same k-anonymity rule as knowledge gaps: a term is
+    // listed only once three different people have searched it, in normalised form.
+    const popular = (
+      await client.query<{ term: string; searches: number; people: number }>(
+        `SELECT query_norm AS term,count(*)::int AS searches,count(DISTINCT actor_id)::int AS people
+           FROM app.search_events s
+          WHERE created_at>=now()-make_interval(days=>$1) AND query_norm<>''
+            AND ($2::text IS NULL OR EXISTS(SELECT 1 FROM app.profiles p WHERE p.id=s.actor_id AND p.unit=$2))
+          GROUP BY query_norm HAVING count(DISTINCT actor_id)>=3
+          ORDER BY searches DESC,term LIMIT 5`,
         [days, unit],
       )
     ).rows;
@@ -236,6 +257,7 @@ export async function dashboardData(actorId: string, days = 30, unit: string | n
         expired: Number(summary.expired),
       },
       activity,
+      popular,
       search,
       approvalHours: approval.hours,
       contributors,
