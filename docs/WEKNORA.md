@@ -92,6 +92,14 @@ pnpm dev
 
 `pnpm weknora:stop` menghentikan profil tanpa menghapus volume. `pnpm services:stop` hanya menyentuh PostgreSQL IntraDocs.
 
+Opsional, setelah jawaban tersusun berjalan (`AI_GENERATION`, `pnpm weknora:generation`): reranker untuk pipeline chat, §17.
+
+```sh
+pnpm weknora:rerank-weights      # bobot int8 terpin (571 MB) ke volume reranker
+docker compose --env-file .env.local --profile weknora --profile weknora-rerank up -d
+pnpm weknora:rerank              # verifikasi lewat WeKnora, daftar sebagai model remote, pin agen
+```
+
 Dua hal yang baru terlihat pada checkout benar-benar bersih (laptop kedua, September 2026):
 
 - `setup:local` kini ikut membuat `WEKNORA_DB_PASSWORD`, `WEKNORA_REDIS_PASSWORD`, `WEKNORA_JWT_SECRET`, dan `WEKNORA_AES_KEY`. Compose v5 menginterpolasi semua service di `compose.yaml`, termasuk yang di balik profil `weknora`, sehingga `up -d postgres` gagal bila keempatnya belum ada. `weknora:setup` tidak menimpa nilai yang sudah ada.
@@ -130,6 +138,8 @@ Semua server-side. `scripts/runtime-env.ts` memilih variabel mana yang sampai ke
 | `WEKNORA_MAX_ANSWER_CHARS`    | 4000    | Ceiling 8000                                                  |
 
 Budget boleh diturunkan, tidak boleh dinaikkan melewati ceiling. Rate limit permintaan AI: 5/menit/akun dan satu generasi aktif/akun, di dalam proses web (satu proses = seluruh deployment pada profil local-dev).
+
+`WEKNORA_AGENT_ID` dan `WEKNORA_GENERATION_MODEL_ID` (ditulis `weknora:agent` / `weknora:generation`) ikut ke web sebagai pin. Yang hanya dibaca skrip dan Compose: `WEKNORA_RERANK_MODEL_ID` (ditulis `weknora:rerank`, dipin ke agen); untuk profil `weknora-rerank`: `WEKNORA_RERANK_MODEL_PATH` (default direktori int8 di volume; `BAAI/bge-reranker-v2-m3` untuk fp32), `WEKNORA_RERANK_MAX_BATCH_TOKENS` (1024), `WEKNORA_RERANK_MEMORY_LIMIT` (3200m), `WEKNORA_RERANK_CPU_LIMIT` (4), `WEKNORA_RERANK_URL` (shim), dan `WEKNORA_RERANK_SHIM_DEBUG` (0; 1 mencetak potongan corpus ke log shim).
 
 ## 5. Batas keamanan
 
@@ -197,6 +207,10 @@ Batas lain: concurrency pool WeKnora 2, ekspor berjalan serial (satu WeKnora lok
 | `503` pada retrieval; log WeKnora: `assertion failed: item_pointer_is_valid(ctid)` (SQLSTATE XX000) | Index BM25 ParadeDB rusak setelah penghapusan massal (mis. KB lama saat `weknora:reindex`). `docker compose --env-file .env.local --profile weknora exec weknora-postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "REINDEX INDEX embeddings_search_idx"'`; `weknora:reindex` kini melakukannya sendiri |
 | `bind: An attempt was made to access a socket in a way forbidden` | Port masuk rentang cadangan WinNAT. `netsh interface ipv4 show excludedportrange protocol=tcp`, lalu pilih port di luar rentang itu |
 | `converter_unavailable` saat unggah | Jaringan `conversion` harus `internal: false` selama worker berjalan di host; port internal tidak dapat dipublikasikan |
+| `weknora-reranker` restart terus; `dmesg` VM: `global_oom … Killed process (text-embeddings)` | VM Docker kehabisan memori saat warm-up bobot fp32, apa pun batas container-nya. Pakai bobot int8 (`pnpm weknora:rerank-weights`, default `WEKNORA_RERANK_MODEL_PATH`) atau VM ≥ 6 GB (§17) |
+| `pnpm weknora:rerank`: `Rerank API error: Http Status: 422` | WeKnora memanggil TEI langsung, bukan lewat shim. `WEKNORA_RERANK_URL` harus `http://weknora-rerank-shim:80` dan shim harus healthy |
+| Chat `503` setelah rerank dipin; log WeKnora `Failed to get rerank model` / `download_failed` | Model rerank terdaftar `source: local` (= Ollama). Jalankan `pnpm weknora:rerank` lagi: ia mendaftar ulang sebagai `remote` dan menghapus catatan lama setelah agen dipin |
+| Jawaban "tidak ada bagian dokumen yang menjawab secara langsung" di atas daftar sumber | Bukan galat: pipeline WeKnora (threshold/reranker) menolak semua kandidat sedangkan gerbang IntraDocs meloloskan sumber terdekat (§17, `resolveGeneratedAnswer`) |
 
 Log yang aman dibagikan: `pnpm weknora:status` dan baris audit `rag.*` di `app.audit_events`. Keduanya tidak memuat key, pertanyaan, atau isi dokumen.
 
@@ -250,6 +264,7 @@ semuanya hidup bersamaan.
 | Portal + reader + katalog + search | `postgres`                                           | ~0,3 GB       |
 | Ditambah asisten AI                | `+ weknora-app`, `weknora-postgres`, `weknora-redis` | ~3,5 GB       |
 | Ditambah unggah dokumen            | `+ clamav`, `converter`                              | ~5,3 GB       |
+| Ditambah reranker (§17)            | `+ weknora-reranker` (int8), `weknora-rerank-shim`   | +1,9 GB       |
 
 Pilih dua dari tiga baris itu pada mesin 8 GB. Untuk menguji unggahan:
 
@@ -260,6 +275,12 @@ docker compose --env-file .env.local --profile knowledge up -d clamav converter
 
 Untuk kembali menguji asisten AI, kebalikannya. Menjalankan ketiganya sekaligus
 membutuhkan sekitar 12 GB agar nyaman.
+
+Pengukuran ulang saat reranker dinyalakan (§17, VM WSL 3,8 GB, `docker stats` di tengah
+`pnpm rag:eval --chat`): keempat baris berjalan bersama — `weknora-reranker` 1,87 GB,
+`weknora-app` 0,23 GB, `clamav` 0,26 GB, sisanya di bawah 0,1 GB masing-masing — dengan
+Ollama (bge-m3 + qwen2.5 3B di GPU 6 GB), build produksi, dan worker di host. Yang tidak muat
+di VM itu hanya bobot reranker fp32.
 
 Port juga perlu perhatian di Windows: rentang yang dipesan WinNAT membuat bind
 gagal dengan "An attempt was made to access a socket in a way forbidden by its
@@ -420,13 +441,14 @@ terdaftar sebelumnya tidak pernah bisa dipanggil — bukan karena konfigurasi, m
 tidak ada server yang melayaninya. Percobaan "dengan vs tanpa rerank" yang urutannya identik dan
 justru lebih cepat kini punya penjelasan lengkap.
 
-Untuk menyalakannya nanti dibutuhkan server reranker terpisah (mis. `text-embeddings-inference`
-dengan `BAAI/bge-reranker-v2-m3`, ±1,2 GB RAM), didaftarkan sebagai model `Rerank` dengan
-`base_url` server itu, lalu `WEKNORA_RERANK_MODEL_ID=<id>` dan `pnpm weknora:agent`. Pada mesin
-7,7 GB ini ia tidak muat bersama portal dan model penjawab, jadi tidak dijalankan.
+Menyalakannya butuh server reranker terpisah, dan itu kini ada sebagai profil compose
+`weknora-rerank` (§17): `text-embeddings-inference` dengan bobot int8 `bge-reranker-v2-m3`
+di belakang shim kecil yang menerjemahkan bentuk permintaan WeKnora ke bentuk TEI. Pada mesin
+7,7 GB ini ia berjalan bersama portal, model penjawab, ClamAV, dan converter — bobot fp32-nya
+tidak muat, dan itu diukur, bukan diduga.
 
-`summary_model_id` senasib: hanya bisa diatur saat knowledge base dibuat, sehingga mengubahnya
-berarti membuat ulang knowledge base dan mengindeks ulang seluruh dokumen.
+`summary_model_id` lain lagi ceritanya: hanya bisa diatur saat knowledge base dibuat, sehingga
+mengubahnya berarti membuat ulang knowledge base dan mengindeks ulang seluruh dokumen.
 
 ## 12. Summary dan UI WeKnora
 
@@ -785,17 +807,104 @@ Angka "2/7 summary salah" adalah alasan summary tidak tampil kepada pembaca: tid
 permukaan mekanis untuk menolak teks bebas yang keliru. Bagi editor ia berguna sebagai bahan;
 bagi pembaca ia akan tampak seperti kalimat dokumen.
 
-### Rerank: server reranker sebagai profil compose opsional
+### Rerank: menyala — TEI int8 di belakang shim, diukur pada jalur chat
 
-`compose.yaml` menambah service `weknora-reranker` (profil `weknora-rerank`,
-`text-embeddings-inference` CPU, model `BAAI/bge-reranker-v2-m3`, ~2,3 GB RAM fp32,
-`WEKNORA_RERANK_HF_MODEL=BAAI/bge-reranker-base` untuk VM yang lebih kecil), hanya terjangkau
-dari jaringan compose, dan `SSRF_WHITELIST_EXTRA` menambahkan namanya saja.
-`pnpm weknora:rerank` memverifikasi lewat `POST /initialization/rerank/check` (field
-`modelName`/`baseUrl` camelCase) bahwa WeKnora benar-benar bisa memanggilnya, mendaftarkannya
-sebagai model `Rerank`, menulis `WEKNORA_RERANK_MODEL_ID`, dan memin agen. Reranker hanya
-mengurutkan ulang chunk yang sudah diambil WeKnora di dalam `knowledge_ids` yang diotorisasi;
-ia tidak menghasilkan teks dan sitasi tetap divalidasi IntraDocs.
+Profil `weknora-rerank` di `compose.yaml` menjalankan dua container yang hanya terjangkau dari
+jaringan compose: `weknora-reranker` (`text-embeddings-inference` CPU 1.8 dengan
+`BAAI/bge-reranker-v2-m3`) dan `weknora-rerank-shim` (`scripts/rerank-shim.mjs` di
+`node:22-alpine`, read-only, tanpa dependensi). `SSRF_WHITELIST_EXTRA` menyebut nama shim saja.
+Tiga hal harus diselesaikan sebelum WeKnora benar-benar memanggilnya; ketiganya diukur.
+
+**Bobot fp32 tidak muat, dan bukan karena batas container.** VM Docker di laptop 7,7 GB ini
+3,8 GB (default WSL: separuh RAM). Bobot fp32 2,27 GB butuh ~2,8 GB residen saat warm-up, dan
+`dmesg` VM mencatat `global_oom … Killed process (text-embeddings) anon-rss:2798024kB` pada
+setiap percobaan — dengan `--max-batch-tokens` 8192, 4096, maupun 1024, dan batas memori
+container 2,8 atau 3,2 GB (batas cgroup tidak berarti bila VM-nya sendiri kehabisan).
+Membesarkan VM berarti mengambil dari Ollama, portal, dan worker di host. Jalan keluarnya
+adalah ekspor int8 ONNX model yang sama (`onnx-community/bge-reranker-v2-m3-ONNX`,
+`onnx/model_int8.onnx` 571 MB) lewat backend ORT TEI: residen ~1,8 GB, dan pasangan contoh
+dari model card ("what is panda?" → 0,995) serta dua pasangan Indonesia langsung (0,99 dan
+0,88 untuk paragraf yang tepat, <0,001 untuk yang tidak) menunjukkan kuantisasi tidak
+merusaknya. `pnpm weknora:rerank-weights` mengunduh lima berkas pada **revisi terpin** dengan
+**sha256 terpin** per berkas ke `var/reranker/`, lalu menyalinnya ke volume reranker memakai
+image TEI sendiri; `WEKNORA_RERANK_MODEL_PATH` mengarahkan TEI ke direktori itu (default) atau
+ke `BAAI/bge-reranker-v2-m3` untuk VM ≥ 6 GB.
+
+**Bentuk permintaannya berbeda.** `internal/models/rerank/remote_api.go` WeKnora mengirim
+`{model, query, documents}` ke `{base_url}/rerank` dan membaca
+`{results: [{index, relevance_score}]}` (bentuk Jina/Cohere); TEI menerima `{query, texts}`
+dan menjawab `[{index, score}]`. Tanpa penerjemah, `rerank/check` mengembalikan `422` dari
+TEI. Shim-nya 140 baris Node tanpa dependensi: batas 64 dokumen dan 1 MB, satu upstream tetap,
+`RERANK_SHIM_DEBUG=1` (mati secara default karena mencetak potongan corpus) mencatat skor per
+kandidat — itulah yang membuat semua angka di bawah bisa dibaca.
+
+**`source: local` berarti Ollama.** Model rerank yang didaftarkan sebagai `local` dicoba
+di-pull WeKnora dari Ollama, berstatus `download_failed`, dan pipeline chat gagal di stage
+rerank (`Failed to get rerank model`) — permintaan menggantung sampai time-out `503`, padahal
+`rerank/check` lulus karena tidak membaca catatan model. Yang benar `source: remote` dengan
+provider generik. `pnpm weknora:rerank` kini mendaftar lebih dulu, memin agen, baru menghapus
+catatan lama (WeKnora menolak menghapus model yang masih dirujuk agen).
+
+**Di mana ia bekerja.** Hanya di pipeline chat agen: `chunk_search_parallel`
+(`embedding_top_k`) → `chunk_rerank` (`rerank_threshold`; bila semua di bawahnya WeKnora tetap
+menyimpan satu kandidat teratas selama skornya ≥ 0,15 — angka tetap di
+`chat_pipeline/rerank.go`; MMR λ 0,7; chunk anak diperluas ke induknya) → `filter_top_k`
+(`rerank_top_k` 6) → model. `/api/rag/search`, sitasi,
+dan gerbang IntraDocs tidak tersentuh: sitasi tetap dari hybrid-search IntraDocs sendiri dan
+tetap divalidasi ke database. Bila tidak ada kandidat yang lolos, WeKnora mengirim
+`fallback_response` — kalimat abstain kita — dan sebelumnya kalimat itu tampil di atas
+"Sumber (4)". `resolveGeneratedAnswer` (`packages/core/src/rag.ts`) mengganti persis string
+itu dengan `NO_DIRECT_ANSWER_MESSAGE` ("tidak ada bagian dokumen yang menjawab secara
+langsung… sumber terdekat di bawah"); teks lain lewat apa adanya. Bukti:
+`tests/unit/rag.test.ts` ("WeKnora's fixed fallback is never shown next to sources…").
+
+**Apa yang sebenarnya dinilai.** `getEnrichedPassage` WeKnora tidak mengirim chunk apa
+adanya: Markdown dibersihkan, lalu **pertanyaan buatan model untuk chunk itu** (§17, bahan
+"pertanyaan pemantik") ditempel sebagai paragraf terakhir, dan pertanyaan mana yang ikut
+bergantung pada jalur retrieval. Untuk cross-encoder itu derau: chunk yang menjawab a13 ("apa
+yang wajib dicantumkan saat mengajukan review perubahan?") diberi 0,32 telanjang, tetapi
+0,155 / 0,10 / 0,078 pada tiga run berturut-turut dengan satu pertanyaan Inggris yang tidak
+terkait menempel — melintasi threshold bolak-balik. Shim membuang paragraf terakhir yang
+seluruhnya berupa pertanyaan satu-kalimat sebelum menilai (`stripQuestionTail`); WeKnora
+tetap menerima indeksnya sendiri, dan yang dibaca model maupun yang dikutip tidak lewat shim.
+Sesudahnya chunk yang sama diberi 0,32 / 0,35 / 0,32.
+
+**Dua knob, dua pengukuran.** Skor cross-encoder ini pada corpus Indonesia tetap tidak
+berada di sekitar 0,5: chunk induk a13 0,39, bagian "## Review"-nya saja 0,16, kalimatnya saja
+0,006, chunk tak terkait <0,01. Jaraknya lebar, tetapi 0,3 (default agen) duduk di tepinya;
+`rerank_threshold` kini 0,1. Dan dengan `embedding_top_k` 10, chunk itu **tidak ada di antara
+kandidat** (ringkasan dan chunk header mengisi tempatnya), jadi reranker terbaik pun tidak
+bisa memilihnya; kini 20 saat reranker dipin (tetap 10 tanpa reranker). Diukur dengan
+`pnpm rag:eval --chat` (jalur `/api/rag/chat`: retrieval + rerank + jawaban 3B), yang juga
+menghitung berapa pertanyaan punya sumber tetapi berakhir fallback:
+
+| `pnpm rag:eval --chat` (3B, GPU)     | tanpa reranker (10 kandidat) | reranker 0,3 / 10 kandidat               | **reranker 0,1 / 20 kandidat + shim** |
+| ------------------------------------ | ---------------------------- | ---------------------------------------- | ------------------------------------- |
+| recall@5 · abstain · kebocoran       | 20/20 · 8/10 · 0             | 20/20 · 8/10 · 0                         | 20/20 · 8/10 · 0                      |
+| punya sumber, tanpa jawaban tersusun | 0/40                         | 7/40 (a13, a19, n06, n10, x08, x09, x10) | 6/40 (a19, n06, n10, x08, x09, x10)   |
+| latensi jawaban p50 · p95            | 4,5 s · 10,5 s               | 5,6 s · 13,6 s                           | 10,4 s · 25,7 s                       |
+
+Recall, abstain, dan kebocoran memang tidak bergeser: ketiganya diputuskan gerbang IntraDocs
+sebelum WeKnora menyusun apa pun. Yang bergeser adalah **isi jawaban** pada tujuh pertanyaan
+yang sumbernya lemah. Tanpa reranker, n06 ("nomor kontrak vendor jaringan yang berlaku?")
+dijawab "dapat ditemukan dalam dokumen SOP-IT-014, di bagian 2.1 Reset Password" — sebuah
+lokasi yang dikarang; n10 mengarang uraian dari kebijakan backup; x09/x10 (aktor yang memang
+berhak) menyalin chunk `# Summary` buatan mesin mentah-mentah ke jawaban. Dengan reranker,
+semua kandidat pertanyaan-pertanyaan itu diberi skor <0,01 dan pembaca mendapat kalimat
+"tidak ada bagian dokumen yang menjawab secara langsung" di atas sumber terdekat.
+
+Harganya waktu, dan berapa tepatnya bergantung pada sisa memori VM. Rerank 20 kandidat
+memakan 5–6 s CPU (int8, 4 core; TEI memecahnya menjadi batch 1024 token) saat VM masih punya
+ruang — run yang sama sebelum shim menyaring pertanyaan mencatat p50 8,5 s · p95 14,0 s.
+Pada run akhir di atas, swap VM sudah penuh (1 GB, `free` di dalam VM) karena profil
+`knowledge` ikut hidup, dan panggilan reranker sendiri naik ke p50 7,8 s · maks 15,8 s.
+Menaikkan `WEKNORA_RERANK_CPU_LIMIT` ke 8 bukan jalan keluar: ORT menyalin arena per thread
+sampai 2,7 GB dan VM membunuhnya lagi — 4 adalah batas yang diukur, bukan pilihan. Untuk demo
+dengan reranker di VM 3,8 GB, matikan profil `knowledge` selama sesi asisten (§9). a19 ("di mana credential disimpan?") tetap fallback: jawabannya
+tersirat dalam dua kalimat ("identitas layanan dari secret manager", "jangan menyimpan
+credential dalam Git") yang oleh cross-encoder dinilai tidak menjawab; itu penilaian yang bisa
+dipertahankan, dan sumbernya tetap tampil. Untuk demo, reranker dinyalakan: jawaban yang
+dikarang pada pertanyaan tanpa bukti lebih mahal daripada beberapa detik.
 
 ## 18. Umpan balik jawaban, gap dari asisten, FAQ yang citable, dan chunking
 

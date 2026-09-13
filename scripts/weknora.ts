@@ -4,8 +4,10 @@
 // and var/ (both git-ignored, 0600); nothing is printed, and nothing is sent anywhere
 // but the loopback WeKnora. Enabling AI is still a separate, deliberate edit: this
 // script never flips AI_PROVIDER for you.
-import { existsSync } from 'node:fs';
-import { appendFile, readFile, writeFile, mkdir } from 'node:fs/promises';
+import { existsSync, createWriteStream } from 'node:fs';
+import { appendFile, readFile, writeFile, mkdir, stat } from 'node:fs/promises';
+import { pipeline } from 'node:stream/promises';
+import { Readable } from 'node:stream';
 import { randomBytes, createHash } from 'node:crypto';
 import path from 'node:path';
 import { Pool } from 'pg';
@@ -651,7 +653,7 @@ async function autotag(): Promise<void> {
         base_url: process.env.WEKNORA_OLLAMA_URL ?? 'http://host.docker.internal:11434',
       },
     });
-    model = { id, name: modelName, type: 'KnowledgeQA', source: 'local' };
+    model = { id, name: modelName, type: 'KnowledgeQA', source: 'local', status: 'active' };
     console.log(`Model ${modelName} terdaftar di WeKnora (id ${id}).`);
   }
 
@@ -790,14 +792,117 @@ async function autotag(): Promise<void> {
 const MAX_COMPLETION_TOKENS = 1024;
 
 /**
+ * Reranker weights, one command: `pnpm weknora:rerank-weights`.
+ *
+ * BAAI/bge-reranker-v2-m3 in fp32 (2.3 GB of weights) needs ~2.8 GB resident on CPU;
+ * inside a 4 GB Docker VM next to WeKnora and ParadeDB the kernel OOM-killed it during
+ * warm-up every time. The int8 ONNX export of the same model (571 MB, onnx-community,
+ * pinned to one revision and one sha256 per file) loads through TEI's ORT backend at
+ * ~1.8 GB and scores the model card's sample pair identically (0.995). Files are fetched
+ * to var/ and copied into the reranker's cache volume with the TEI image itself, so
+ * nothing else needs to be installed; TEI is then pointed at the directory
+ * (WEKNORA_RERANK_MODEL_PATH, compose.yaml).
+ */
+const RERANK_WEIGHTS = {
+  repo: 'onnx-community/bge-reranker-v2-m3-ONNX',
+  revision: '6f5ff65298512715a1e669753bc754d2bc8f367b',
+  dir: 'bge-reranker-v2-m3-int8',
+  files: [
+    {
+      remote: 'config.json',
+      local: 'config.json',
+      sha256: '122e922dcfed6503c8721e6fe1daf090340c3d95ca7f3aa3a72730b321a51cfd',
+    },
+    {
+      remote: 'tokenizer.json',
+      local: 'tokenizer.json',
+      sha256: '8bf8afbfd11306bd872018c53bfdf2e160a56f8edbcf49933324404791c148d3',
+    },
+    {
+      remote: 'tokenizer_config.json',
+      local: 'tokenizer_config.json',
+      sha256: 'b87c8703482b0300d3da30e201519aa641f6a450f5eb5bf1e624afbf70c74d80',
+    },
+    {
+      remote: 'special_tokens_map.json',
+      local: 'special_tokens_map.json',
+      sha256: '8c785abebea9ae3257b61681b4e6fd8365ceafde980c21970d001e834cf10835',
+    },
+    {
+      remote: 'onnx/model_int8.onnx',
+      local: 'onnx/model.onnx',
+      sha256: '912fc1215c2dbff6499700534bd8d31253af01573861abbfc43afd1fab6cce5d',
+    },
+  ],
+} as const;
+
+async function sha256File(file: string): Promise<string> {
+  const hash = createHash('sha256');
+  hash.update(await readFile(file));
+  return hash.digest('hex');
+}
+
+async function rerankWeights(): Promise<void> {
+  loadLocalEnv();
+  const staging = path.join(ROOT, 'var', 'reranker', RERANK_WEIGHTS.dir);
+  for (const f of RERANK_WEIGHTS.files) {
+    const target = path.join(staging, f.local);
+    if (existsSync(target) && (await sha256File(target)) === f.sha256) {
+      console.log(`  ${f.local}: sudah ada, sha256 cocok.`);
+      continue;
+    }
+    await mkdir(path.dirname(target), { recursive: true });
+    const url = `https://huggingface.co/${RERANK_WEIGHTS.repo}/resolve/${RERANK_WEIGHTS.revision}/${f.remote}`;
+    console.log(`  ${f.local}: mengunduh ${url}`);
+    const response = await fetch(url, { redirect: 'follow' });
+    if (!response.ok || !response.body)
+      throw new Error(`Unduhan ${f.remote} gagal: HTTP ${response.status}.`);
+    await pipeline(Readable.fromWeb(response.body as never), createWriteStream(target));
+    const digest = await sha256File(target);
+    if (digest !== f.sha256)
+      throw new Error(
+        `sha256 ${f.local} tidak cocok (${digest.slice(0, 12)}… vs ${f.sha256.slice(0, 12)}…). Berkas dihapus dari pertimbangan; ulangi unduhan.`,
+      );
+    console.log(`  ${f.local}: ${((await stat(target)).size / 1e6).toFixed(1)} MB, sha256 cocok.`);
+  }
+  // Into the service's own volume, with the service's own image: the volume name is
+  // whatever compose derives for this project, and the image is pulled anyway.
+  const inside = `/data/${RERANK_WEIGHTS.dir}`;
+  command('docker', [
+    'compose',
+    '--env-file',
+    '.env.local',
+    '--profile',
+    'weknora-rerank',
+    'run',
+    '--rm',
+    '--no-deps',
+    '--entrypoint',
+    'sh',
+    '-v',
+    `${staging}:/src:ro`,
+    'weknora-reranker',
+    '-c',
+    `mkdir -p ${inside}/onnx && cp /src/config.json /src/tokenizer.json /src/tokenizer_config.json /src/special_tokens_map.json ${inside}/ && cp /src/onnx/model.onnx ${inside}/onnx/model.onnx && ls -la ${inside} ${inside}/onnx`,
+  ]);
+  console.log('');
+  console.log(`Bobot reranker tersalin ke volume (${inside}). Selanjutnya:`);
+  console.log(
+    '  docker compose --env-file .env.local --profile weknora --profile weknora-rerank up -d',
+  );
+  console.log('  pnpm weknora:rerank');
+}
+
+/**
  * Reranker, one command: `pnpm weknora:rerank`.
  *
  * Requires the optional compose profile: `docker compose --env-file .env.local --profile
- * weknora --profile weknora-rerank up -d weknora-reranker`. WeKnora calls `{base_url}/rerank`
- * (TEI/Jina style) and Ollama has no such endpoint, which is why the earlier registration
- * never worked (WEKNORA.md §11). This registers the TEI service as a Rerank model, proves it
- * answers through WeKnora's own check endpoint, writes WEKNORA_RERANK_MODEL_ID, and re-pins
- * the agent. The reranker only ever reorders chunks WeKnora already retrieved within the
+ * weknora --profile weknora-rerank up -d`. WeKnora calls `{base_url}/rerank` in the
+ * Jina/Cohere shape; Ollama has no such endpoint, which is why the earlier registration
+ * never worked (WEKNORA.md §11), and TEI answers a different shape, which is what the
+ * `weknora-rerank-shim` service translates. This registers the shim as a Rerank model,
+ * proves it answers through WeKnora's own check endpoint, writes WEKNORA_RERANK_MODEL_ID,
+ * and re-pins the agent. The reranker only ever reorders chunks WeKnora already retrieved within the
  * authorised knowledge_ids; it produces no text and IntraDocs still validates every citation.
  */
 async function rerank(): Promise<void> {
@@ -805,8 +910,9 @@ async function rerank(): Promise<void> {
   const ai = readAiConfig(process.env);
   if (!ai.weknora) throw new Error('AI_PROVIDER masih off. Aktifkan weknora-local dulu.');
   const modelName = process.env.WEKNORA_RERANK_HF_MODEL ?? 'BAAI/bge-reranker-v2-m3';
-  // Reached over the compose network; never published to the host.
-  const baseUrl = process.env.WEKNORA_RERANK_URL ?? 'http://weknora-reranker:80';
+  // The shim (scripts/rerank-shim.mjs) in front of TEI, reached over the compose network
+  // only; neither it nor the reranker is published to the host.
+  const baseUrl = process.env.WEKNORA_RERANK_URL ?? 'http://weknora-rerank-shim:80';
   const client = new WeknoraClient(ai.weknora);
   const check = await client.checkRerank({ modelName, baseUrl });
   if (!check.available)
@@ -815,22 +921,33 @@ async function rerank(): Promise<void> {
         'Pastikan profil weknora-rerank berjalan dan healthy (unduhan model pertama memakan waktu).',
     );
   console.log(`Reranker ${modelName} menjawab lewat WeKnora (${baseUrl}).`);
-  let model = (await client.listModels()).find((m) => m.type === 'Rerank' && m.name === modelName);
+  // "local" means Ollama to WeKnora: it tries to pull the name and the record ends up
+  // download_failed, which the chat pipeline then refuses at the rerank stage. An HTTP
+  // reranker is a "remote" model with the generic (OpenAI/Jina-shaped) provider.
+  const models = await client.listModels();
+  let model = models.find(
+    (m) => m.type === 'Rerank' && m.source === 'remote' && m.name === modelName,
+  );
   if (!model) {
     const id = await client.registerModel({
       name: modelName,
       displayName: `TEI ${modelName}`,
       type: 'Rerank',
-      source: 'local',
-      parameters: { base_url: baseUrl },
+      source: 'remote',
+      parameters: { base_url: baseUrl, api_key: '', provider: 'generic' },
     });
-    model = { id, name: modelName, type: 'Rerank', source: 'local' };
+    model = { id, name: modelName, type: 'Rerank', source: 'remote', status: 'active' };
     console.log(`Model rerank terdaftar di WeKnora (id ${id}).`);
   }
   await setEnv('WEKNORA_RERANK_MODEL_ID', model.id);
   process.env.WEKNORA_RERANK_MODEL_ID = model.id;
   console.log(`WEKNORA_RERANK_MODEL_ID=${model.id} ditulis ke .env.local.`);
   await pinAgent();
+  // Only now: WeKnora refuses to delete a model an agent still points at.
+  for (const stale of models.filter((m) => m.type === 'Rerank' && m.id !== model.id)) {
+    await client.deleteModel(stale.id);
+    console.log(`Catatan rerank lama dihapus (id ${stale.id}, ${stale.source}/${stale.status}).`);
+  }
 }
 
 /**
@@ -906,7 +1023,7 @@ async function generationModel(): Promise<void> {
         base_url: process.env.WEKNORA_OLLAMA_URL ?? 'http://host.docker.internal:11434',
       },
     });
-    model = { id, name: derived, type: 'KnowledgeQA', source: 'local' };
+    model = { id, name: derived, type: 'KnowledgeQA', source: 'local', status: 'active' };
     console.log(`Model ${derived} terdaftar di WeKnora (id ${id}).`);
   }
   await setEnv('WEKNORA_GENERATION_MODEL_ID', model.id);
@@ -970,11 +1087,21 @@ async function pinAgent(): Promise<void> {
       web_fetch_enabled: false,
       multi_turn_enabled: false,
       history_turns: 0,
-      embedding_top_k: 10,
+      // Candidates WeKnora's own retrieval hands the answering model (or the reranker).
+      // At 10, split between vector and keyword hits and crowded by summary and header
+      // chunks, the passage that answered a13 was not among them; the reranker can only
+      // choose from what it is given. Doubling costs ~4 s of CPU rerank per question.
+      embedding_top_k: rerankModelId ? 20 : 10,
       keyword_threshold: 0.3,
       vector_threshold: 0.5,
       rerank_top_k: 6,
-      rerank_threshold: 0.3,
+      // bge-reranker-v2-m3 (int8) on this Indonesian corpus scores a passage that answers
+      // directly at 0.3-0.7 and an unrelated one below 0.01, so the gap is wide but the
+      // usual 0.3 sits at its edge (a13's answering chunk: 0.32-0.35). Below the threshold
+      // WeKnora still keeps the top candidate if it scores >= 0.15 (fixed in its source),
+      // and hands the model the fixed fallback when nothing survives -- see
+      // resolveGeneratedAnswer. Measured in WEKNORA.md §17.
+      rerank_threshold: 0.1,
       enable_query_expansion: false,
       enable_rewrite: false,
       fallback_strategy: 'fixed',
@@ -1170,6 +1297,7 @@ async function main(): Promise<void> {
   if (action === 'generation') return generationModel();
   if (action === 'reindex') return reindex();
   if (action === 'rerank') return rerank();
+  if (action === 'rerank-weights') return rerankWeights();
   if (action === 'repair') {
     loadLocalEnv();
     rebuildBm25Index();
@@ -1183,7 +1311,7 @@ async function main(): Promise<void> {
     return;
   }
   throw new Error(
-    'Gunakan: pnpm weknora:setup | weknora:sync | weknora:status | weknora:model | weknora:generation | weknora:reindex | weknora:rerank | weknora:repair | weknora:autotag | weknora:agent | weknora:lab | weknora:stop.',
+    'Gunakan: pnpm weknora:setup | weknora:sync | weknora:status | weknora:model | weknora:generation | weknora:reindex | weknora:rerank-weights | weknora:rerank | weknora:repair | weknora:autotag | weknora:agent | weknora:lab | weknora:stop.',
   );
 }
 

@@ -3,6 +3,7 @@
 // unit-testable offline and cannot be softened by a live service being agreeable.
 import { createHash } from 'node:crypto';
 import { headingSlug, InputError, parseUuid } from './validation.ts';
+import { ABSTAIN_MESSAGE, NO_DIRECT_ANSWER_MESSAGE } from './rag-messages.ts';
 
 /**
  * Bumping this forces every version to be re-exported on the next sync. Change it
@@ -470,7 +471,20 @@ export function parseChatBody(value: unknown, maxChars: number): ChatBody {
   };
 }
 
-export { ABSTAIN_MESSAGE } from './rag-messages.ts';
+export { ABSTAIN_MESSAGE, NO_DIRECT_ANSWER_MESSAGE } from './rag-messages.ts';
+
+/**
+ * The generated answer as it should reach a reader. WeKnora's agent has a fixed fallback
+ * (the abstain sentence) for the case where its own pipeline kept no chunk -- its
+ * thresholds, or the reranker when one is on, rejected every candidate. Shown verbatim next
+ * to the sources IntraDocs' gate did pass, it would contradict them; so that one string is
+ * replaced by a sentence that says what actually happened. Any other text is passed through.
+ */
+export function resolveGeneratedAnswer(text: string): { answer: string; fellBack: boolean } {
+  const trimmed = text.trim();
+  if (trimmed === ABSTAIN_MESSAGE) return { answer: NO_DIRECT_ANSWER_MESSAGE, fellBack: true };
+  return { answer: text, fellBack: false };
+}
 
 /* ------------------------------------------------------------------ *
  * Export worker

@@ -19,6 +19,8 @@ import {
   parseChatBody,
   parseQuestion,
   ABSTAIN_MESSAGE,
+  NO_DIRECT_ANSWER_MESSAGE,
+  resolveGeneratedAnswer,
   type AllowedSource,
   type IndexEntry,
   type DesiredVersion,
@@ -432,6 +434,21 @@ test('questions are bounded and free of control characters', () => {
 test('the abstain message promises nothing it cannot show a source for', () => {
   assert(ABSTAIN_MESSAGE.includes('tanpa bukti'));
   assert(!/mungkin|kemungkinan|biasanya/i.test(ABSTAIN_MESSAGE));
+});
+
+test("WeKnora's fixed fallback is never shown next to sources as if it were an answer", () => {
+  // The agent's fallback_response is the abstain sentence; when WeKnora's own pipeline
+  // (thresholds, reranker) kept no chunk it streams that back although IntraDocs' gate had
+  // passed sources. Shown verbatim above a "Sumber (n)" list it would contradict them.
+  const fallback = resolveGeneratedAnswer(`${ABSTAIN_MESSAGE}
+`);
+  assert.equal(fallback.fellBack, true);
+  assert.equal(fallback.answer, NO_DIRECT_ANSWER_MESSAGE);
+  assert(!/mungkin|kemungkinan|biasanya/i.test(NO_DIRECT_ANSWER_MESSAGE));
+  // A real answer, even one quoting the sentence inside longer text, passes through untouched.
+  const real = resolveGeneratedAnswer(`Backup diverifikasi lewat restore. ${ABSTAIN_MESSAGE}`);
+  assert.equal(real.fellBack, false);
+  assert(real.answer.startsWith('Backup diverifikasi'));
 });
 
 // ---- relevance gate -----------------------------------------------------------------

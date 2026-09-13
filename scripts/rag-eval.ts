@@ -10,6 +10,7 @@ import path from 'node:path';
 import { Pool } from 'pg';
 import { ROOT, loadLocalEnv, localAdminUrl, reportFailure } from './shared.ts';
 import { GOLD, GOLD_COUNTS, type GoldQuestion } from '../tests/rag/gold-questions.ts';
+import { NO_DIRECT_ANSWER_MESSAGE } from '../packages/core/src/rag-messages.ts';
 import type { DemoAccount } from './seed.ts';
 
 interface Outcome {
@@ -19,6 +20,8 @@ interface Outcome {
   hit: boolean;
   rank: number | null;
   abstained: boolean;
+  /** --chat only: sources were found but WeKnora's pipeline answered with the fixed fallback. */
+  fellBack: boolean;
   ms: number;
 }
 
@@ -26,6 +29,9 @@ async function main(): Promise<void> {
   loadLocalEnv();
   if (process.env.AI_PROVIDER !== 'weknora-local')
     throw new Error('Aktifkan AI_PROVIDER=weknora-local sebelum menjalankan evaluasi.');
+  // Default: /api/rag/search, retrieval only, seconds per run. --chat: /api/rag/chat, so the
+  // answering model and WeKnora's rerank/fallback stages are measured too; minutes per run.
+  const chat = process.argv.includes('--chat');
   const base = process.env.APP_URL!;
   const admin = new Pool({ connectionString: localAdminUrl(), max: 1 });
   const accounts = JSON.parse(
@@ -62,7 +68,7 @@ async function main(): Promise<void> {
   for (const q of GOLD) {
     const cookie = await session(q.actor);
     const started = Date.now();
-    const response = await fetch(base + '/api/rag/search', {
+    const response = await fetch(base + (chat ? '/api/rag/chat' : '/api/rag/search'), {
       method: 'POST',
       headers: { Origin: base, 'Content-Type': 'application/json', Cookie: cookie },
       body: JSON.stringify({ question: q.question }),
@@ -72,8 +78,11 @@ async function main(): Promise<void> {
       throw new Error(`Pertanyaan ${q.id} ditolak dengan status ${response.status}`);
     const body = (await response.json()) as {
       citations?: Array<{ documentId: string; anchor: string | null }>;
+      answer?: string;
     };
     const citations = body.citations ?? [];
+    const fellBack =
+      chat && citations.length > 0 && (body.answer ?? '').trim() === NO_DIRECT_ANSWER_MESSAGE;
     anchored += citations.filter((c) => c.anchor).length;
     citedTotal += citations.length;
     // Rank by first appearance, deduplicated: several chunks of one document are one hit.
@@ -88,6 +97,7 @@ async function main(): Promise<void> {
       hit: q.gold.length > 0 && q.gold.every((g) => top5.includes(g)),
       rank: q.gold.length === 1 ? top5.indexOf(q.gold[0]!) + 1 || null : null,
       abstained: citations.length === 0,
+      fellBack,
       ms,
     });
   }
@@ -104,7 +114,9 @@ async function main(): Promise<void> {
   const p = (q: number) =>
     latencies[Math.min(latencies.length - 1, Math.floor(latencies.length * q))];
 
-  console.log(`\nQ4 — ${GOLD_COUNTS.total} pertanyaan berlabel pada corpus sintetis\n`);
+  console.log(
+    `\nQ4 — ${GOLD_COUNTS.total} pertanyaan berlabel pada corpus sintetis (${chat ? '/api/rag/chat: retrieval + jawaban' : '/api/rag/search: retrieval saja'})\n`,
+  );
   console.log(
     `  answerable       : ${recallHits}/${answerable.length} recall@5 = ${recall.toFixed(1)}%`,
     `  sitasi ber-anchor: ${anchored}/${citedTotal}`,
@@ -119,8 +131,13 @@ async function main(): Promise<void> {
     `  kebocoran total  : ${leaks.length}  ${leaks.length === 0 ? '(nol)' : '<-- GAGAL'}`,
   );
   console.log(
-    `  latensi retrieval: p50 ${p(0.5)} ms · p95 ${p(0.95)} ms · maks ${latencies.at(-1)} ms`,
+    `  latensi ${chat ? 'jawaban  ' : 'retrieval'}: p50 ${p(0.5)} ms · p95 ${p(0.95)} ms · maks ${latencies.at(-1)} ms`,
   );
+  const fallbacks = outcomes.filter((o) => o.fellBack);
+  if (chat)
+    console.log(
+      `  fallback WeKnora : ${fallbacks.length}/${outcomes.length} punya sumber tetapi tanpa jawaban tersusun (threshold/rerank WeKnora menolak semua kandidat)`,
+    );
 
   const misses = answerable.filter((o) => !o.hit);
   if (misses.length) {
@@ -135,6 +152,11 @@ async function main(): Promise<void> {
       console.log(
         `    ${w.q.id}  ${w.q.question.slice(0, 62)}  (dikutip: ${w.citedDocs.map((d) => d.slice(-4)).join(', ')})`,
       );
+  }
+  if (fallbacks.length) {
+    console.log('\n  Sumber ada, jawaban fallback:');
+    for (const f of fallbacks)
+      console.log(`    ${f.q.id}  ${f.q.question.slice(0, 62)}  (dikutip: ${f.citedDocs.length})`);
   }
   if (leaks.length) {
     console.log('\n  KEBOCORAN:');

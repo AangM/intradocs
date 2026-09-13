@@ -12,6 +12,7 @@ import {
   gateByRelevance,
   validateRetrieval,
   ABSTAIN_MESSAGE,
+  resolveGeneratedAnswer,
   type Citation,
   type RawHit,
   type RetrievalScope,
@@ -212,7 +213,7 @@ export async function answerQuestion(
   );
   return remember({
     ...shape,
-    answer: answer.answer,
+    answer: resolveGeneratedAnswer(answer.answer).answer,
     citations: retrieval.citations,
     abstained: false,
   });

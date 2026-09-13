@@ -41,6 +41,14 @@ pnpm build && pnpm start                                       # web + worker, m
 
 Cek terakhir sebelum orang lain melihat: Ollama hidup (`curl http://localhost:11434/api/version`), `pnpm weknora:status` menyebut "Hybrid search: ok", dan satu pertanyaan pemantik di AI Assistant dijawab dengan sitasi.
 
+**Reranker (opsional, ~571 MB unduhan sekali):** membuat asisten memilih potongan yang benar-benar menjawab dan menolak menyusun jawaban dari potongan yang hanya mirip — dengan biaya beberapa detik CPU per pertanyaan (p50 jawaban 4,5 s → 8–10 s; di VM Docker 3,8 GB matikan profil `knowledge` selama demo asisten agar VM tidak swap). Tanpa reranker, "nomor kontrak vendor yang berlaku?" dijawab dengan lokasi yang dikarang; dengan reranker, pembaca mendapat "tidak ada bagian dokumen yang menjawab secara langsung" di atas sumber terdekat. Rinciannya dan angkanya di [docs/WEKNORA.md §17](docs/WEKNORA.md).
+
+```sh
+pnpm weknora:rerank-weights                                              # unduh bobot int8 terpin ke volume
+docker compose --env-file .env.local --profile weknora --profile weknora-rerank up -d
+pnpm weknora:rerank                                                      # daftarkan + pin ke agen
+```
+
 ## Memperbarui folder sebelumnya
 
 Backup DB + `var/storage` menurut kebijakan Anda; jangan menghapus data. Dari folder paket baru:
@@ -88,7 +96,7 @@ Akun demo ada di `var/demo-accounts.json` (siti = viewer Infrastruktur+Data; faj
 
 Ingin mencoba wiki dan chat bawaan WeKnora pada corpus yang sama? `pnpm weknora:lab` membuat knowledge base terpisah dengan semuanya menyala dan membuka UI WeKnora ke sana tanpa menyentuh yang dibaca portal — lihat [docs/WEKNORA.md §15](docs/WEKNORA.md).
 
-Yang sengaja **tidak** ada di portal dan alasannya ada di [docs/WEKNORA.md](docs/WEKNORA.md): rerank tanpa server reranker (profil `weknora-rerank` + `pnpm weknora:rerank` menyalakannya bila bobotnya terunduh), wiki/Langfuse/unggah ke WeKnora (rekaman tanpa versi IntraDocs tidak bisa dikutip), UI WeKnora sebagai permukaan pengguna (tidak mengenal klasifikasi, scope, grant), dan teks buatan model sebagai sitasi (chunk `summary` ditolak gerbang, §22).
+Yang sengaja **tidak** ada di portal dan alasannya ada di [docs/WEKNORA.md](docs/WEKNORA.md): wiki/Langfuse/unggah ke WeKnora (rekaman tanpa versi IntraDocs tidak bisa dikutip), UI WeKnora sebagai permukaan pengguna (tidak mengenal klasifikasi, scope, grant), dan teks buatan model sebagai sitasi (chunk `summary` ditolak gerbang, §22).
 
 ## Konversi yang jujur
 

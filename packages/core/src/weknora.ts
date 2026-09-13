@@ -523,17 +523,36 @@ export class WeknoraClient {
   }
 
   /** Registered models, without their parameters: a provider key lives there. */
-  async listModels(): Promise<Array<{ id: string; name: string; type: string; source: string }>> {
+  async listModels(): Promise<
+    Array<{ id: string; name: string; type: string; source: string; status: string }>
+  > {
     const data = await this.json('GET', '/api/v1/models');
     const items = Array.isArray(data) ? data : [];
-    const out: Array<{ id: string; name: string; type: string; source: string }> = [];
+    const out: Array<{ id: string; name: string; type: string; source: string; status: string }> =
+      [];
     for (const item of items) {
       if (!item || typeof item !== 'object') continue;
       const r = item as Json;
       const id = str(r.id);
-      if (id) out.push({ id, name: str(r.name), type: str(r.type), source: str(r.source) });
+      if (id)
+        out.push({
+          id,
+          name: str(r.name),
+          type: str(r.type),
+          source: str(r.source),
+          status: str(r.status),
+        });
     }
     return out;
+  }
+
+  /** Removes a model record; absent is success, the same as deleteKnowledge. */
+  async deleteModel(modelId: string): Promise<void> {
+    try {
+      await this.json('DELETE', `/api/v1/models/${encodeURIComponent(modelId)}`);
+    } catch (error) {
+      if (!(error instanceof WeknoraError && error.status === 404)) throw error;
+    }
   }
 
   /** Tag vocabulary of the knowledge base; the pool the auto-tagger may choose from. */

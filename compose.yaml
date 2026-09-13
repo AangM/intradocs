@@ -153,7 +153,7 @@ services:
       # machine, so it is opt-in through the environment and never a default; the portal
       # additionally refuses to use it until AI_GENERATION_LOCATION says so out loud.
       # host.docker.internal for Ollama; weknora-reranker for the optional TEI service.
-      SSRF_WHITELIST_EXTRA: ${WEKNORA_SSRF_WHITELIST_EXTRA:-host.docker.internal,weknora-reranker}
+      SSRF_WHITELIST_EXTRA: ${WEKNORA_SSRF_WHITELIST_EXTRA:-host.docker.internal,weknora-rerank-shim}
       OLLAMA_OPTIONAL: 'true'
       OLLAMA_BASE_URL: ${WEKNORA_OLLAMA_URL:-http://host.docker.internal:11434}
       CONCURRENCY_POOL_SIZE: ${WEKNORA_CONCURRENCY:-2}
@@ -224,23 +224,36 @@ services:
   # Reranker for WeKnora's chat pipeline (optional profile `weknora-rerank`).
   #
   # Ollama has no /rerank endpoint, so a rerank model registered against it can never be
-  # called (WEKNORA.md §11). text-embeddings-inference serves the TEI-style /rerank that
-  # WeKnora expects. The model weights are fetched from the Hugging Face hub on first
-  # start into a named volume; nothing from the corpus is sent anywhere -- the container
-  # only receives (query, chunk) pairs from weknora-app over the compose network and is
-  # published nowhere. bge-reranker-v2-m3 is multilingual and the right choice for
-  # Indonesian text; it needs ~2.3 GB RAM on CPU (fp32). Smaller Docker VMs can set
-  # WEKNORA_RERANK_HF_MODEL=BAAI/bge-reranker-base (~1.1 GB).
+  # called (WEKNORA.md §11). text-embeddings-inference serves BAAI/bge-reranker-v2-m3,
+  # the multilingual cross-encoder that is the right choice for Indonesian text, behind
+  # the shim below. Nothing from the corpus is sent anywhere: the container only receives
+  # (question, chunk) pairs from the shim over the compose network and is published
+  # nowhere. The weights are the int8 ONNX export copied into the volume by
+  # `pnpm weknora:rerank-weights` (pinned revision and sha256): the fp32 original needs
+  # ~2.8 GB resident during warm-up and was OOM-killed by the 4 GB Docker VM every time,
+  # the int8 one runs at ~1.8 GB through TEI's ORT backend and scores the model card's
+  # sample pair identically. WEKNORA_RERANK_MODEL_PATH=BAAI/bge-reranker-v2-m3 downloads
+  # and runs the fp32 weights instead on a VM with 6 GB or more.
   weknora-reranker:
     profiles: ['weknora-rerank']
     image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.8
+    # Warm-up runs one sequence of --max-batch-tokens through the model; the attention
+    # scores alone are 16 x n^2 x 4 bytes per layer, so the 8192 default and 4096 both
+    # pushed the fp32 container past 3 GB. A (question, chunk) pair here is a few hundred
+    # tokens, so the cap only sets how many pairs share a forward pass.
     command:
       - '--model-id'
-      - '${WEKNORA_RERANK_HF_MODEL:-BAAI/bge-reranker-v2-m3}'
-      - '--max-client-batch-size'
-      - '32'
+      - '${WEKNORA_RERANK_MODEL_PATH:-/data/bge-reranker-v2-m3-int8}'
       - '--max-batch-tokens'
-      - '8192'
+      - '${WEKNORA_RERANK_MAX_BATCH_TOKENS:-1024}'
+      - '--max-batch-requests'
+      - '8'
+      # WeKnora posts every retrieval candidate in one request.
+      - '--max-client-batch-size'
+      - '64'
+      # Required once max-batch-tokens is below the model's 8192 input length; nothing
+      # of chunk size is ever actually truncated.
+      - '--auto-truncate'
     environment:
       HF_HUB_ENABLE_HF_TRANSFER: '0'
     volumes:
@@ -254,8 +267,46 @@ services:
     deploy:
       resources:
         limits:
-          memory: ${WEKNORA_RERANK_MEMORY_LIMIT:-2800m}
-          cpus: '${WEKNORA_RERANK_CPU_LIMIT:-2}'
+          memory: ${WEKNORA_RERANK_MEMORY_LIMIT:-3200m}
+          cpus: '${WEKNORA_RERANK_CPU_LIMIT:-4}'
+    restart: unless-stopped
+  # WeKnora's generic reranker speaks the Jina/Cohere shape ({model, query, documents} ->
+  # {results: [{index, relevance_score}]}); TEI speaks its own ({query, texts} ->
+  # [{index, score}]). Neither is configurable, so this dependency-free Node script
+  # translates between them. It is the only rerank host WeKnora is allowed to reach.
+  weknora-rerank-shim:
+    profiles: ['weknora-rerank']
+    image: node:22-alpine
+    command: ['node', '/app/server.mjs']
+    environment:
+      RERANK_UPSTREAM: http://weknora-reranker:80
+      # 1 logs each query with the top scores and the first 120 chars of every passage;
+      # that is corpus text, so leave it off outside a synthetic corpus.
+      RERANK_SHIM_DEBUG: ${WEKNORA_RERANK_SHIM_DEBUG:-0}
+      RERANK_SHIM_DEBUG_CHARS: ${WEKNORA_RERANK_SHIM_DEBUG_CHARS:-120}
+    volumes:
+      - ./scripts/rerank-shim.mjs:/app/server.mjs:ro
+    depends_on:
+      weknora-reranker:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:80/health').then((r)=>process.exit(r.ok?0:1),()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    pids_limit: 32
+    mem_limit: 128m
+    cpus: 0.5
     restart: unless-stopped
 
 networks:
