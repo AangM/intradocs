@@ -764,6 +764,14 @@ export function AssistantChat({
                     </span>
                     Mencari di dokumen{generating ? ' dan menyusun jawaban' : ''}…
                     {generating ? ' Model berjalan lokal, biasanya 10–30 detik.' : ''}
+                    <button
+                      type="button"
+                      className="typing-stop"
+                      onClick={() => abort.current?.abort()}
+                    >
+                      <Icon name="x" size={12} />
+                      Hentikan
+                    </button>
                   </div>
                 </div>
               )}

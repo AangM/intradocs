@@ -1312,3 +1312,57 @@ kutipan passage terdekat, sisanya pertanyaan tanpa bukti atau lintas izin yang m
 ditolak. Tes: `tests/unit/rag.test.ts` (`classifyIntent`, `salvageDecline`, `remainder`),
 `tests/unit/rerank-shim.test.ts` (`isGeneratedSummary`), tes HTTP dan e2e asisten tidak
 berubah dan tetap hijau. `rag:eval` kini menghapus percakapan yang dibuatnya.
+
+## 26. Apakah fitur WeKnora sudah dipakai maksimal? Matriks per fitur (13 September 2026)
+
+"Maksimal" di sini berarti: setiap fitur yang **menambah nilai tanpa menembus gerbang kebijakan
+IntraDocs** dipakai; yang menembusnya dimatikan dengan alasan tertulis; yang belum dicoba
+disebut belum dicoba. Prinsip yang mengikat semuanya ada di §13: rekaman tanpa versi IntraDocs
+tidak bisa dikutip, jadi fitur yang menghasilkan teks di sisi WeKnora hanya berguna bila
+hasilnya kembali ke IntraDocs sebagai _saran_ yang diputuskan orang.
+
+| Fitur WeKnora                                 | Status di IntraDocs | Bagaimana / mengapa                                                                                                                                                          |
+| --------------------------------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Knowledge base + ingest Markdown              | ✅ dipakai          | Satu KB produksi; hanya Markdown kanonik versi final-approved yang diekspor (§2)                                                                                             |
+| Embedding (bge-m3 via Ollama)                 | ✅ dipakai          | Vektor + kata kunci; kemiripan kosinus dari `disable_keywords_match` menjadi gerbang relevansi (§14)                                                                         |
+| Hybrid search (`knowledge_ids`)               | ✅ dipakai          | Retrieval selalu dibatasi daftar versi berizin; sitasi divalidasi ulang ke DB                                                                                                |
+| Parent-child chunking                         | ✅ dipakai          | Diukur vs flat, sedikit lebih baik (§18)                                                                                                                                     |
+| Reranker (bge-reranker-v2-m3 int8, via shim)  | ✅ dipakai          | Chunk ringkasan diskor 0, ekor pertanyaan dibuang (§17, §25)                                                                                                                 |
+| Agent + prompt sistem/template konteks kustom | ✅ dipakai          | Grounding ketat, sumber-dulu, jawaban lengkap (§24–§25)                                                                                                                      |
+| Session / multi-turn history                  | ✅ dipakai          | Satu sesi per percakapan, 5 giliran, dibuang saat izin berubah (§24)                                                                                                         |
+| Knowledge chat (generasi jawaban)             | ✅ dipakai          | Qwen 2.5 3B turunan (`num_ctx` 8192, `num_predict` 1024); fallback tetap                                                                                                     |
+| Summary generation saat ingest                | ✅ sebagai saran    | Draf ringkasan untuk yang boleh merevisi (§17); **bukan bukti** (§25)                                                                                                        |
+| Question generation saat ingest               | ✅ sebagai saran    | Pertanyaan pemantik dan chip lanjutan (§17, §25)                                                                                                                             |
+| Auto-tag                                      | ✅ sebagai saran    | Saran label disaring kosakata kategori, tidak pernah diterapkan otomatis (§11)                                                                                               |
+| Query rewrite / expansion                     | ✗ mati, sengaja     | Rewrite di dalam WeKnora terjadi _setelah_ gerbang IntraDocs, jadi tidak membantu retrieval; lanjutan tanpa subjek ditangani deterministik (§24)                             |
+| Streaming token ke UI                         | ✗ tidak dipakai     | Jawaban dibuffer dan divalidasi dulu (aturan M4 "tidak ada token yang belum diperiksa"); biaya: ~2–10 s tanpa umpan balik selain indikator. Kandidat berikutnya, lihat bawah |
+| Wiki (Map/Reduce LLM)                         | ✗ mati              | Teks sintesis lintas dokumen tanpa versi, tidak bisa dikutip, berat di CPU (§13)                                                                                             |
+| Knowledge graph (`graph_enabled`)             | ✗ mati              | Alasan sama dengan wiki; belum ada pertanyaan gold yang membutuhkannya                                                                                                       |
+| FAQ (`faq_config`)                            | ✗ mati              | FAQ lahir di WeKnora tanpa review; bentuk amannya "Jawab sebagai dokumen" dari knowledge gap (§18)                                                                           |
+| Web search / web fetch                        | ✗ mati              | Dokumen internal tidak boleh dicampur sumber internet; juga egress                                                                                                           |
+| Tools / MCP / skills / agent mode             | ✗ mati              | PRD §5: tidak ada chatbot dengan action tools                                                                                                                                |
+| Unggah berkas asli ke WeKnora (docreader)     | ✗ tidak dipakai     | Yang terindeks harus yang disetujui reviewer (§13); parser-nya kandidat untuk membuat Markdown kanonik PPTX/OCR (S05 V1)                                                     |
+| Multimodal (VLM), ASR                         | ✗ mati              | Tidak ada dokumen gambar/audio di scope; PDF pindai adalah item OCR S05 V1                                                                                                   |
+| Langfuse                                      | ✗ mati              | Mengirim prompt+dokumen ke luar mesin bila cloud; self-hosted tidak muat di 8 GB (§13)                                                                                       |
+| WeKnora UI                                    | ◐ lab saja          | KB `intradocs-lab` untuk mencoba fitur ingest pada corpus sintetis (§15); tidak untuk pengguna portal                                                                        |
+| Multi-tenant / multi-KB                       | ◐                   | Satu tenant, satu KB produksi + satu lab; PRD: satu organisasi cukup                                                                                                         |
+
+**Jadi: maksimal untuk kebijakan yang berlaku, belum maksimal untuk pengalaman.** Semua fitur
+yang aman sudah dipakai dan diukur; fitur yang mati, mati karena melanggar invarian "yang
+dikutip adalah yang disetujui" atau karena egress — bukan karena belum dicoba. Yang masih bisa
+menambah nilai tanpa melanggar apa pun, urut dari yang paling bernilai:
+
+1. **Streaming jawaban ke layar** dengan validasi di akhir: token ditampilkan sebagai
+   "sedang disusun", lalu diganti hasil final (pembersihan tag `<kb>`, deteksi penolakan, kutipan
+   terdekat). Mengubah persepsi 2–10 s menjadi langsung terasa, tanpa mengubah apa yang boleh
+   dikutip. Perlu keputusan eksplisit karena menyentuh aturan M4.
+2. **Parser WeKnora untuk PPTX/PDF pindai → Markdown kanonik** yang lalu masuk alur
+   unggah–scan–review (§13). Ini jalan tercepat menutup format V1 S05 tanpa layanan OCR baru.
+3. **Deteksi konflik antar-sumber** (PRD §3.4): dua passage dari dokumen berbeda yang
+   menjawab hal yang sama dengan nilai berbeda — belum ada di WeKnora maupun IntraDocs;
+   bisa dimulai dari heuristik angka/tanggal berbeda pada kutipan yang sama-sama lolos gerbang.
+4. **Model penjawab lebih besar** bila mesin mengizinkan (≥16 GB RAM atau GPU ≥ 8 GB):
+   batas 3B terlihat pada inferensi "belum berhasil sebelum X" (§25). Bukan fitur WeKnora,
+   tapi pengungkit terbesar untuk kualitas jawaban.
+5. **Knowledge graph** hanya bila korpus nyata punya pertanyaan relasional lintas dokumen —
+   belum ada bukti kebutuhan pada 40 pertanyaan gold.

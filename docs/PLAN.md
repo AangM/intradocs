@@ -138,15 +138,57 @@ Demo visual memakai fixture deterministik; functional test memakai identitas dan
 
 ## 4. Status tunggal — diperbarui, bukan ditumpuk di chat
 
-| Item                  | Status sekarang                                | Bukti                                                                                 |
-| --------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Pembacaan mockup 1–11 | DONE — source audit                            | Peta PRD/UI, hash referensi asli                                                      |
-| Rencana               | READY FOR LOCAL IMPLEMENTATION                 | v0.2, enam file Markdown yang sama                                                    |
-| Tim/deadline/lokal    | CONFIRMED                                      | Dua orang, tanpa deadline, laptop dulu                                                |
-| Default development   | SELECTED                                       | Auth lokal, storage lokal, AI demo opsional, cloud deploy tidak wajib                 |
-| Go-live Telkom        | BLOCKED                                        | SSO nyata, data policy, provider/residency dan Q1–Q6 belum diverifikasi               |
-| M0–M5                 | NOT STARTED                                    | Belum ada repository aplikasi atau commit implementasi                                |
-| Q1–Q6                 | NOT RUN                                        | Belum ada hasil test aplikasi/visual/benchmark                                        |
-| Tahap berikut         | M0: buat repository yang bisa dijalankan lokal | Tidak perlu menunggu IdP/GPU; belum ada persetujuan deploy atau penggunaan data nyata |
+**Diperbarui 13 September 2026** setelah review kebutuhan PRD §2–§4 terhadap source dan bukti
+yang benar-benar dijalankan (bagian 0 di atas adalah checkpoint 7 September 2026 dan dibiarkan
+sebagai sejarah; tabel ini yang berlaku).
 
-Template langsung eksekusi: “Mulai M0 sesuai rencana v0.2. Buat repository siap dicoba lokal beserta setup, login dan seed sintetis. Jangan deploy, aktifkan AI berbayar, atau memasukkan data Telkom. Sertakan bukti tes dan panduan run singkat.”
+| Item                  | Status sekarang                                                            | Bukti                                                                                                                                         |
+| --------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pembacaan mockup 1–11 | DONE                                                                       | Peta PRD/UI, hash referensi asli                                                                                                              |
+| M0–M3                 | DONE (lokal, sintetis)                                                     | README "Hasil implementasi"; unit 266 / integrasi RLS 52 / HTTP 47 / e2e 14 (WEKNORA.md §8)                                                   |
+| M4 · RAG lokal        | DONE (lokal); gate pilot BLOCKED                                           | `rag:eval --chat` 20/20 · 8/10 · 0 bocor (WEKNORA.md §8, §25); SSO/OIDC belum ada                                                             |
+| M5 · V1               | SEBAGIAN — lihat §5 di bawah                                               | Yang ada: saran label, akses, bacaan wajib, cabut massal, diff+rollback, merge label, gap, undangan. Yang tidak: OCR/PPTX, role kustom, email |
+| Q1 kode               | LULUS lokal; CI tertulis, **belum pernah dilihat berjalan**                | `pnpm check`, `.github/workflows/ci.yml`                                                                                                      |
+| Q2 akses              | LULUS pada suite lokal; OIDC/offboarding BELUM                             | integrasi RLS 52, HTTP 47, e2e canary; §5 WEKNORA.md                                                                                          |
+| Q3 data/workflow      | LULUS pada fixture; format V1 (OCR/PPTX/HTML/DOC/ZIP) BELUM                | tests/integration, tests/http/uploads                                                                                                         |
+| Q4 kualitas AI        | LULUS pada corpus sintetis; review grounding pemilik domain BELUM          | 40 gold questions, `pnpm rag:eval`                                                                                                            |
+| Q5 UI/aksesibilitas   | Visual DONE (UI.md §5, U09–U11); **axe/keyboard-only dan load test BELUM** | `pnpm ui:shots`, tidak ada tes axe di `tests/`                                                                                                |
+| Q6 operasi            | NOT RUN                                                                    | backup/restore, rollback release, alarm, D04/D05/D07 belum ada                                                                                |
+| Go-live Telkom        | BLOCKED                                                                    | SSO nyata, kebijakan data, persetujuan security/ops/mentor                                                                                    |
+
+## 5. Review kebutuhan PRD §2 — apa yang nyata, apa yang belum (13 September 2026)
+
+Legenda: ✅ ada dan diuji · ◐ ada sebagian / dengan batas · ✗ belum ada · — bukan target rilis ini.
+
+| Layar | Pilot/MVP (PRD §2 kolom kiri)                                                                                                                                                                                                                                | V1 (kolom kanan)                                                                                                                             |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| S01   | ✅ hero → Tanya AI, kategori, paling dibaca, publikasi terbaru, hitungan sesuai akses, topik kurasi                                                                                                                                                          | ✅ topik populer dari log 30 hari (k-anonim ≥3)                                                                                              |
+| S02   | ✅ kata kunci + semantik (kartu sumber AI), facet kategori/label/format/waktu/status/pemilik, sort, paginasi, draft sendiri; jawaban tersusun lewat tombol ke asisten                                                                                        | ✅ permintaan akses via `/akses`; judul terkunci tidak bocor (tes). BM25: tidak dibangun, belum terbukti perlu                               |
+| S03   | ✅ tabel, versi/pemilik/metadata/klasifikasi/status, filter, paginasi, draft & antrean sendiri, favorit, riwayat baca                                                                                                                                        | ✅ cabut massal atomik dengan konfirmasi + audit                                                                                             |
+| S04   | ✅ reader tiga kolom, TOC, kode/tabel, versi immutable, metadata approval, lampiran/original berizin, dokumen terkait, feedback                                                                                                                              | ✅ diff versi (`/versi`) dan rollback via draft                                                                                              |
+| S05   | ✅ empat langkah, multi-file, 50 MiB, konversi→preview→metadata→submit, MD/TXT/PDF berteks/DOCX/XLSX, duplicate warning                                                                                                                                      | ◐ bantuan metadata (mirip & label) tanpa mengirim draft ✅; **OCR/PPTX/HTML/DOC/ZIP ✗** — tidak ditampilkan sebagai didukung                 |
+| S06   | ✅ antrean/detail, preview asli & konversi, catatan, approve/revisi/tolak, 1–2 tahap, larangan self-approval, ClamAV + pola secret, audit, publikasi lalu indeks                                                                                             | ◐ bacaan wajib ✅, pra-cek otomatis ✅; **@mention ✗, email/kanal ✗** (butuh integrasi yang disetujui), bantuan AI duplikasi hanya di unggah |
+| S07   | ✅ CRUD ≤3 tingkat, leaf, label multi, urutan, cegah siklus/hapus terpakai, aturan akses/Kritikal/review                                                                                                                                                     | ✅ drag-and-drop + ↑/↓, ekspor, merge label, saran mirip/tidak terpakai                                                                      |
+| S08   | ✅ lima role, matriks, scope, aktivasi/nonaktivasi, audit, login lokal nyata; reviewer tidak lintas cakupan. **SSO ✗ (blokir pilot)**                                                                                                                        | ◐ undangan lokal sekali pakai ✅; **editor role kustom ✗** (kartu "di luar rilis")                                                           |
+| S09   | ✅ percakapan pribadi multi-turn (WEKNORA.md §24), scope KB/kategori/dokumen, sumber versi+lokasi, tidak ditemukan, status proses + **Hentikan**, feedback, histori dgn recheck izin. **Konflik antar-sumber ✗** — tidak dideteksi, sumber ditampilkan semua | ✅ ekspor Markdown, saran lanjutan (§25), tautan sumber berautentikasi; "lampirkan" = scope dokumen yang dibuka ◐                            |
+| S10   | ✅ KPI per status, aktivitas baca/chat, durasi approval, pencarian tanpa hasil, kontributor, filter periode/unit, empty state                                                                                                                                | ◐ knowledge gap teragregasi ✅ + "Jawab sebagai dokumen"; **laporan ekspor ✗**; penugasan penulis formal ✗                                   |
+| S11   | — dokumen (ARCHITECTURE/PLAN/WEKNORA), bukan layar                                                                                                                                                                                                           | —                                                                                                                                            |
+
+**Kontrak alur PRD §3:** 1 kontribusi ✅ · 2 validasi ✅ · 3 publikasi ✅ (staging indeks, gagal
+indeks tidak dilaporkan sukses) · 4 konsumsi ◐ — sitasi membuka bagian sumber ✅, abstain ✅,
+**"sumber bertentangan → tampilkan konflik" ✗** · 5 pemeliharaan ✅ (pengingat, expiry, feedback
+ke pemilik, revisi lewat review).
+
+**Aturan §4 yang tidak bisa ditawar:** semuanya punya tes negatif — kebocoran lewat judul/
+cuplikan/hitungan/related/duplicate/AI/chat lama (integrasi RLS + HTTP + e2e canary), draft
+tidak masuk retrieval, MD tidak ditulis ulang AI (sitasi harus verbatim di Markdown), lampiran
+mengikuti klasifikasi induk, ekspor jawaban tetap draft. Satu yang belum diuji sebagai suite:
+**autocomplete** — tidak ada fitur autocomplete, jadi tidak ada permukaan bocornya.
+
+**Kesimpulan jujur:** MVP lokal (definisi PRD §1) terpenuhi end-to-end pada data sintetis,
+termasuk hampir semua kolom V1 yang tidak memerlukan integrasi eksternal. Yang tersisa adalah
+(a) hal yang memang butuh organisasi — SSO/OIDC, email/kanal, kebijakan data, security/ops
+review, UAT pemilik domain; (b) format V1 berat — OCR/PPTX/HTML/DOC/ZIP; (c) tiga fitur produk
+kecil — konflik antar-sumber di asisten, role kustom, laporan ekspor dashboard; (d) dua gate
+teknis — axe/keyboard-only dan load test Q5, serta Q6 operasi. Tidak satu pun dari itu boleh
+disebut selesai lewat stub.

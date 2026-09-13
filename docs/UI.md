@@ -203,5 +203,8 @@ jawaban, dan itu diputuskan di server (docs/WEKNORA.md §25):
   kalimat (prompt "lengkap", 8 passage, `num_ctx` 8192, repeat penalty 1,02, chunk ringkasan
   bukan bukti).
 
-Bukti: `var/chat-shots2.mts` (katalog, penolakan dengan kutipan dan chip), `rag:eval --chat`
-dan tes di §25.
+- Tombol **Hentikan** di samping indikator "Mencari…" membatalkan permintaan yang berjalan
+  (PRD S09 "status proses dan cancel"); composer langsung bisa dipakai lagi.
+
+Bukti: `var/chat-shots2.mts` (katalog, penolakan dengan kutipan dan chip), `var/pending-shot.mts`
+(Hentikan), `rag:eval --chat` dan tes di §25.
