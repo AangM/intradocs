@@ -630,14 +630,14 @@ select:disabled {
   margin: auto 0;
   padding: 24px 0;
 }
-.login-story-body > h1 {
+.login-story-body > .login-tagline {
   font-size: 38px;
   line-height: 1.22;
   font-weight: 800;
   letter-spacing: -1px;
   margin: 22px 0;
 }
-.login-story-body > h1 em {
+.login-story-body > .login-tagline em {
   color: var(--blue-600);
   font-style: normal;
 }
@@ -751,7 +751,7 @@ select:disabled {
 .login-card {
   width: min(100%, 380px);
 }
-.login-card h2 {
+.login-card h1 {
   font-size: 24px;
   margin: 16px 0 8px;
   letter-spacing: -0.5px;
@@ -1064,7 +1064,7 @@ select:disabled {
   .login-story {
     padding: 42px 8%;
   }
-  .login-story-body > h1 {
+  .login-story-body > .login-tagline {
     font-size: 31px;
   }
   .login-story > .logo {

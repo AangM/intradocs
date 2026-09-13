@@ -27,9 +27,9 @@ export default async function Login({
             <Icon name="shield" size={14} />
             Satu tempat untuk pengetahuan tim
           </span>
-          <h1>
+          <p className="login-tagline">
             Tanya, temukan, <em>percaya.</em>
-          </h1>
+          </p>
           <p>
             SOP, panduan, dan kebijakan IT dalam satu tempat — dan asisten yang menjawab dari
             dokumen resmi, lengkap dengan sumbernya.
@@ -85,7 +85,7 @@ export default async function Login({
       <section className="login-panel">
         <div className="login-card">
           <span className="pill p-blue">SELAMAT DATANG</span>
-          <h2>Masuk ke IntraDocs</h2>
+          <h1>Masuk ke IntraDocs</h1>
           <p className="sub">Pakai akun demo dari setup lokal Anda.</p>
           <LoginForm returnTo={safeReturnTo(params.returnTo)} />
           <div className="callout c-info">

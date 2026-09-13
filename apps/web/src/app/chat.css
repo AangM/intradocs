@@ -233,8 +233,10 @@
   line-height: 1.25;
   min-width: 0;
 }
-.chat-head-t strong {
+.chat-head-t h1 {
+  margin: 0;
   font-size: 14.5px;
+  font-weight: 700;
 }
 .chat-head-t .sub {
   white-space: nowrap;

@@ -76,7 +76,13 @@ export function RevisionSuggestions({
         {summary && (
           <div>
             <strong className="tiny">Draf ringkasan:</strong>
-            <blockquote className="insight-draft">{summary}</blockquote>
+            <blockquote
+              className="insight-draft"
+              tabIndex={0}
+              aria-label="Draf ringkasan (dapat digulir)"
+            >
+              {summary}
+            </blockquote>
             <button
               type="button"
               className="btn btn-sm"

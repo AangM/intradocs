@@ -215,3 +215,25 @@ jawaban, dan itu diputuskan di server (docs/WEKNORA.md §25):
 
 Bukti: `var/chat-shots2.mts` (katalog, penolakan dengan kutipan dan chip), `var/pending-shot.mts`
 (Hentikan), `rag:eval --chat` dan tes di §25.
+
+## Delta U12 — gate aksesibilitas Q5 (September 2026)
+
+`tests/e2e/a11y.spec.ts` menjalankan axe (wcag2a/aa, wcag21aa, best-practice) pada login dan
+S01–S10 + notifikasi/akses/pengaturan, desktop dan ponsel; **serious/critical = gagal**,
+moderate/minor dicetak. Plus jalur keyboard-only: login (Tab–Tab–Enter), skip link → `main`,
+pencarian dari keyboard, laci sidebar di ponsel (Enter buka, Escape tutup), dialog role (Enter
+buka, Tab tetap di dalam, Escape tutup). Yang diperbaiki agar lulus — semuanya perubahan kecil
+pada lapisan tema, bukan struktur mentor:
+
+- `--muted-2` #8b95a7 → #667085 (label kecil 11–12 px gagal 4,5:1 di atas kartu putih).
+- Biru aksen di atas tint-nya sendiri (chip filter aktif, tag kategori biru) 3,9:1 → memakai
+  `--accent-ink`.
+- Tautan facet pencarian memakai `aria-current`, bukan `aria-pressed` (tidak valid pada `<a>`).
+- Blok draf ringkasan yang bisa digulir mendapat `tabIndex=0` + label; `main` (wilayah gulir
+  utama) `tabIndex=0` dengan ring fokus hanya pada `:focus-visible`.
+- Satu `h1` per halaman: judul asisten jadi `h1`, tagline login jadi `p` dan "Masuk ke
+  IntraDocs" jadi `h1`.
+- Landmark: panel samping approval bukan `aside` bersarang; dua wilayah tabel di S08 punya
+  label berbeda.
+
+Sisa temuan moderate: tidak ada. Load test Q5 tetap menunggu hardware target.

@@ -98,7 +98,13 @@ export function DocumentInsights({
               tampil kepada pembaca. Pakai sebagai bahan saat membuat revisi — ringkasan resmi hanya
               berubah lewat revisi yang direview.
             </p>
-            <blockquote className="insight-draft">{state.summary}</blockquote>
+            <blockquote
+              className="insight-draft"
+              tabIndex={0}
+              aria-label="Draf ringkasan (dapat digulir)"
+            >
+              {state.summary}
+            </blockquote>
             <div className="reader-actions">
               <button
                 type="button"

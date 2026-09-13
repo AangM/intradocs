@@ -74,6 +74,14 @@ export default async function Dashboard({
                 ...data.units.map((u) => [u, u, href(days, u)] as const),
               ]}
             />
+            <a
+              className="btn btn-sm"
+              href={`/api/reports/dashboard?days=${days}${unit ? `&unit=${encodeURIComponent(unit)}` : ''}`}
+              title="Unduh angka di halaman ini sebagai CSV"
+            >
+              <Icon name="download" size={14} />
+              Ekspor CSV
+            </a>
           </div>
         }
       />

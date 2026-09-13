@@ -519,7 +519,7 @@ export function AssistantChat({
             <Icon name="list" size={18} />
           </label>
           <div className="chat-head-t">
-            <strong>AI Assistant</strong>
+            <h1>AI Assistant</h1>
             <span className="sub tiny">{scopeSummary}</span>
           </div>
           <span className="pill p-green chat-head-pill">

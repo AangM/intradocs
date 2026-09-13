@@ -32,6 +32,10 @@
     "scanner:check": "tsx scripts/knowledge.ts check",
     "test:upload-http": "tsx --test --test-concurrency=1 tests/http/uploads.test.ts",
     "storage:gc": "tsx scripts/storage-gc.ts",
+    "ops:backup": "tsx scripts/ops.ts backup",
+    "ops:restore": "tsx scripts/ops.ts restore",
+    "ops:verify-backup": "tsx scripts/ops.ts verify-backup",
+    "ops:ready": "tsx scripts/ops.ts ready",
     "verify:local": "node scripts/verify-local.ts",
     "test:python": "python -m unittest discover -s tests/python -v",
     "knowledge:check": "tsx scripts/knowledge.ts converter-check",
@@ -54,6 +58,7 @@
     "weknora:repair": "tsx scripts/weknora.ts repair"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.10.2",
     "@playwright/test": "1.56.1",
     "@types/mdast": "4.0.4",
     "@types/node": "24.0.13",

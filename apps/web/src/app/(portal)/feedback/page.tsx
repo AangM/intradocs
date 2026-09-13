@@ -8,10 +8,7 @@ export default async function Feedback() {
     rows = await ownerFeedback(a.id);
   return (
     <div className="pad">
-      <PageHeading
-        title="Masukan Dokumen"
-        subtitle="Apa kata pembaca tentang dokumen Anda."
-      />
+      <PageHeading title="Masukan Dokumen" subtitle="Apa kata pembaca tentang dokumen Anda." />
       {rows.length ? (
         <section className="card">
           <div className="card-h">

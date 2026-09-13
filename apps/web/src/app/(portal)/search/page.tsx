@@ -22,6 +22,7 @@ const FORMAT_LABEL: Record<string, string> = {
   PDF: 'PDF',
   DOCX: 'Word (.docx)',
   XLSX: 'Excel (.xlsx)',
+  HTML: 'HTML (.html)',
   PPTX: 'PowerPoint (.pptx)',
 };
 
@@ -138,7 +139,7 @@ export default async function Search({
                 key={c.id}
                 className="fitem"
                 href={withParam('category', query.category === c.id ? undefined : c.id)}
-                aria-pressed={query.category === c.id}
+                aria-current={query.category === c.id ? 'true' : undefined}
               >
                 <Check on={query.category === c.id} /> {c.name} <span className="n">{c.n}</span>
               </Link>
@@ -156,7 +157,7 @@ export default async function Search({
                     key={l.name}
                     className={`tag ${query.label === l.name ? 'tag-on' : ''}`}
                     href={withParam('label', query.label === l.name ? undefined : l.name)}
-                    aria-pressed={query.label === l.name}
+                    aria-current={query.label === l.name ? 'true' : undefined}
                   >
                     {l.name} <span className="n">{l.n}</span>
                   </Link>
@@ -171,7 +172,7 @@ export default async function Search({
                 key={f.format}
                 className="fitem"
                 href={withParam('format', query.format === f.format ? undefined : f.format)}
-                aria-pressed={query.format === f.format}
+                aria-current={query.format === f.format ? 'true' : undefined}
               >
                 <Check on={query.format === f.format} /> {FORMAT_LABEL[f.format] ?? f.format}{' '}
                 <span className="n">{f.n}</span>
@@ -191,7 +192,7 @@ export default async function Search({
                 key={key}
                 className="fitem"
                 href={withParam('after', after)}
-                aria-pressed={activeRecency === key}
+                aria-current={activeRecency === key ? 'true' : undefined}
               >
                 <Check on={activeRecency === key} /> {label} <span className="n">{n}</span>
               </Link>

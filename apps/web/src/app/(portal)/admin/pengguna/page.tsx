@@ -106,7 +106,7 @@ export default async function Users() {
           className="table-scroll"
           tabIndex={0}
           role="region"
-          aria-label="Tabel yang dapat digulir"
+          aria-label="Matriks izin (dapat digulir)"
         >
           <table className="matrix">
             <thead>
@@ -195,7 +195,7 @@ export default async function Users() {
           className="table-scroll"
           tabIndex={0}
           role="region"
-          aria-label="Tabel yang dapat digulir"
+          aria-label="Daftar pengguna (dapat digulir)"
         >
           <table>
             <thead>

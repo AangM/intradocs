@@ -384,7 +384,7 @@ export function Shell({
             </nav>
           </aside>
         )}
-        <main id="main-content" className={reader ? 'reader-area' : 'main'} tabIndex={-1}>
+        <main id="main-content" className={reader ? 'reader-area' : 'main'} tabIndex={0}>
           {children}
         </main>
       </div>

@@ -16,9 +16,9 @@ export const UPLOAD_LIMITS = Object.freeze({
 });
 export const UPLOAD_PIPELINE = 'text-v1';
 export type TextFormat = 'MD' | 'TXT';
-export type SourceFormat = TextFormat | 'PDF' | 'DOCX' | 'XLSX' | 'PPTX';
+export type SourceFormat = TextFormat | 'PDF' | 'DOCX' | 'XLSX' | 'HTML' | 'PPTX';
 /** Formats the local converter handles; PPTX needs WeKnora's parser (weknora-parse.ts). */
-export const LOCAL_FORMATS: readonly SourceFormat[] = ['MD', 'TXT', 'PDF', 'DOCX', 'XLSX'];
+export const LOCAL_FORMATS: readonly SourceFormat[] = ['MD', 'TXT', 'PDF', 'DOCX', 'XLSX', 'HTML'];
 export class UploadError extends InputError {
   readonly code: string;
   readonly status: number;
@@ -307,12 +307,21 @@ export function validateDocumentFile(
     DOCX: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     XLSX: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     PPTX: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    HTML: 'text/html',
   };
-  const signature = format === 'PDF' ? Buffer.from('%PDF-') : Buffer.from([0x50, 0x4b, 0x03, 0x04]);
-  if (
-    !['', 'application/octet-stream', types[format!]!].includes(contentType) ||
-    !Buffer.from(bytes.subarray(0, signature.length)).equals(signature)
-  )
+  // HTML has no magic bytes: it must start with '<' after an optional BOM and whitespace.
+  const head = Buffer.from(bytes.subarray(0, 64));
+  const looksLike =
+    format === 'HTML'
+      ? /^\s*<|^\xef\xbb\xbf\s*</.test(head.toString('latin1'))
+      : head
+          .subarray(0, 5)
+          .equals(
+            format === 'PDF'
+              ? Buffer.from('%PDF-')
+              : Buffer.from([0x50, 0x4b, 0x03, 0x04, head[4] ?? 0]),
+          );
+  if (!['', 'application/octet-stream', types[format!]!].includes(contentType) || !looksLike)
     throw new UploadError(
       'unsupported_format',
       'Ekstensi, MIME, dan magic bytes tidak cocok.',

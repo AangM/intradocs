@@ -4,6 +4,7 @@ import hashlib
 import io
 import json
 import re
+from html.parser import HTMLParser
 import sys
 import zipfile
 from pathlib import PurePosixPath
@@ -306,6 +307,145 @@ def pdf(source, out):
     except Exception as exc:
         raise ConversionError('invalid_file') from exc
 
+class HtmlText(HTMLParser):
+    """Text and block structure from HTML, nothing else: no attribute, script, style,
+    link target or embedded object survives. Blocks become paragraphs, headings, list
+    items and simple tables; everything inside is escaped as literal text."""
+    SKIP = {'script', 'style', 'noscript', 'template', 'svg', 'math', 'iframe', 'object', 'embed', 'head'}
+    BLOCK = {'p', 'div', 'section', 'article', 'header', 'footer', 'main', 'aside', 'nav', 'blockquote',
+             'figure', 'figcaption', 'dd', 'dt', 'summary', 'details', 'address', 'hr'}
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.blocks = []      # (kind, prefix, text)
+        self.buffer = []
+        self.prefix = ''
+        self.kind = 'paragraph'
+        self.skip = 0
+        self.lists = []       # 'ul' | 'ol' with counters
+        self.table = None     # rows in progress
+        self.row = None
+        self.cell = None
+        self.pre = 0
+
+    def flush(self):
+        text = ''.join(self.buffer)
+        text = text if self.pre else re.sub(r'\s+', ' ', text).strip()
+        if text.strip():
+            self.blocks.append((self.kind, self.prefix, text))
+        self.buffer = []
+        self.prefix = ''
+        self.kind = 'paragraph'
+
+    def handle_starttag(self, tag, attrs):
+        if self.skip or tag in self.SKIP:
+            if tag in self.SKIP:
+                self.skip += 1
+            return
+        if tag == 'table':
+            self.flush()
+            self.table = []
+        elif tag == 'tr' and self.table is not None:
+            self.row = []
+        elif tag in ('td', 'th') and self.row is not None:
+            self.cell = []
+        elif self.table is not None:
+            return
+        elif re.fullmatch(r'h[1-6]', tag):
+            self.flush()
+            self.prefix = '#' * int(tag[1]) + ' '
+        elif tag in ('ul', 'ol'):
+            self.flush()
+            self.lists.append([tag, 0])
+        elif tag == 'li':
+            self.flush()
+            if self.lists:
+                kind, n = self.lists[-1]
+                self.lists[-1][1] = n + 1
+                self.prefix = '  ' * (len(self.lists) - 1) + ('- ' if kind == 'ul' else f'{n + 1}. ')
+        elif tag == 'pre':
+            self.flush()
+            self.pre += 1
+            self.kind = 'code'
+        elif tag == 'br':
+            self.buffer.append('\n' if self.pre else ' ⏎ ')
+        elif tag in self.BLOCK:
+            self.flush()
+
+    def handle_endtag(self, tag):
+        if tag in self.SKIP:
+            self.skip = max(0, self.skip - 1)
+            return
+        if self.skip:
+            return
+        if tag in ('td', 'th') and self.cell is not None and self.row is not None:
+            self.row.append(re.sub(r'\s+', ' ', ''.join(self.cell)).strip())
+            self.cell = None
+        elif tag == 'tr' and self.row is not None and self.table is not None:
+            if self.row:
+                self.table.append(self.row)
+            self.row = None
+        elif tag == 'table' and self.table is not None:
+            rows = self.table
+            self.table = None
+            if rows:
+                self.blocks.append(('table', '', rows))
+        elif self.table is not None:
+            return
+        elif tag in ('ul', 'ol'):
+            self.flush()
+            if self.lists:
+                self.lists.pop()
+        elif tag == 'pre':
+            self.flush()
+            self.pre = max(0, self.pre - 1)
+        elif re.fullmatch(r'h[1-6]', tag) or tag == 'li' or tag in self.BLOCK:
+            self.flush()
+
+    def handle_data(self, data):
+        if self.skip:
+            return
+        if self.cell is not None:
+            self.cell.append(data)
+        elif self.table is None:
+            self.buffer.append(data)
+
+
+def html(source, out):
+    try:
+        text = source.decode('utf-8')
+    except UnicodeDecodeError:
+        raise ConversionError('invalid_file')
+    if '\x00' in text:
+        raise ConversionError('invalid_file')
+    parser = HtmlText()
+    parser.feed(text)
+    parser.close()
+    parser.flush()
+    blocks = parser.blocks
+    if len(blocks) > 20000:
+        raise ConversionError('complexity')
+    para = table = 0
+    for kind, prefix, content in blocks:
+        if kind == 'table':
+            table += 1
+            rows = content
+            if len(rows) > 2000 or any(len(row) > 50 for row in rows):
+                raise ConversionError('complexity')
+            columns = max(map(len, rows))
+            rows = [[escape(c) for c in row] + [''] * (columns - len(row)) for row in rows]
+            lines = ['| ' + ' | '.join(row) + ' |' for row in rows]
+            lines.insert(1, '| ' + ' | '.join(['---'] * columns) + ' |')
+            out.add('\n'.join(lines), 'table', f'Tabel {table}, baris 1–{len(rows)}')
+        elif kind == 'code':
+            para += 1
+            out.add(literal(content.strip('\n')), 'paragraph', f'Blok kode {para}')
+        else:
+            para += 1
+            out.add(prefix + escape(content), 'paragraph', f'Paragraf {para}')
+    out.warning('Teks diambil dari HTML; tautan, gambar, skrip dan gaya dibuang; tabel gabungan disederhanakan.')
+
+
 def convert(source, kind):
     if not source or len(source) > MAX_SOURCE:
         raise ConversionError('complexity')
@@ -314,6 +454,8 @@ def convert(source, kind):
         pdf(source, out)
     elif kind in ('DOCX', 'XLSX') and source.startswith(b'PK\x03\x04'):
         (docx if kind == 'DOCX' else xlsx)(source, out)
+    elif kind == 'HTML' and re.match(rb'^\s*(?:\xef\xbb\xbf)?\s*<', source[:64]):
+        html(source, out)
     else:
         raise ConversionError('invalid_file')
     return out.result(source)

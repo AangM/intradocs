@@ -19,7 +19,7 @@ export function sha256(bytes: Uint8Array): string {
   return createHash('sha256').update(bytes).digest('hex');
 }
 function limitFor(key: string) {
-  return /\/(?:original|attachment-[1-4])\.(md|txt|pdf|docx|xlsx|pptx)$/.test(key)
+  return /\/(?:original|attachment-[1-4])\.(md|txt|pdf|docx|xlsx|html|pptx)$/.test(key)
     ? 50 * 1024 * 1024
     : 2 * 1024 * 1024;
 }

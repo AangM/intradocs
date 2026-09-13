@@ -111,3 +111,37 @@ test('oversized auth body rejected before provider/database processing', async (
   });
   assert.equal(r.status, 413);
 });
+
+test('the dashboard CSV report follows the analytics capability and the actor scope', async () => {
+  // Two more sign-ins after the suite above: clear the login limiter first.
+  await admin.query('DELETE FROM auth."rateLimit"');
+  // A viewer has no analytics.view: the report is refused before any query runs.
+  const viewer = await login(IDS.viewer);
+  const denied = await fetch(base + '/api/reports/dashboard?days=30', {
+    headers: { Cookie: viewer },
+  });
+  assert.equal(denied.status, 403);
+  assert.equal((await fetch(base + '/api/reports/dashboard')).status, 401);
+  // The knowledge admin gets a CSV with the sections the page shows and a BOM for Excel.
+  const adminCookie = await login(IDS.admin);
+  const ok = await fetch(base + '/api/reports/dashboard?days=7', {
+    headers: { Cookie: adminCookie },
+  });
+  assert.equal(ok.status, 200);
+  assert.match(ok.headers.get('content-type') ?? '', /text\/csv/);
+  assert.match(ok.headers.get('content-disposition') ?? '', /intradocs-dashboard-.*-7h\.csv/);
+  // text() would strip the BOM while decoding; check the bytes, then the text.
+  const bytes = new Uint8Array(await ok.arrayBuffer());
+  assert.deepEqual([...bytes.slice(0, 3)], [0xef, 0xbb, 0xbf], 'UTF-8 BOM for Excel');
+  const csv = new TextDecoder().decode(bytes);
+  assert(csv.startsWith('Laporan dashboard IntraDocs'));
+  for (const section of [
+    'Periode (hari),7',
+    'Dokumen aktif,',
+    'Tanggal,Pembacaan,Pertanyaan AI',
+    'Kontributor,Dokumen disetujui',
+  ])
+    assert(csv.includes(section), section);
+  // Gap terms never travel in the file, whatever the log holds.
+  assert(!/harga saham/i.test(csv));
+});

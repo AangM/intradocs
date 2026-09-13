@@ -5,7 +5,7 @@ Portal knowledge base **local-dev, corpus sintetis, AI opt-in dan off secara def
 ## Hasil implementasi
 
 - **M1:** Better Auth/session lokal, lima role, category scope, RLS PostgreSQL, proteksi URL/file, audit, shell responsif, penugasan role/scope dan aktivasi akun.
-- **M2:** MD/TXT/PDF berteks/DOCX/XLSX (+ PPTX lewat parser WeKnora bila aktif, [§27](docs/WEKNORA.md)), original + maksimal empat lampiran, scan ClamAV wajib, converter non-AI, canonical gabungan dan provenance/locator, preview, private draft, duplicate/idempotency, retry, revisi immutable, taksonomi.
+- **M2:** MD/TXT/PDF berteks/DOCX/XLSX/HTML (+ PPTX lewat parser WeKnora bila aktif, [§27](docs/WEKNORA.md)), original + maksimal empat lampiran, scan ClamAV wajib, converter non-AI, canonical gabungan dan provenance/locator, preview, private draft, duplicate/idempotency, retry, revisi immutable, taksonomi.
 - **M4:** WeKnora lokal sebagai mesin RAG di belakang policy gate IntraDocs — ekspor idempoten versi final-approved, retrieval ber-scope, sitasi yang divalidasi ulang ke database pada setiap request, dan abstain bila tidak ada bukti sah. Aktif hanya bila `AI_PROVIDER=weknora-local` diisi sendiri. Rinciannya di [docs/WEKNORA.md](docs/WEKNORA.md).
 - **M5 (V1):** saran label dari auto-tag WeKnora yang disaring kosakata kategori (tidak pernah diterapkan otomatis), permintaan akses dengan keputusan tercatat, bacaan wajib per kategori dengan konfirmasi versi, aksi cabut massal yang atomik, rollback versi via draft, merge label sebagai alias, gerbang relevansi yang membuat asisten menjawab "tidak tahu" pada pertanyaan tanpa bukti, metrik AI dari jejak audit di dashboard, cakupan jawaban (seluruh KB / kategori / dokumen yang dibuka) dan riwayat percakapan yang tunduk RLS di asisten, kartu sumber AI di halaman pencarian ([docs/WEKNORA.md §16](docs/WEKNORA.md)), summary dan pertanyaan yang dihasilkan WeKnora saat ingest sebagai saran — pertanyaan untuk pembaca, draf ringkasan hanya untuk yang boleh merevisi ([§17](docs/WEKNORA.md)), penilaian jawaban dan pertanyaan tak terjawab sebagai knowledge gap ([§18](docs/WEKNORA.md)), perapian taksonomi ([§19](docs/WEKNORA.md)), bantuan metadata saat unggah tanpa mengirim draft ([§20](docs/WEKNORA.md)), dan undangan pengguna lokal dengan tautan sekali pakai ([§21](docs/WEKNORA.md)).
 - **M3:** satu/dua reviewer berbeda, larangan self-approval, justifikasi temuan, minta revisi/tolak, outbox ber-lease/retry, publikasi dan indeks atomik, lexical search ber-RLS, favorit, feedback pemilik, histori, notifikasi, pengingat/expiry, dokumen terkait, dan KPI aktual berfilter periode/unit.
@@ -68,6 +68,17 @@ pnpm dev
 ```
 
 Migrasi bersifat additive. SQL yang sudah diterapkan tidak ditulis ulang. Jangan menjalankan `db:seed` untuk mereset data yang ada.
+
+## Operasi lokal (Q6, sebagian)
+
+```sh
+pnpm ops:ready                          # tabel kesiapan: DB, web, storage, ClamAV, converter, WeKnora, Ollama + pemilik
+pnpm ops:backup                         # var/backups/<stamp>/{db.dump,storage.tar,manifest.json}; .env dan akun demo tidak ikut
+pnpm ops:verify-backup var/backups/<stamp>   # restore drill ke database uji + folder sementara; tidak menyentuh yang hidup
+pnpm ops:restore var/backups/<stamp> --yes   # menimpa DB dan storage lokal; app harus berhenti dulu
+```
+
+WeKnora tidak ikut di-backup: indeksnya turunan dari `app.rag_index_entries` + Markdown kanonik dan dibangun ulang oleh `pnpm weknora:sync`. Rollback rilis = checkout tag sebelumnya + `pnpm build`; migrasi hanya maju, jadi rollback skema berarti restore dari backup sebelum migrasi itu.
 
 ## Demo alur lengkap
 

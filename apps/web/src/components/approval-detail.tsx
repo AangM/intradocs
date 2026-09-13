@@ -316,7 +316,7 @@ export function ApprovalDetail({
           </section>
         </div>
 
-        <aside className="appr-side">
+        <div className="appr-side" role="group" aria-label="Alur, catatan, dan tindak lanjut">
           <section className="card mb">
             <div className="card-h">
               <h2 className="h3">Alur persetujuan</h2>
@@ -451,7 +451,7 @@ export function ApprovalDetail({
               )}
             </div>
           </section>
-        </aside>
+        </div>
       </div>
     </div>
   );
