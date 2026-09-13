@@ -530,6 +530,97 @@ export function salvageDecline(question: string, remainder: string): string | nu
 }
 
 /**
+ * PRD §3.4: when sources disagree, show the disagreement instead of letting the model
+ * pick. Deterministic and narrow on purpose: a "quantity" is a number with a unit
+ * (7 hari, 24 jam, 30 menit, 50 MiB, 2 tahap, 90%); two citations from DIFFERENT
+ * documents that state different values for the same unit, each in a sentence that
+ * shares a word with the question, are a conflict. Anything subtler (wording, policy
+ * text without numbers) is not detected -- and is not claimed to be.
+ */
+export interface SourceConflict {
+  unit: string;
+  values: Array<{
+    value: string;
+    documentId: string;
+    documentTitle: string;
+    href: string;
+    excerpt: string;
+  }>;
+}
+
+const UNIT_ALIASES: Record<string, string> = {
+  hari: 'hari',
+  jam: 'jam',
+  menit: 'menit',
+  detik: 'detik',
+  minggu: 'minggu',
+  bulan: 'bulan',
+  tahun: 'tahun',
+  '%': '%',
+  persen: '%',
+  kali: 'kali',
+  tahap: 'tahap',
+  orang: 'orang',
+  karakter: 'karakter',
+  kb: 'KB',
+  kib: 'KB',
+  mb: 'MB',
+  mib: 'MB',
+  gb: 'GB',
+  gib: 'GB',
+};
+
+export function detectConflicts(
+  question: string,
+  citations: ReadonlyArray<Pick<Citation, 'documentId' | 'documentTitle' | 'href' | 'snippet'>>,
+): SourceConflict[] {
+  const words = question
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((w) => w.length >= 4 && !CONTINUATION_WORDS.has(w));
+  if (words.length === 0) return [];
+  const byUnit = new Map<string, SourceConflict['values']>();
+  const quantity =
+    /(\d+(?:[.,]\d+)?)\s*(hari|jam|menit|detik|minggu|bulan|tahun|%|persen|kali|tahap|orang|karakter|kib|kb|mib|mb|gib|gb)\b/giu;
+  for (const c of citations) {
+    for (const sentence of c.snippet.replace(/\s+/g, ' ').split(/(?<=[.;!?])\s+|\s*\|\s*/)) {
+      const lower = sentence.toLowerCase();
+      if (!words.some((w) => lower.includes(w))) continue;
+      for (const m of sentence.matchAll(quantity)) {
+        const unit = UNIT_ALIASES[m[2]!.toLowerCase()];
+        if (!unit) continue;
+        const value = m[1]!.replace(',', '.');
+        const list = byUnit.get(unit) ?? [];
+        if (!list.some((v) => v.documentId === c.documentId && v.value === value))
+          list.push({
+            value,
+            documentId: c.documentId,
+            documentTitle: c.documentTitle,
+            href: c.href,
+            excerpt: sentence.trim().slice(0, 200),
+          });
+        byUnit.set(unit, list);
+      }
+    }
+  }
+  const out: SourceConflict[] = [];
+  for (const [unit, values] of byUnit) {
+    const documents = new Set(values.map((v) => v.documentId));
+    const distinct = new Set(values.map((v) => v.value));
+    if (documents.size < 2 || distinct.size < 2) continue;
+    // Only a real disagreement: some document states a value another does not.
+    const perDoc = new Map<string, Set<string>>();
+    for (const v of values)
+      perDoc.set(v.documentId, (perDoc.get(v.documentId) ?? new Set()).add(v.value));
+    const sets = [...perDoc.values()];
+    const agree = sets.every((a) => sets.every((b) => [...a].every((x) => b.has(x))));
+    if (agree) continue;
+    out.push({ unit, values });
+  }
+  return out;
+}
+
+/**
  * What a question is asked against. `all` is every active version the actor may read;
  * the other two NARROW that set -- a category the actor can see, or documents the actor
  * has opened. A scope never widens anything: the IDs are filtered through the same

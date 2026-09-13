@@ -42,7 +42,7 @@ export function parseCatalogQuery(
     view = scalar('view');
   if (label && (label.length > 32 || /[\u0000-\u001f]/.test(label)))
     throw new InputError('Label tidak valid.');
-  if (format && !['MD', 'TXT', 'PDF', 'DOCX', 'XLSX'].includes(format))
+  if (format && !['MD', 'TXT', 'PDF', 'DOCX', 'XLSX', 'PPTX'].includes(format))
     throw new InputError('Format tidak valid.');
   if (owner && !/^[A-Za-z0-9_-]{1,128}$/.test(owner)) throw new InputError('Pemilik tidak valid.');
   if (

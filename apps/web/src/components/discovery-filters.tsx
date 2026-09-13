@@ -34,7 +34,7 @@ export function DiscoveryFilters({
         Format
         <select className="inp" name="format" defaultValue={q.format ?? ''}>
           <option value="">Semua format</option>
-          {['MD', 'TXT', 'PDF', 'DOCX', 'XLSX'].map((f) => (
+          {['MD', 'TXT', 'PDF', 'DOCX', 'XLSX', 'PPTX'].map((f) => (
             <option key={f}>{f}</option>
           ))}
         </select>

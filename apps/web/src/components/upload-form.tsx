@@ -34,6 +34,7 @@ export function UploadForm({
   categories,
   ownerName,
   maxFileBytes,
+  formats = ['MD', 'TXT', 'PDF', 'DOCX', 'XLSX'],
   initialScanner,
   revision,
   initialTitle,
@@ -41,6 +42,8 @@ export function UploadForm({
   categories: Category[];
   ownerName: string;
   maxFileBytes: number;
+  /** Formats this installation accepts (server-decided; PPTX only with WeKnora). */
+  formats?: readonly string[];
   initialScanner: ScannerState;
   revision?: RevisionInput;
   /** Title seed for a new document, e.g. a knowledge-gap term from the dashboard. */
@@ -76,9 +79,10 @@ export function UploadForm({
     requestId.current = null;
     setError('');
   };
+  const accept = formats.map((f) => `.${f.toLowerCase()}`).join(',');
   function checkFile(f: File) {
-    if (!/\.(md|txt|pdf|docx|xlsx)$/i.test(f.name))
-      throw new Error('Gunakan MD, TXT, PDF bertesks, DOCX, atau XLSX.');
+    const ext = f.name.split('.').at(-1)?.toUpperCase() ?? '';
+    if (!formats.includes(ext)) throw new Error(`Gunakan ${formats.join(', ')}.`);
     if (!f.size || f.size > maxFileBytes)
       throw new Error('Setiap berkas harus berisi data dan maksimal 50 MiB.');
   }
@@ -311,7 +315,7 @@ export function UploadForm({
               <h2>Tarik sumber utama ke sini</h2>
               <p className="sub">50 MiB per berkas · 100 MiB total · data sintetis saja</p>
               <div className="fmt">
-                {['MD', 'TXT', 'PDF', 'DOCX', 'XLSX'].map((f) => (
+                {formats.map((f) => (
                   <span key={f}>{f}</span>
                 ))}
               </div>
@@ -321,7 +325,7 @@ export function UploadForm({
                 type="file"
                 hidden
                 aria-label="Berkas utama"
-                accept=".md,.txt,.pdf,.docx,.xlsx"
+                accept={accept}
                 onChange={(e) => void choose(e.target.files)}
               />
               <button className="btn btn-p" onClick={() => input.current?.click()}>
@@ -382,7 +386,7 @@ export function UploadForm({
                 type="file"
                 hidden
                 multiple
-                accept=".md,.txt,.pdf,.docx,.xlsx"
+                accept={accept}
                 aria-label="Lampiran"
                 onChange={(e) => chooseAttachments(e.target.files)}
               />

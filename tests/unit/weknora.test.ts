@@ -9,6 +9,8 @@ import {
   WeknoraError,
   parseChatStream,
   cleanAnswer,
+  createKbTagFilter,
+  answerDelta,
 } from '../../packages/core/src/weknora.ts';
 
 const config = readAiConfig({
@@ -285,4 +287,32 @@ test("WeKnora's own citation markup never reaches a reader", () => {
     cleanAnswer('Lihat bagian Review.\n\n**Sumber:** standar penamaan repository.'),
     'Lihat bagian Review.\n\n**Sumber:** standar penamaan repository.',
   );
+});
+
+test('streamed fragments never show a half-written <kb> tag, and keep everything else', () => {
+  const f = createKbTagFilter();
+  // Text before a '<' is released at once; the tag is held until it closes, then dropped.
+  assert.equal(
+    f.push('MFA dibutuhkan. <kb doc="[IntraDocs:x] Konfigurasi VPN"'),
+    'MFA dibutuhkan. ',
+  );
+  assert.equal(f.push(' chunk_id="c1" />'), '');
+  assert.equal(f.push(' Lihat langkah 3.'), ' Lihat langkah 3.');
+  // A closing tag split across fragments is dropped too.
+  assert.equal(f.push('a</k'), 'a');
+  assert.equal(f.push('b>c'), 'c');
+  // A '<' that is not a tag (a comparison, a space after it) is plain text.
+  assert.equal(f.push('x < 5 dan y <'), 'x < 5 dan y ');
+  assert.equal(f.push(' 3'), '< 3');
+  // Other markup passes through; flush releases what is left minus any kb remnant.
+  assert.equal(f.push('<b>tebal</b> <kb'), '<b>tebal</b> ');
+  assert.equal(f.flush(), '');
+});
+
+test('answerDelta reads only answer frames from an SSE block', () => {
+  assert.equal(answerDelta('data: {"response_type":"answer","content":"Hal"}'), 'Hal');
+  assert.equal(answerDelta('data: {"response_type":"references","content":"x"}'), '');
+  assert.equal(answerDelta('data: [DONE]'), '');
+  assert.equal(answerDelta('data: not json'), '');
+  assert.equal(answerDelta('event: ping'), '');
 });

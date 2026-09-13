@@ -1321,48 +1321,109 @@ disebut belum dicoba. Prinsip yang mengikat semuanya ada di §13: rekaman tanpa 
 tidak bisa dikutip, jadi fitur yang menghasilkan teks di sisi WeKnora hanya berguna bila
 hasilnya kembali ke IntraDocs sebagai _saran_ yang diputuskan orang.
 
-| Fitur WeKnora                                 | Status di IntraDocs | Bagaimana / mengapa                                                                                                                                                          |
-| --------------------------------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Knowledge base + ingest Markdown              | ✅ dipakai          | Satu KB produksi; hanya Markdown kanonik versi final-approved yang diekspor (§2)                                                                                             |
-| Embedding (bge-m3 via Ollama)                 | ✅ dipakai          | Vektor + kata kunci; kemiripan kosinus dari `disable_keywords_match` menjadi gerbang relevansi (§14)                                                                         |
-| Hybrid search (`knowledge_ids`)               | ✅ dipakai          | Retrieval selalu dibatasi daftar versi berizin; sitasi divalidasi ulang ke DB                                                                                                |
-| Parent-child chunking                         | ✅ dipakai          | Diukur vs flat, sedikit lebih baik (§18)                                                                                                                                     |
-| Reranker (bge-reranker-v2-m3 int8, via shim)  | ✅ dipakai          | Chunk ringkasan diskor 0, ekor pertanyaan dibuang (§17, §25)                                                                                                                 |
-| Agent + prompt sistem/template konteks kustom | ✅ dipakai          | Grounding ketat, sumber-dulu, jawaban lengkap (§24–§25)                                                                                                                      |
-| Session / multi-turn history                  | ✅ dipakai          | Satu sesi per percakapan, 5 giliran, dibuang saat izin berubah (§24)                                                                                                         |
-| Knowledge chat (generasi jawaban)             | ✅ dipakai          | Qwen 2.5 3B turunan (`num_ctx` 8192, `num_predict` 1024); fallback tetap                                                                                                     |
-| Summary generation saat ingest                | ✅ sebagai saran    | Draf ringkasan untuk yang boleh merevisi (§17); **bukan bukti** (§25)                                                                                                        |
-| Question generation saat ingest               | ✅ sebagai saran    | Pertanyaan pemantik dan chip lanjutan (§17, §25)                                                                                                                             |
-| Auto-tag                                      | ✅ sebagai saran    | Saran label disaring kosakata kategori, tidak pernah diterapkan otomatis (§11)                                                                                               |
-| Query rewrite / expansion                     | ✗ mati, sengaja     | Rewrite di dalam WeKnora terjadi _setelah_ gerbang IntraDocs, jadi tidak membantu retrieval; lanjutan tanpa subjek ditangani deterministik (§24)                             |
-| Streaming token ke UI                         | ✗ tidak dipakai     | Jawaban dibuffer dan divalidasi dulu (aturan M4 "tidak ada token yang belum diperiksa"); biaya: ~2–10 s tanpa umpan balik selain indikator. Kandidat berikutnya, lihat bawah |
-| Wiki (Map/Reduce LLM)                         | ✗ mati              | Teks sintesis lintas dokumen tanpa versi, tidak bisa dikutip, berat di CPU (§13)                                                                                             |
-| Knowledge graph (`graph_enabled`)             | ✗ mati              | Alasan sama dengan wiki; belum ada pertanyaan gold yang membutuhkannya                                                                                                       |
-| FAQ (`faq_config`)                            | ✗ mati              | FAQ lahir di WeKnora tanpa review; bentuk amannya "Jawab sebagai dokumen" dari knowledge gap (§18)                                                                           |
-| Web search / web fetch                        | ✗ mati              | Dokumen internal tidak boleh dicampur sumber internet; juga egress                                                                                                           |
-| Tools / MCP / skills / agent mode             | ✗ mati              | PRD §5: tidak ada chatbot dengan action tools                                                                                                                                |
-| Unggah berkas asli ke WeKnora (docreader)     | ✗ tidak dipakai     | Yang terindeks harus yang disetujui reviewer (§13); parser-nya kandidat untuk membuat Markdown kanonik PPTX/OCR (S05 V1)                                                     |
-| Multimodal (VLM), ASR                         | ✗ mati              | Tidak ada dokumen gambar/audio di scope; PDF pindai adalah item OCR S05 V1                                                                                                   |
-| Langfuse                                      | ✗ mati              | Mengirim prompt+dokumen ke luar mesin bila cloud; self-hosted tidak muat di 8 GB (§13)                                                                                       |
-| WeKnora UI                                    | ◐ lab saja          | KB `intradocs-lab` untuk mencoba fitur ingest pada corpus sintetis (§15); tidak untuk pengguna portal                                                                        |
-| Multi-tenant / multi-KB                       | ◐                   | Satu tenant, satu KB produksi + satu lab; PRD: satu organisasi cukup                                                                                                         |
+| Fitur WeKnora                                 | Status di IntraDocs | Bagaimana / mengapa                                                                                                                                        |
+| --------------------------------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Knowledge base + ingest Markdown              | ✅ dipakai          | Satu KB produksi; hanya Markdown kanonik versi final-approved yang diekspor (§2)                                                                           |
+| Embedding (bge-m3 via Ollama)                 | ✅ dipakai          | Vektor + kata kunci; kemiripan kosinus dari `disable_keywords_match` menjadi gerbang relevansi (§14)                                                       |
+| Hybrid search (`knowledge_ids`)               | ✅ dipakai          | Retrieval selalu dibatasi daftar versi berizin; sitasi divalidasi ulang ke DB                                                                              |
+| Parent-child chunking                         | ✅ dipakai          | Diukur vs flat, sedikit lebih baik (§18)                                                                                                                   |
+| Reranker (bge-reranker-v2-m3 int8, via shim)  | ✅ dipakai          | Chunk ringkasan diskor 0, ekor pertanyaan dibuang (§17, §25)                                                                                               |
+| Agent + prompt sistem/template konteks kustom | ✅ dipakai          | Grounding ketat, sumber-dulu, jawaban lengkap (§24–§25)                                                                                                    |
+| Session / multi-turn history                  | ✅ dipakai          | Satu sesi per percakapan, 5 giliran, dibuang saat izin berubah (§24)                                                                                       |
+| Knowledge chat (generasi jawaban)             | ✅ dipakai          | Qwen 2.5 3B turunan (`num_ctx` 8192, `num_predict` 1024); fallback tetap                                                                                   |
+| Summary generation saat ingest                | ✅ sebagai saran    | Draf ringkasan untuk yang boleh merevisi (§17); **bukan bukti** (§25)                                                                                      |
+| Question generation saat ingest               | ✅ sebagai saran    | Pertanyaan pemantik dan chip lanjutan (§17, §25)                                                                                                           |
+| Auto-tag                                      | ✅ sebagai saran    | Saran label disaring kosakata kategori, tidak pernah diterapkan otomatis (§11)                                                                             |
+| Query rewrite / expansion                     | ✗ mati, sengaja     | Rewrite di dalam WeKnora terjadi _setelah_ gerbang IntraDocs, jadi tidak membantu retrieval; lanjutan tanpa subjek ditangani deterministik (§24)           |
+| Streaming token ke UI                         | ✅ dipakai (§27)    | Fragmen jawaban tampil saat ditulis sebagai _pratinjau_; yang disimpan dan dikutip tetap hasil akhir yang dibuffer dan divalidasi                          |
+| Wiki (Map/Reduce LLM)                         | ✗ mati              | Teks sintesis lintas dokumen tanpa versi, tidak bisa dikutip, berat di CPU (§13)                                                                           |
+| Knowledge graph (`graph_enabled`)             | ✗ mati              | Alasan sama dengan wiki; belum ada pertanyaan gold yang membutuhkannya                                                                                     |
+| FAQ (`faq_config`)                            | ✗ mati              | FAQ lahir di WeKnora tanpa review; bentuk amannya "Jawab sebagai dokumen" dari knowledge gap (§18)                                                         |
+| Web search / web fetch                        | ✗ mati              | Dokumen internal tidak boleh dicampur sumber internet; juga egress                                                                                         |
+| Tools / MCP / skills / agent mode             | ✗ mati              | PRD §5: tidak ada chatbot dengan action tools                                                                                                              |
+| Parser in-process WeKnora (PPTX)              | ✅ dipakai (§27)    | Sebagai _converter_: berkas masuk KB parse terpisah, teks keluar sebagai Markdown kanonik, rekaman dihapus; lalu scan–preview–review seperti unggahan lain |
+| docreader (OCR PDF pindai, DOC lama)          | ✗ tidak muat        | ~4 GB di samping WeKnora; tidak muat di VM 3,8 GB mesin rujukan. Jalurnya sama dengan PPTX bila mesin memadai                                              |
+| Multimodal (VLM), ASR                         | ✗ mati              | Tidak ada dokumen gambar/audio di scope; PDF pindai adalah item OCR S05 V1                                                                                 |
+| Langfuse                                      | ✗ mati              | Mengirim prompt+dokumen ke luar mesin bila cloud; self-hosted tidak muat di 8 GB (§13)                                                                     |
+| WeKnora UI                                    | ◐ lab saja          | KB `intradocs-lab` untuk mencoba fitur ingest pada corpus sintetis (§15); tidak untuk pengguna portal                                                      |
+| Multi-tenant / multi-KB                       | ◐                   | Satu tenant, satu KB produksi + satu lab; PRD: satu organisasi cukup                                                                                       |
 
-**Jadi: maksimal untuk kebijakan yang berlaku, belum maksimal untuk pengalaman.** Semua fitur
-yang aman sudah dipakai dan diukur; fitur yang mati, mati karena melanggar invarian "yang
-dikutip adalah yang disetujui" atau karena egress — bukan karena belum dicoba. Yang masih bisa
-menambah nilai tanpa melanggar apa pun, urut dari yang paling bernilai:
+**Jadi: maksimal untuk kebijakan yang berlaku.** Semua fitur yang aman sudah dipakai dan
+diukur; fitur yang mati, mati karena melanggar invarian "yang dikutip adalah yang disetujui"
+atau karena egress — bukan karena belum dicoba. Tiga hal yang semula tercantum sebagai
+kandidat (streaming, parser untuk PPTX, konflik antar-sumber) dikerjakan di §27. Yang
+tersisa:
 
-1. **Streaming jawaban ke layar** dengan validasi di akhir: token ditampilkan sebagai
-   "sedang disusun", lalu diganti hasil final (pembersihan tag `<kb>`, deteksi penolakan, kutipan
-   terdekat). Mengubah persepsi 2–10 s menjadi langsung terasa, tanpa mengubah apa yang boleh
-   dikutip. Perlu keputusan eksplisit karena menyentuh aturan M4.
-2. **Parser WeKnora untuk PPTX/PDF pindai → Markdown kanonik** yang lalu masuk alur
-   unggah–scan–review (§13). Ini jalan tercepat menutup format V1 S05 tanpa layanan OCR baru.
-3. **Deteksi konflik antar-sumber** (PRD §3.4): dua passage dari dokumen berbeda yang
-   menjawab hal yang sama dengan nilai berbeda — belum ada di WeKnora maupun IntraDocs;
-   bisa dimulai dari heuristik angka/tanggal berbeda pada kutipan yang sama-sama lolos gerbang.
-4. **Model penjawab lebih besar** bila mesin mengizinkan (≥16 GB RAM atau GPU ≥ 8 GB):
+1. **Model penjawab lebih besar** bila mesin mengizinkan (≥16 GB RAM atau GPU ≥ 8 GB):
    batas 3B terlihat pada inferensi "belum berhasil sebelum X" (§25). Bukan fitur WeKnora,
-   tapi pengungkit terbesar untuk kualitas jawaban.
-5. **Knowledge graph** hanya bila korpus nyata punya pertanyaan relasional lintas dokumen —
+   tapi pengungkit terbesar untuk kualitas jawaban. Tidak harus _deploy_: sebuah PC/laptop
+   dengan GPU 8–12 GB di jaringan yang sama, atau mesin on-prem, cukup — yang berubah hanya
+   `ollama pull` model 7B dan `pnpm weknora:generation`. Cloud tidak boleh tanpa keputusan
+   kebijakan data (§13).
+2. **docreader** untuk PDF pindai/OCR dan DOC lama — jalurnya sudah ada (§27), yang kurang
+   hanya memori.
+3. **Knowledge graph** hanya bila korpus nyata punya pertanyaan relasional lintas dokumen —
    belum ada bukti kebutuhan pada 40 pertanyaan gold.
+
+## 27. Tiga yang tadinya kandidat: streaming, parser PPTX, konflik antar-sumber
+
+### Streaming jawaban, validasi di akhir
+
+`POST /api/rag/chat` dengan `Accept: application/x-ndjson` mengirim baris NDJSON:
+`{type:'status',stage}` (retrieving → generating), `{type:'delta',text}` untuk setiap fragmen
+yang ditulis model, lalu `{type:'result',…}` — objek yang sama persis dengan respons JSON
+biasa — sebagai baris terakhir; kegagalan setelah byte pertama keluar dilaporkan sebagai
+`{type:'error',status,message}` dengan pemetaan yang sama seperti `apiError`. Tanpa header
+itu responsnya JSON seperti sebelumnya (tes HTTP lama tidak berubah).
+
+Aturan M4 "tidak ada token yang belum diperiksa" dipertahankan dengan dua cara. Pertama,
+**retrieval dan validasi sitasi selesai sebelum fragmen pertama** — model hanya membaca
+passage yang boleh dibaca actor, jadi fragmen tidak bisa memuat apa pun yang tidak boleh
+muncul di jawaban akhir; tes HTTP "the streamed variant…" memastikan canary rahasia tidak
+ada di fragmen mana pun. Kedua, fragmen adalah **pratinjau**: `createKbTagFilter` menahan
+teks sejak `<` sampai tag tertutup sehingga markup sitasi WeKnora (`<kb … />`) tidak pernah
+tampil setengah, dan UI menandainya "Menyusun jawaban… diperiksa dulu sebelum final" lalu
+mengganti seluruhnya dengan hasil akhir (pembersihan, deteksi penolakan, kutipan terdekat,
+chip). Yang disimpan di riwayat dan dikutip tetap hanya hasil akhir. `WeknoraClient.
+knowledgeChat` menerima `onDelta` dan mem-parse blok SSE saat tiba (`readBounded` dengan
+`onBlock`); batas ukuran respons tetap berlaku. Tombol **Hentikan** membatalkan `fetch`;
+server tetap menyelesaikan dan menyimpan giliran.
+
+### PPTX lewat parser in-process WeKnora
+
+Diukur dulu (`var/parse-probe.mts`): tanpa layanan `docreader`, WeKnora mengurai **PPTX**
+in-process menjadi Markdown yang rapi — judul slide sebagai `##`, isi sebagai paragraf; HTML
+tidak (parse tidak selesai), PDF pindai tidak (butuh OCR di docreader ~4 GB, tidak muat).
+
+`WeknoraParseConverter` (`packages/core/src/weknora-parse.ts`) membungkus converter lokal:
+format selain PPTX diteruskan; PPTX diunggah ke knowledge base **`intradocs-parse`** yang
+dibuat sendiri (embedding produksi karena API mewajibkannya, tanpa summary model, question
+generation dan auto-tag mati, satu chunk 4000 karakter per rekaman), status parse dipoll,
+chunk dibaca dan digabung urut, lalu rekaman **dihapus di `finally`** — berhasil atau gagal.
+Tidak ada baris `app.rag_index_entries` yang menunjuk ke KB itu, jadi menurut §13 isinya tidak
+pernah bisa dikutip; KB produksi tidak pernah melihat draft. Hasilnya `ConvertedText` dengan
+`pipeline: 'weknora-parse-v1'`, satu locator `slide:N` per heading, dan peringatan bahwa tata
+letak/gambar/catatan pembicara tidak dipertahankan; migrasi 034 menambahkan `PPTX` dan
+pipeline itu ke CHECK dan policy insert. Sesudahnya berkas menempuh jalur yang sama dengan
+unggahan lain: scan ClamAV, preview, metadata, draft privat, review, terbit, baru diindeks —
+**yang diindeks tetap yang disetujui reviewer**.
+
+Format PPTX **hanya ditawarkan bila WeKnora aktif** (`acceptedFormats()` dibaca halaman unggah
+dan `ingestDraft` yang sama), sesuai PRD S05 "tidak menampilkan format nonaktif seolah
+didukung". Diukur end-to-end (`var/upload-pptx.mts`, deck sintetis dua slide): unggah 201
+dalam 4,7 s, provenance `weknora-parse-v1` dengan dua locator slide, Markdown kanonik terbaca
+di reader, KB parse kosong kembali setelah penghapusan asinkron WeKnora.
+
+### Konflik antar-sumber (PRD §3.4)
+
+`detectConflicts(question, citations)` (core, diuji unit) sengaja sempit dan deterministik:
+"kuantitas" = angka + satuan (hari, jam, menit, minggu, bulan, tahun, %, kali, tahap, orang,
+karakter, KB/MB/GB); dua sitasi dari **dokumen berbeda** yang menyebut nilai berbeda untuk
+satuan yang sama, masing-masing dalam kalimat yang berbagi kata dengan pertanyaan, adalah
+konflik. Nilai sama di dua dokumen = sepakat; angka di kalimat yang tidak menyangkut pertanyaan
+diabaikan. Respons chat membawa `conflicts`, UI menampilkan callout "Sumber tidak sepakat"
+dengan nilai per dokumen (tautan ke reader), dan prompt agen diberi satu aturan tambahan:
+sebutkan keduanya, jangan memilih tanpa dasar. Yang tidak dideteksi — dan tidak diklaim —
+adalah pertentangan tanpa angka (kebijakan yang berbeda dalam kata-kata). Korpus fixture
+tidak memuat pasangan yang bertentangan, jadi buktinya tes unit; kasus nyata akan terlihat
+pada korpus sungguhan.

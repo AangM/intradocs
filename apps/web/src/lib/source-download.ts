@@ -45,6 +45,7 @@ export async function downloadSource(rawId: string, kind: 'original' | 'provenan
                 PDF: 'application/pdf',
                 DOCX: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                 XLSX: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                PPTX: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
               }[artifact.format] ?? 'text/plain; charset=utf-8')
             : 'application/json; charset=utf-8',
         'Content-Disposition': `attachment; filename="intradocs-${id}-${kind}.${artifact.format.toLowerCase()}"`,

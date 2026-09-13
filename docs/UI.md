@@ -205,6 +205,13 @@ jawaban, dan itu diputuskan di server (docs/WEKNORA.md §25):
 
 - Tombol **Hentikan** di samping indikator "Mencari…" membatalkan permintaan yang berjalan
   (PRD S09 "status proses dan cancel"); composer langsung bisa dipakai lagi.
+- **Jawaban tampil saat ditulis** (docs/WEKNORA.md §27): gelembung pertanyaan langsung
+  terpasang, jawaban tumbuh dengan kursor berkedip dan label "Menyusun jawaban… diperiksa dulu
+  sebelum final", lalu diganti hasil akhir beserta sumber dan chip.
+- Callout **"Sumber tidak sepakat"** bila dua dokumen yang dikutip menyebut angka berbeda
+  untuk hal yang ditanyakan, dengan nilai per dokumen.
+- Halaman unggah menampilkan chip **PPTX** hanya bila WeKnora aktif (parser-nya); katalog dan
+  pencarian mengenal format itu (label "PowerPoint", badge oranye).
 
 Bukti: `var/chat-shots2.mts` (katalog, penolakan dengan kutipan dan chip), `var/pending-shot.mts`
 (Hentikan), `rag:eval --chat` dan tes di §25.

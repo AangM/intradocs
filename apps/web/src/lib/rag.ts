@@ -7,7 +7,7 @@ import {
   type AiConfig,
   type AiStatus,
 } from '@intradocs/core/ai-config';
-import { WeknoraClient } from '@intradocs/core/weknora';
+import { WeknoraClient, createKbTagFilter } from '@intradocs/core/weknora';
 import {
   gateByRelevance,
   validateRetrieval,
@@ -16,7 +16,9 @@ import {
   salvageDecline,
   isContinuation,
   classifyIntent,
+  detectConflicts,
   type AssistantIntent,
+  type SourceConflict,
   type Citation,
   type RawHit,
   type RetrievalScope,
@@ -176,6 +178,8 @@ export interface ChatResult {
   related: RelatedLink[];
   /** Questions the person can ask next, generated at ingest for the documents in play. */
   suggestions: string[];
+  /** Quantities that the cited documents state differently (PRD §3.4); see detectConflicts. */
+  conflicts: SourceConflict[];
 }
 
 export interface RelatedLink {
@@ -346,11 +350,25 @@ function intentAnswer(intent: AssistantIntent, docs: RelatedDocument[], total: n
  * never asked: an abstention is returned instead, so there is no path where an answer
  * exists without evidence behind it.
  */
+/**
+ * Progress a streaming caller can show while a turn is in flight. `delta` carries
+ * answer fragments as the model writes them -- a preview: WeKnora's citation markup is
+ * filtered out, but the text is otherwise unvalidated and is replaced by the final
+ * ChatResult, which alone is stored and cited. Retrieval and validation have already
+ * finished before the first delta, so a fragment can only come from passages the
+ * actor may read.
+ */
+export interface AnswerHooks {
+  status?: (stage: 'retrieving' | 'generating') => void;
+  delta?: (text: string) => void;
+}
+
 export async function answerQuestion(
   actor: Actor,
   question: string,
   within: RetrievalScope = { type: 'all' },
   conversationId: string | null = null,
+  hooks: AnswerHooks = {},
 ): Promise<ChatResult> {
   const config = getAiConfig();
   const weknora = requireEnabled(config);
@@ -396,6 +414,7 @@ export async function answerQuestion(
       abstained: false,
       related: intent === 'catalog' ? docs.map(relatedLink) : [],
       suggestions,
+      conflicts: [],
     });
   }
   // Conversational context, when this turn continues a conversation: the WeKnora
@@ -421,6 +440,7 @@ export async function answerQuestion(
   // dropped: it made "berapa harga saham?" inherit the VPN sources and stop abstaining.
   const continuation =
     !!context.previousQuestion && context.previousQuestion !== question && isContinuation(question);
+  hooks.status?.('retrieving');
   const retrieval = await retrieve(
     actor,
     continuation ? (context.previousQuestion as string) : question,
@@ -444,6 +464,7 @@ export async function answerQuestion(
         near.map((d) => d.knowledgeId).filter((k): k is string => !!k),
         question,
       ),
+      conflicts: [],
     });
   }
   if (mode !== 'generated') {
@@ -456,6 +477,7 @@ export async function answerQuestion(
       abstained: false,
       related: [],
       suggestions: [],
+      conflicts: detectConflicts(question, retrieval.citations),
     });
   }
   // One WeKnora session per conversation, so the model can read this person's own
@@ -466,11 +488,19 @@ export async function answerQuestion(
   // It is deleted in WeKnora when the person deletes the conversation.
   const sessionId = context.sessionId ?? (await client.createSession(`intradocs-${Date.now()}`));
   let answer: Awaited<ReturnType<WeknoraClient['knowledgeChat']>>;
+  hooks.status?.('generating');
+  const preview = hooks.delta ? createKbTagFilter() : null;
   try {
-    answer = await client.knowledgeChat(sessionId, {
-      query: question,
-      knowledgeIds: retrieval.knowledgeIds,
-    });
+    answer = await client.knowledgeChat(
+      sessionId,
+      { query: question, knowledgeIds: retrieval.knowledgeIds },
+      preview
+        ? (fragment) => {
+            const text = preview.push(fragment);
+            if (text) hooks.delta?.(text);
+          }
+        : undefined,
+    );
   } catch (error) {
     // A session WeKnora no longer knows (restart, retention) is not an answer failure:
     // forget it so the next turn starts a fresh one.
@@ -510,6 +540,7 @@ export async function answerQuestion(
     abstained: false,
     related: [],
     suggestions: await suggestionsFor(client, retrieval.knowledgeIds, question),
+    conflicts: detectConflicts(question, retrieval.citations),
   });
   // Remember the session on the conversation this turn now belongs to (a first turn
   // creates the conversation inside remember); a replaced session overwrites the old one.

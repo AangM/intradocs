@@ -22,6 +22,7 @@ const FORMAT_LABEL: Record<string, string> = {
   PDF: 'PDF',
   DOCX: 'Word (.docx)',
   XLSX: 'Excel (.xlsx)',
+  PPTX: 'PowerPoint (.pptx)',
 };
 
 /** Query terms (3+ chars) wrapped in <mark>; everything stays a text node. */

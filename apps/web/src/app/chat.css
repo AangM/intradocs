@@ -431,6 +431,27 @@
   margin-top: 4px;
 }
 
+/* Sources that disagree on a number */
+.conflict {
+  align-items: flex-start;
+}
+.conflict-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+}
+.conflict-v {
+  display: inline-block;
+  margin-right: 12px;
+  font-size: 12.5px;
+}
+.conflict-v a {
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
 /* Sources as chips, with a detail list one click away */
 .src-row {
   display: flex;
@@ -608,6 +629,21 @@
   margin-left: 8px;
   font-size: 11px;
   color: var(--muted-2);
+}
+
+/* In flight: the question already in place, the answer forming */
+.a-preview {
+  color: var(--ink-2);
+}
+.a-preview::after {
+  content: '▍';
+  color: var(--accent);
+  animation: caret 1s steps(2) infinite;
+}
+@keyframes caret {
+  50% {
+    opacity: 0;
+  }
 }
 
 /* Pending */

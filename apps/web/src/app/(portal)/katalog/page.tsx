@@ -22,6 +22,7 @@ const FORMAT_LABEL: Record<string, string> = {
   PDF: 'PDF',
   DOCX: 'Word',
   XLSX: 'Excel',
+  PPTX: 'PowerPoint',
 };
 const FT_CLASS: Record<string, string> = {
   MD: 'md',
@@ -29,8 +30,9 @@ const FT_CLASS: Record<string, string> = {
   PDF: 'pdf',
   DOCX: 'doc',
   XLSX: 'xls',
+  PPTX: 'pptx',
 };
-const FORMATS = ['MD', 'TXT', 'PDF', 'DOCX', 'XLSX'];
+const FORMATS = ['MD', 'TXT', 'PDF', 'DOCX', 'XLSX', 'PPTX'];
 
 export default async function Catalog({
   searchParams,

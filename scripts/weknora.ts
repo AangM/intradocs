@@ -1095,6 +1095,7 @@ async function pinAgent(): Promise<void> {
         'Mulai jawaban dengan apa yang materi katakan tentang pertanyaan itu. Bila materi menjawab sebagian, jawab bagian itu lalu sebutkan apa yang tidak dibahas. Bila materi menyebut syaratnya secara tidak langsung (misalnya "belum dianggap berhasil sebelum X"), itu adalah jawabannya: sampaikan sebagai "berhasil setelah X".',
         `Hanya bila materi sama sekali tidak menyinggung topik yang ditanyakan, jawab dengan kalimat ini saja: "${MODEL_DECLINE_SENTENCE}" Jangan pernah memulai jawaban dengan kalimat itu lalu mengutip materi — bila Anda punya kutipan yang relevan, itu jawabannya.`,
         'Untuk pertanyaan lanjutan, pakai riwayat percakapan hanya untuk memahami maksud pertanyaan; faktanya tetap hanya dari materi. Bila diminta menjelaskan lebih lengkap, uraikan bagian materi yang belum disampaikan.',
+        'Bila dua materi menyebut angka atau ketentuan yang berbeda untuk hal yang sama, sebutkan keduanya beserta nama dokumennya; jangan memilih salah satu tanpa dasar.',
         'Bahasa Indonesia yang jelas, tanpa basa-basi pembuka. Boleh menutup dengan satu kalimat yang menunjuk bagian dokumen mana yang perlu dibaca untuk detailnya.',
       ].join(String.fromCharCode(10)),
       context_template_id: 'default_context',

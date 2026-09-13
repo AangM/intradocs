@@ -18,6 +18,7 @@
     "./workflow": "./src/workflow.ts",
     "./taxonomy": "./src/taxonomy.ts",
     "./converter": "./src/converter.ts",
+    "./weknora-parse": "./src/weknora-parse.ts",
     "./ai-config": "./src/ai-config.ts",
     "./weknora": "./src/weknora.ts",
     "./rag": "./src/rag.ts",

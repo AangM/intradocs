@@ -36,6 +36,17 @@ interface Turn {
   related?: Array<{ documentId: string; title: string; categoryName: string; href: string }>;
   /** Questions the person can ask next; live turns only. */
   suggestions?: string[];
+  /** Cited documents that state a quantity differently; live turns only. */
+  conflicts?: Array<{
+    unit: string;
+    values: Array<{
+      value: string;
+      documentId: string;
+      documentTitle: string;
+      href: string;
+      excerpt: string;
+    }>;
+  }>;
 }
 
 export interface ConversationItem {
@@ -120,6 +131,11 @@ export function AssistantChat({
   const sideId = useId();
   const [question, setQuestion] = useState(initialQuestion);
   const [pending, setPending] = useState(false);
+  // What is on screen while a turn is in flight: the stage, the question being asked,
+  // and the answer forming (a preview -- replaced by the validated turn at the end).
+  const [draft, setDraft] = useState<{ question: string; stage: string; text: string } | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -217,10 +233,13 @@ export function AssistantChat({
     abort.current = controller;
     setPending(true);
     setError(null);
+    setDraft({ question: trimmed, stage: 'retrieving', text: '' });
     try {
       const response = await fetch('/api/rag/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        // NDJSON: status lines and answer fragments as they happen, the validated
+        // result last. A server without streaming answers plain JSON; both are handled.
+        headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson' },
         // The question, a narrowing scope, and which of my threads to append to. The
         // knowledge base, prompt and model are chosen on the server; sending them from
         // here would not be honoured anyway.
@@ -232,13 +251,15 @@ export function AssistantChat({
         setError(await readError(response));
         return;
       }
-      const body = (await response.json()) as Omit<
-        Turn,
-        'id' | 'question' | 'scope' | 'hiddenCitations' | 'helpful'
-      > & {
-        conversationId: string;
-        turnId: string;
-      };
+      const body = await readTurn(response, (event) => {
+        if (event.type === 'status') setDraft((d) => (d ? { ...d, stage: event.stage } : d));
+        else if (event.type === 'delta')
+          setDraft((d) => (d ? { ...d, stage: 'generating', text: d.text + event.text } : d));
+      });
+      if ('error' in body) {
+        setError(body.error);
+        return;
+      }
       const turn: Turn = {
         id: body.turnId,
         question: trimmed,
@@ -253,6 +274,7 @@ export function AssistantChat({
         scopeSize: body.scopeSize,
         related: body.related ?? [],
         suggestions: body.suggestions ?? [],
+        conflicts: body.conflicts ?? [],
       };
       setTurns((list) => [...list, turn]);
       setQuestion('');
@@ -280,6 +302,7 @@ export function AssistantChat({
       if ((e as Error).name !== 'AbortError') setError('Tidak dapat menghubungi layanan lokal.');
     } finally {
       setPending(false);
+      setDraft(null);
     }
   }
 
@@ -611,6 +634,35 @@ export function AssistantChat({
                             ))}
                           </div>
                         )}
+                        {(turn.conflicts?.length ?? 0) > 0 && (
+                          <div className="callout c-warn conflict" role="note">
+                            <Icon name="alert" size={15} />
+                            <div>
+                              <strong>Sumber tidak sepakat.</strong> Dokumen berikut menyebut angka
+                              yang berbeda; periksa mana yang berlaku untuk kasus Anda.
+                              <ul className="conflict-list">
+                                {turn.conflicts!.map((k) => (
+                                  <li key={k.unit}>
+                                    {k.values.map((v) => (
+                                      <span
+                                        key={`${v.documentId}-${v.value}`}
+                                        className="conflict-v"
+                                      >
+                                        <Link href={v.href} prefetch={false}>
+                                          {v.documentTitle}
+                                        </Link>
+                                        :{' '}
+                                        <strong>
+                                          {v.value} {k.unit}
+                                        </strong>
+                                      </span>
+                                    ))}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                        )}
                         {docs.length > 0 && (
                           <div className="src-row">
                             <span className="src-lbl">Sumber</span>
@@ -751,29 +803,44 @@ export function AssistantChat({
                   </article>
                 );
               })}
-              {pending && (
-                <div className="a-msg a-pending" aria-label="Sedang mencari">
-                  <span className="a-avatar pulse" aria-hidden="true">
-                    <Icon name="spark" size={15} />
-                  </span>
-                  <div className="typing">
-                    <span className="dots">
-                      <i />
-                      <i />
-                      <i />
-                    </span>
-                    Mencari di dokumen{generating ? ' dan menyusun jawaban' : ''}…
-                    {generating ? ' Model berjalan lokal, biasanya 10–30 detik.' : ''}
-                    <button
-                      type="button"
-                      className="typing-stop"
-                      onClick={() => abort.current?.abort()}
-                    >
-                      <Icon name="x" size={12} />
-                      Hentikan
-                    </button>
+              {pending && draft && (
+                <article className="turn turn-draft" aria-label="Sedang dijawab">
+                  <div className="u-msg">
+                    <div className="u-bubble">{draft.question}</div>
                   </div>
-                </div>
+                  <div className="a-msg a-pending">
+                    <span className="a-avatar pulse" aria-hidden="true">
+                      <Icon name="spark" size={15} />
+                    </span>
+                    <div className="a-body">
+                      {draft.text && (
+                        <div className="a-text a-preview">
+                          <AnswerText text={draft.text} />
+                        </div>
+                      )}
+                      <div className="typing">
+                        <span className="dots">
+                          <i />
+                          <i />
+                          <i />
+                        </span>
+                        {draft.text
+                          ? 'Menyusun jawaban… diperiksa dulu sebelum final.'
+                          : draft.stage === 'generating'
+                            ? 'Menyusun jawaban dari sumber…'
+                            : 'Mencari di dokumen…'}
+                        <button
+                          type="button"
+                          className="typing-stop"
+                          onClick={() => abort.current?.abort()}
+                        >
+                          <Icon name="x" size={12} />
+                          Hentikan
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </article>
               )}
               {error && (
                 <div className="callout c-warn" role="alert">
@@ -862,6 +929,59 @@ function groupCitations(citations: readonly AssistantCitation[]) {
       });
   }
   return docs;
+}
+
+type TurnBody = Omit<Turn, 'id' | 'question' | 'scope' | 'hiddenCitations' | 'helpful'> & {
+  conversationId: string;
+  turnId: string;
+};
+type StreamEvent =
+  | { type: 'status'; stage: string }
+  | { type: 'delta'; text: string }
+  | ({ type: 'result' } & TurnBody)
+  | { type: 'error'; status: number; message: string };
+
+/**
+ * Reads the chat response either way: an NDJSON stream (events forwarded to `onEvent`,
+ * the `result` line returned) or a plain JSON body. A stream that ends without a
+ * result line is reported as an error, never as an empty answer.
+ */
+async function readTurn(
+  response: Response,
+  onEvent: (event: StreamEvent) => void,
+): Promise<TurnBody | { error: string }> {
+  const type = response.headers.get('content-type') ?? '';
+  if (!type.includes('application/x-ndjson')) return (await response.json()) as TurnBody;
+  const reader = response.body?.getReader();
+  if (!reader) return { error: 'Tidak dapat membaca jawaban.' };
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let result: TurnBody | { error: string } | null = null;
+  const handle = (line: string) => {
+    if (!line.trim()) return;
+    let event: StreamEvent;
+    try {
+      event = JSON.parse(line) as StreamEvent;
+    } catch {
+      return;
+    }
+    if (event.type === 'result') result = event;
+    else if (event.type === 'error') result = { error: event.message };
+    else onEvent(event);
+  };
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let at: number;
+    while ((at = buffer.indexOf('\n')) >= 0) {
+      handle(buffer.slice(0, at));
+      buffer = buffer.slice(at + 1);
+    }
+  }
+  buffer += decoder.decode();
+  if (buffer.trim()) handle(buffer);
+  return result ?? { error: 'Jawaban terputus sebelum selesai. Coba lagi.' };
 }
 
 function describeScope(scope: RetrievalScope, categories: readonly ScopeCategory[]): string {

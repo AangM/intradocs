@@ -8,6 +8,7 @@ import { parseUuid } from '@intradocs/core/validation';
 import { UPLOAD_LIMITS } from '@intradocs/core/uploads';
 import { PageHeading } from '@/components/shared';
 import { UploadForm, type RevisionInput } from '@/components/upload-form';
+import { acceptedFormats } from '@/lib/converter';
 export default async function Upload({
   searchParams,
 }: {
@@ -51,6 +52,7 @@ export default async function Upload({
         categories={categories}
         ownerName={actor.name}
         maxFileBytes={UPLOAD_LIMITS.binaryBytes}
+        formats={acceptedFormats()}
         initialScanner={scanner}
         revision={revision}
         initialTitle={topic}

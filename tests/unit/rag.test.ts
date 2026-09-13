@@ -21,6 +21,7 @@ import {
   isContinuation,
   classifyIntent,
   salvageDecline,
+  detectConflicts,
   ABSTAIN_MESSAGE,
   NO_DIRECT_ANSWER_MESSAGE,
   MODEL_DECLINE_SENTENCE,
@@ -631,5 +632,58 @@ test('a decline that goes on to quote the answer is salvaged; one that only desc
   assert.equal(
     salvageDecline('Apa nomor kontrak vendor jaringan yang berlaku?', 'Tidak ada.'),
     null,
+  );
+});
+
+test('two documents stating different quantities for the asked thing are reported as a conflict', () => {
+  const base = { href: '/dokumen/x/y', snippet: '' };
+  const conflicts = detectConflicts('Berapa lama masa tumpang tindih kunci lama?', [
+    {
+      ...base,
+      documentId: 'd1',
+      documentTitle: 'Panduan Rotasi Kunci API',
+      snippet: 'Kunci baru dibuat di secret manager; kunci lama diberi masa tumpang tindih 7 hari.',
+    },
+    {
+      ...base,
+      documentId: 'd2',
+      documentTitle: 'SOP Manajemen Identitas',
+      snippet:
+        'Masa tumpang tindih kunci lama adalah 14 hari sejak rotasi. SLA permintaan 30 menit.',
+    },
+  ]);
+  assert.equal(conflicts.length, 1);
+  assert.equal(conflicts[0]!.unit, 'hari');
+  assert.deepEqual(
+    conflicts[0]!.values.map((v) => [v.documentId, v.value]),
+    [
+      ['d1', '7'],
+      ['d2', '14'],
+    ],
+  );
+  // The same number in both documents is agreement, not a conflict; a number in a
+  // sentence unrelated to the question is ignored; one document alone never conflicts.
+  assert.deepEqual(
+    detectConflicts('Berapa lama masa tumpang tindih kunci lama?', [
+      { ...base, documentId: 'd1', documentTitle: 'A', snippet: 'Masa tumpang tindih 7 hari.' },
+      {
+        ...base,
+        documentId: 'd2',
+        documentTitle: 'B',
+        snippet: 'Tumpang tindih kunci: 7 hari. Backup disimpan 90 hari.',
+      },
+    ]),
+    [],
+  );
+  assert.deepEqual(
+    detectConflicts('Berapa lama masa tumpang tindih kunci lama?', [
+      {
+        ...base,
+        documentId: 'd1',
+        documentTitle: 'A',
+        snippet: 'Tumpang tindih 7 hari. Retensi 90 hari.',
+      },
+    ]),
+    [],
   );
 });
