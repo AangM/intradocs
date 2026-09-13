@@ -170,6 +170,15 @@ kepadatan.
   taksonomi tampil sebagai tombol pil dengan caret berputar, bukan teks dengan segitiga.
 - **Konteks pertanyaan lanjutan** ("jelaskan lebih lengkap"): bukan UI — lihat
   docs/WEKNORA.md §24.
+- **Beranda (S01) dipadatkan.** Delapan bagian menjadi lima: hero → "Menunggu Anda" (hanya
+  bila ada pengajuan/notifikasi/draft) → bacaan wajib (bila ada) → kategori → dua kolom "Baru
+  diterbitkan" | "Paling dibaca" → footer. Yang dihapus karena redundan: baris statistik
+  (angkanya kini satu baris di badge hero), banner AI (hero sudah bertanya ke AI), dan
+  "Dokumen terbaru" (daftar yang sama dengan "Mulai membaca"). Chip topik kini **bertanya ke
+  asisten** — label pendek, pertanyaan lengkap di baliknya (`STARTER_TOPICS`; topik terukur
+  dibungkus "Apa yang dijelaskan dokumen tentang …") — dan kembali ke pencarian bila AI mati.
+  Kartu kategori: ikon kiri, deskripsi dua baris; di ponsel menjadi ubin dua kolom tanpa
+  deskripsi. Sapaan nama depan di judul. Kontributor melihat ajakan "Punya dokumen baru?".
 
 Bukti: `var/chat-shots.mts` (desktop 1440 dan 390 px: pending, utas dua giliran, kutipan
 terbuka, laci ponsel, rel terlipat, dialog role), `tests/e2e` rag + portal 14/14. Riwayat
