@@ -1125,8 +1125,8 @@ permintaan menyebut `knowledge_base_ids: [kb]` **dan** `knowledge_ids: [...beriz
 `buildSearchTargets` di `session_knowledge_qa.go` memperlakukan knowledge base yang disebut
 sebagai target pencarian penuh dan **melewati** setiap `knowledge_id` yang berada di dalamnya
 ("skip if this KB is already fully searched"). Retrieval untuk model penjawab pun berjalan
-pada seluruh KB, dengan atau tanpa agen — diukur dengan `var/leak-probe.mts` (loopback,
-korpus sintetis): `agent=true leaked=true refs dari 7de9fca1…` (lampiran rahasia),
+pada seluruh KB, dengan atau tanpa agen — diukur dengan probe sekali pakai ke `/knowledge-chat`
+(loopback, korpus sintetis; regresinya kini hidup sebagai tes, bukan skrip): `agent=true leaked=true refs dari 7de9fca1…` (lampiran rahasia),
 `agent=false` referensi dari 8 knowledge termasuk yang rahasia. Endpoint `hybrid-search`
 yang dipakai sitasi tidak punya masalah ini (dan sitasi divalidasi ulang ke database), itulah
 mengapa hanya jalur jawaban yang bocor.
