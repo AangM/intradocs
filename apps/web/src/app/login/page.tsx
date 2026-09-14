@@ -88,15 +88,10 @@ export default async function Login({
           <h1>Masuk ke IntraDocs</h1>
           <p className="sub">Pakai akun demo dari setup lokal Anda.</p>
           <LoginForm returnTo={safeReturnTo(params.returnTo)} />
-          <div className="callout c-info">
-            <Icon name="help" />
-            <div>
-              Akun demo ada di <code>var/demo-accounts.json</code> (dibuat oleh{' '}
-              <code>pnpm setup:local</code>). Tidak ada pendaftaran publik.
-            </div>
-          </div>
           <p className="privacy-note">
-            Lingkungan demo lokal — jangan masukkan password atau data perusahaan yang nyata.
+            <Icon name="help" size={14} />
+            Akun demo ada di <code>var/demo-accounts.json</code>; tidak ada pendaftaran publik.
+            Jangan masukkan password atau data perusahaan yang nyata.
           </p>
         </div>
       </section>

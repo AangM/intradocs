@@ -1,0 +1,1186 @@
+/* IntraDocs visual layer, part two ("depth"): colour roles, four depth levels, one enter
+   motion and the status vocabulary. Loaded last, after theme.css and chat.css, so a rule
+   here wins on equal specificity. Layouts stay the mentor's; only surfaces, colour and
+   motion change. Delta recorded in docs/UI.md ("Delta U13").
+
+   Colour roles -- one hue per job, so the eye can tell them apart:
+     --accent   the one primary action on a screen, the active nav item, links
+     --ai       everything the assistant says or offers (topbar ask, avatars, AI cards)
+     --flow-*   where something is in the workflow: review (amber), ok (green),
+                block (red), draft (slate). Used as row tints, chips, timeline dots.
+     category tones stay the sidebar's six colours.
+
+   Depth levels -- never a card inside a card of the same colour:
+     L0 page      tinted ground with three soft orbs (the only place the blur has
+                  something to blur)
+     L1 card      near-solid white, small shadow, no blur (crisp text, cheap paint)
+     L2 sunken    a tint inside a card: previews, nested panels, quotes, code
+     L3 floating  topbar, sidebar, menus, dialogs, composer -- the only blurred layer */
+
+:root {
+  --ai: #7c5cf6;
+  --ai-2: #c04fd8;
+  --ai-ink: #6534d1;
+  --ai-tint: rgba(124, 92, 246, 0.08);
+  --ai-line: rgba(124, 92, 246, 0.22);
+  --flow-review: #d97706;
+  --flow-review-ink: #a45300;
+  --flow-review-tint: rgba(217, 119, 6, 0.09);
+  --flow-ok: #0f9d6e;
+  --flow-ok-ink: #086b4a;
+  --flow-ok-tint: rgba(15, 157, 110, 0.1);
+  --flow-block: #e0304f;
+  --flow-block-ink: #b91c3c;
+  --flow-block-tint: rgba(224, 48, 79, 0.08);
+  --flow-draft: #64748b;
+  --flow-draft-ink: #475569;
+  --flow-draft-tint: rgba(100, 116, 139, 0.1);
+  --surface: rgba(255, 255, 255, 0.92);
+  --sunken: rgba(15, 23, 42, 0.035);
+  --sunken-line: rgba(15, 23, 42, 0.06);
+}
+
+/* ---------- L0: the ground ---------- */
+body {
+  background:
+    radial-gradient(900px 520px at 6% -8%, rgba(99, 132, 255, 0.2), transparent 60%),
+    radial-gradient(760px 480px at 96% 2%, rgba(150, 108, 255, 0.16), transparent 60%),
+    radial-gradient(640px 420px at 92% 62%, rgba(255, 176, 128, 0.07), transparent 62%),
+    radial-gradient(900px 600px at 40% 118%, rgba(59, 108, 246, 0.09), transparent 60%), var(--bg);
+  background-attachment: fixed;
+}
+
+/* ---------- L1: cards are solid and quiet ---------- */
+.card,
+.kpi,
+.cat,
+.mostread,
+.role-card,
+.home-list,
+.res {
+  background: var(--surface);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.card {
+  border-color: rgba(15, 23, 42, 0.07);
+}
+
+/* ---------- L2: anything nested in a card sinks instead of stacking ---------- */
+.card .card,
+.doc-wrap > .card,
+.editor-tools-body .card {
+  background: var(--sunken);
+  border-color: var(--sunken-line);
+  box-shadow: none;
+}
+.card .card > .card-h,
+.doc-wrap > .card > .card-h {
+  border-bottom-color: var(--sunken-line);
+}
+
+/* ---------- L3: only floating things blur ---------- */
+.topbar,
+.side,
+.account-panel,
+.fchip-menu,
+.invite-card,
+dialog.glass-dialog,
+.chat-head,
+.chat-box,
+.bell-panel,
+.toast {
+  backdrop-filter: saturate(160%) blur(18px);
+  -webkit-backdrop-filter: saturate(160%) blur(18px);
+}
+dialog.glass-dialog .dialog-body {
+  /* One frame, not two: the body is a region of the dialog, not a box inside it. */
+  background: transparent;
+  border: 0;
+}
+
+/* ---------- Format badges: one tinted family, no black tiles ---------- */
+.ft {
+  color: var(--ft-ink, #334155);
+  background: var(--ft-bg, #f1f5f9);
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.05) inset;
+  border-radius: 9px;
+  font-size: 9.5px;
+  letter-spacing: 0.3px;
+}
+.ft-md {
+  --ft-bg: #eceefd;
+  --ft-ink: #3c48b0;
+}
+.ft-txt {
+  --ft-bg: #f1f5f9;
+  --ft-ink: #334155;
+}
+.ft-pdf {
+  --ft-bg: #fee9ec;
+  --ft-ink: #b3182f;
+}
+.ft-doc,
+.ft-docx {
+  --ft-bg: #e7f0ff;
+  --ft-ink: #1d4ed8;
+}
+.ft-xls,
+.ft-xlsx {
+  --ft-bg: #e4f7ee;
+  --ft-ink: #146c43;
+}
+.ft-ppt,
+.ft-pptx {
+  --ft-bg: #ffecdd;
+  --ft-ink: #b4430b;
+}
+.ft-html {
+  --ft-bg: #e0f2fe;
+  --ft-ink: #0369a1;
+}
+
+/* ---------- Sidebar: the current place is obvious at a glance ---------- */
+.nav-i {
+  position: relative;
+}
+.nav-i::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, var(--accent), var(--accent-2));
+  opacity: 0;
+  transform: scaleY(0.4);
+  transition:
+    opacity 0.16s var(--ease),
+    transform 0.16s var(--ease);
+}
+.nav-i.on::before {
+  opacity: 1;
+  transform: scaleY(1);
+}
+.side-collapsed .nav-i::before {
+  left: 0;
+}
+.nav-i .cnt.grey {
+  background: var(--flow-draft-tint);
+  color: var(--flow-draft-ink);
+}
+.nav-i[href='/notifikasi'] .cnt.grey {
+  background: rgba(59, 108, 246, 0.12);
+  color: var(--accent-ink);
+}
+
+/* ---------- Topbar: the assistant has its own colour; one "Tanya AI" on the home ---------- */
+.topbar-ask {
+  color: var(--ai-ink);
+  border-color: var(--ai-line);
+  background: rgba(255, 255, 255, 0.85);
+}
+.topbar-ask:hover {
+  background: var(--ai-tint);
+  border-color: var(--ai);
+}
+.topbar-ask.btn-on {
+  background: var(--ai-tint);
+  border-color: var(--ai-line);
+}
+.topbar-ask svg {
+  color: var(--ai);
+}
+.topbar-ask.compact span {
+  display: none;
+}
+.topbar-ask.compact {
+  padding: 0 10px;
+}
+.topbar-bell {
+  position: relative;
+}
+.dot-badge {
+  background: var(--flow-block);
+}
+
+/* Bell popover: the last few notifications without leaving the page */
+.bell-menu {
+  position: relative;
+}
+.bell-menu > summary {
+  list-style: none;
+  cursor: pointer;
+}
+.bell-menu > summary::-webkit-details-marker {
+  display: none;
+}
+.bell-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  width: min(380px, calc(100vw - 24px));
+  z-index: 40;
+  background: var(--glass-strong);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 14px;
+  box-shadow: var(--sh-lg);
+  overflow: hidden;
+  animation: rise 0.18s var(--ease) both;
+}
+.bell-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--line-2);
+  font-size: 13px;
+  font-weight: 700;
+}
+.bell-head .pill {
+  margin-left: 6px;
+}
+.bell-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  max-height: 360px;
+  overflow-y: auto;
+}
+.bell-list li + li {
+  border-top: 1px solid var(--line-2);
+}
+.bell-list a {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 10px 14px;
+  color: var(--ink);
+  transition: background 0.14s var(--ease);
+}
+.bell-list a:hover {
+  background: rgba(59, 108, 246, 0.06);
+}
+.bell-list a > span:last-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.bell-list .nt-t {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bell-list .nt-m {
+  display: block;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.bell-list li.unread .nt-t {
+  font-weight: 750;
+}
+.bell-empty {
+  padding: 22px 14px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}
+.bell-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line-2);
+}
+.bell-foot a,
+.bell-foot button {
+  font-size: 12.5px;
+  font-weight: 650;
+}
+
+/* ---------- Notification vocabulary: an icon and a colour per kind ---------- */
+.nt-ic {
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  background: var(--nt-bg, var(--flow-draft-tint));
+  color: var(--nt-ink, var(--flow-draft-ink));
+}
+.nt-review {
+  --nt-bg: var(--flow-review-tint);
+  --nt-ink: var(--flow-review-ink);
+}
+.nt-ok {
+  --nt-bg: var(--flow-ok-tint);
+  --nt-ink: var(--flow-ok-ink);
+}
+.nt-block {
+  --nt-bg: var(--flow-block-tint);
+  --nt-ink: var(--flow-block-ink);
+}
+.nt-info {
+  --nt-bg: rgba(59, 108, 246, 0.1);
+  --nt-ink: var(--accent-ink);
+}
+.nt-ai {
+  --nt-bg: var(--ai-tint);
+  --nt-ink: var(--ai-ink);
+}
+.nt-group {
+  margin: 0 0 8px;
+  padding-top: 16px;
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+.nt-card > .card-b:last-child {
+  padding-bottom: 6px !important;
+}
+.nt-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.nt-row {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 16px;
+  border-top: 1px solid var(--line-2);
+}
+.nt-row:first-child {
+  border-top: 0;
+}
+.nt-row.unread {
+  background: linear-gradient(90deg, rgba(59, 108, 246, 0.05), transparent 60%);
+}
+.nt-row .nt-t {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.nt-row.unread .nt-t {
+  font-weight: 750;
+}
+.nt-row .nt-t a {
+  color: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nt-row .nt-t a:hover {
+  color: var(--accent-ink);
+}
+.nt-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex: none;
+}
+.nt-row .nt-m {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.nt-mark {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted-2);
+  cursor: pointer;
+  transition:
+    background 0.14s var(--ease),
+    color 0.14s var(--ease),
+    border-color 0.14s var(--ease);
+}
+.nt-mark:hover {
+  background: var(--flow-ok-tint);
+  color: var(--flow-ok-ink);
+  border-color: rgba(15, 157, 110, 0.3);
+}
+.nt-mark:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+.nt-read {
+  font-size: 11.5px;
+  color: var(--muted-2);
+}
+.nt-card .card-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* ---------- Status chips: the flow colours, everywhere ---------- */
+.pill.p-amber {
+  background: var(--flow-review-tint);
+  color: var(--flow-review-ink);
+}
+.pill.p-green {
+  background: var(--flow-ok-tint);
+  color: var(--flow-ok-ink);
+}
+.pill.p-red {
+  background: var(--flow-block-tint);
+  color: var(--flow-block-ink);
+}
+.pill.p-grey {
+  background: var(--flow-draft-tint);
+  color: var(--flow-draft-ink);
+}
+.pill.p-ai {
+  background: var(--ai-tint);
+  color: var(--ai-ink);
+}
+
+/* "Menunggu Anda" on the home: a row of coloured chips, not a wide empty box */
+.attn {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.attn-t {
+  font-size: 11px;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+.attn-i {
+  padding: 8px 13px;
+  font-weight: 600;
+  border-color: var(--attn-line, rgba(15, 23, 42, 0.08));
+  background: var(--attn-bg, rgba(255, 255, 255, 0.85));
+  color: var(--attn-ink, var(--ink-2));
+  box-shadow: var(--sh-sm);
+}
+.attn-i strong,
+.attn-i svg,
+.attn-i .attn-go {
+  color: var(--attn-ink, var(--accent-ink));
+}
+.attn-i.attn-review {
+  --attn-bg: var(--flow-review-tint);
+  --attn-line: rgba(217, 119, 6, 0.3);
+  --attn-ink: var(--flow-review-ink);
+}
+.attn-i.attn-notif {
+  --attn-bg: rgba(59, 108, 246, 0.09);
+  --attn-line: rgba(59, 108, 246, 0.3);
+  --attn-ink: var(--accent-ink);
+}
+.attn-i.attn-draft {
+  --attn-bg: var(--flow-draft-tint);
+  --attn-line: rgba(100, 116, 139, 0.3);
+  --attn-ink: var(--flow-draft-ink);
+}
+.attn-i:hover {
+  border-color: var(--attn-ink);
+}
+
+/* ---------- Buttons: one primary per screen; destructive is quiet until hovered ---------- */
+.btn-r,
+.btn.btn-r {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--flow-block-ink);
+}
+.btn-r:hover,
+.btn.btn-r:hover {
+  background: var(--flow-block-tint);
+  border-color: rgba(224, 48, 79, 0.35);
+  transform: none;
+  box-shadow: none;
+}
+.btn-r:disabled,
+.btn.btn-r:disabled {
+  color: var(--muted-2);
+}
+
+/* ---------- Home ---------- */
+.home-hero .chip svg,
+.home-hero .bigsearch > svg {
+  color: var(--ai);
+}
+.home-hero .bigsearch .go {
+  background: linear-gradient(135deg, var(--ai), var(--ai-2));
+  box-shadow: 0 8px 20px -8px rgba(124, 92, 246, 0.7);
+}
+.home-hero .chip:hover {
+  border-color: var(--ai-line);
+  color: var(--ai-ink);
+  background: var(--ai-tint);
+}
+.home-cats .cat.tone-blue .ic {
+  color: var(--accent-ink);
+}
+/* Empty categories step back so the ones with documents lead. */
+.home-cats .cat.is-empty {
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: none;
+}
+.home-cats .cat.is-empty .ic {
+  opacity: 0.7;
+}
+.home-cats .cat.is-empty .m span:first-child {
+  color: var(--muted-2);
+}
+.home-row .rank {
+  background: rgba(59, 108, 246, 0.1);
+  color: var(--accent-ink);
+}
+.home-row:first-child .rank {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff;
+}
+.home-cta-ic {
+  background: linear-gradient(135deg, var(--flow-ok), #0b8f6f);
+}
+.home-cta {
+  border-color: rgba(15, 157, 110, 0.35);
+}
+.home-cta:hover {
+  border-color: var(--flow-ok);
+}
+.foot {
+  background: transparent;
+  border-top: 1px solid var(--line-2);
+}
+
+/* ---------- Reader: calm ground, roomier type, the assistant card in its colour ---------- */
+.doc-main {
+  background: transparent;
+}
+.doc-wrap {
+  max-width: 800px;
+  padding: 36px 52px 64px;
+  background: var(--surface);
+  border-color: rgba(15, 23, 42, 0.07);
+}
+.doc-wrap p,
+.doc-wrap ul,
+.doc-wrap ol {
+  font-size: 15.5px;
+  line-height: 1.76;
+}
+.doc-wrap h2 {
+  font-size: 21px;
+  margin-top: 34px;
+}
+.doc-wrap h3 {
+  font-size: 16.5px;
+}
+.markdown-body pre {
+  background: #1e2a3b;
+  border-radius: 12px;
+  font-size: 13px;
+}
+.doc-wrap .callout.c-info {
+  font-size: 13.5px;
+}
+.docnav .ft {
+  border-radius: 8px;
+}
+/* The assistant's card inside the article is L2 in the assistant's tint. */
+.doc-wrap > .card[aria-label='Tanya asisten tentang dokumen ini'] {
+  background: linear-gradient(180deg, var(--ai-tint), rgba(124, 92, 246, 0.03));
+  border-color: var(--ai-line);
+}
+.doc-wrap > .card[aria-label='Tanya asisten tentang dokumen ini'] > .card-h {
+  border-bottom-color: var(--ai-line);
+}
+.doc-wrap > .card[aria-label='Tanya asisten tentang dokumen ini'] .card-h svg {
+  color: var(--ai);
+}
+.insight-questions a {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(124, 92, 246, 0.16);
+}
+.insight-questions a:hover {
+  border-color: var(--ai);
+  background: #fff;
+}
+.insight-questions a svg {
+  color: var(--ai);
+}
+details.insight-summary {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ai-line);
+}
+details.insight-summary > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: rgba(255, 255, 255, 0.85);
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--ink-2);
+  cursor: pointer;
+  list-style: none;
+}
+details.insight-summary > summary::-webkit-details-marker {
+  display: none;
+}
+details.insight-summary > summary::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-right: 1.8px solid currentColor;
+  border-bottom: 1.8px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.16s var(--ease);
+}
+details.insight-summary[open] > summary::before {
+  transform: rotate(45deg);
+}
+details.insight-summary > summary:hover {
+  border-color: var(--ai-line);
+  background: var(--ai-tint);
+}
+details.insight-summary > .sub {
+  margin-top: 10px;
+}
+.related-documents .pill {
+  font-size: 10.5px;
+}
+.reader-actions .btn[href^='/ai-assistant'] {
+  color: var(--ai-ink);
+  border-color: var(--ai-line);
+}
+.reader-actions .btn[href^='/ai-assistant'] svg {
+  color: var(--ai);
+}
+.reader-actions .btn[href^='/ai-assistant']:hover {
+  background: var(--ai-tint);
+}
+
+/* ---------- Version compare: same shell as the reader ---------- */
+.versi-page .doc-wrap {
+  max-width: 1040px;
+  width: 100%;
+  flex: 1;
+}
+.diff-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  padding: 14px 16px;
+  margin: 18px 0 14px;
+  border-radius: 14px;
+  background: var(--sunken);
+  border: 1px solid var(--sunken-line);
+}
+.diff-picker label {
+  display: grid;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--ink-2);
+}
+.diff-picker select {
+  min-width: 220px;
+}
+.diff-view {
+  border: 1px solid var(--sunken-line);
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.7);
+}
+.diff-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.diff-summary .pill {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.versi-empty {
+  padding: 26px 0 6px;
+}
+
+/* ---------- Assistant: its own colour throughout ---------- */
+.a-avatar,
+.chat-orb,
+.msg-ai {
+  background: linear-gradient(135deg, var(--ai), var(--ai-2));
+  box-shadow: 0 6px 16px -8px rgba(124, 92, 246, 0.7);
+}
+.a-avatar.pulse {
+  animation-name: ai-pulse;
+}
+@keyframes ai-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(124, 92, 246, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(124, 92, 246, 0);
+  }
+}
+.chat-new,
+.chat-new:hover {
+  background: linear-gradient(135deg, var(--ai), var(--ai-2));
+  box-shadow: 0 8px 20px -8px rgba(124, 92, 246, 0.7);
+}
+.chat-send,
+.chat-send:hover {
+  background: linear-gradient(135deg, var(--ai), var(--ai-2));
+}
+.chat-head-pill {
+  background: var(--ai-tint);
+  color: var(--ai-ink);
+}
+.chat-starter svg,
+.chat-side-note svg,
+.scope-opt.on svg,
+.chat-box-scope svg {
+  color: var(--ai);
+}
+.chat-starter:hover {
+  border-color: var(--ai-line);
+}
+.scope-opt.on {
+  color: var(--ai-ink);
+  border-color: var(--ai-line);
+}
+.chat-box-scope {
+  background: var(--ai-tint);
+  color: var(--ai-ink);
+}
+.chat-box:focus-within {
+  border-color: rgba(124, 92, 246, 0.5);
+  box-shadow:
+    0 0 0 5px rgba(124, 92, 246, 0.12),
+    var(--sh-lg);
+}
+.chat-conv[aria-current='true'],
+.chat-convs li.on .chat-conv {
+  color: var(--ai-ink);
+}
+.chat-side {
+  background: rgba(255, 255, 255, 0.5);
+}
+/* Answers sit on the page like text, not in a second white box; the sources row
+   underneath carries the assistant's line. */
+.a-body,
+.chat .turn-a {
+  background: var(--surface);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-color: rgba(124, 92, 246, 0.14);
+  box-shadow: 0 1px 2px rgba(11, 18, 32, 0.04);
+}
+.src-lbl {
+  color: var(--ai-ink);
+}
+.src-chip:hover,
+.sugg-chip:hover {
+  border-color: var(--ai-line);
+  color: var(--ai-ink);
+}
+.u-bubble {
+  background: rgba(59, 108, 246, 0.09);
+  color: var(--ink);
+}
+/* A list the model restarts at "1." keeps counting: ordered lists in an answer share one
+   counter per turn instead of reading 1, 1, 1. */
+.a-text ol {
+  counter-reset: none;
+}
+
+/* ---------- Approval and drafts: the flow colours on rows and the timeline ---------- */
+.appr-i.on {
+  box-shadow: inset 3px 0 0 var(--flow-review);
+}
+.diff-add {
+  background: var(--flow-ok-tint);
+}
+.diff-remove {
+  background: var(--flow-block-tint);
+}
+
+/* ---------- Access requests: form beside the lists, decided ones in the history ---------- */
+.access-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
+  gap: 20px;
+  align-items: start;
+}
+.access-layout .card {
+  margin-bottom: 18px;
+}
+.access-form .card-h h2,
+.nt-card .card-h h2,
+.access-layout .card-h h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.access-form .choice-grid {
+  margin: 2px 0 4px;
+}
+.access-form .workflow-fields > label {
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--ink-2);
+}
+.access-form .inp {
+  width: 100%;
+}
+.access-form textarea.inp {
+  min-height: 96px;
+}
+.access-form .row {
+  margin-top: 4px;
+}
+.access-form .field-help {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
+}
+.acc-row {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 14px 18px;
+  border-top: 1px solid var(--line-2);
+}
+.acc-row:first-child {
+  border-top: 0;
+}
+.acc-row.pending {
+  background: linear-gradient(90deg, var(--flow-review-tint), transparent 55%);
+}
+.acc-t {
+  font-size: 13.5px;
+  font-weight: 600;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+.acc-m {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.acc-reason {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--ink-2);
+  line-height: 1.6;
+}
+.acc-note {
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--sunken);
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+.acc-note strong {
+  color: var(--muted);
+  font-weight: 650;
+}
+.acc-decide {
+  grid-column: 2;
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+.acc-decide .inp {
+  width: 100%;
+}
+details.acc-history > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  margin: 0 18px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: rgba(255, 255, 255, 0.85);
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--ink-2);
+  cursor: pointer;
+  list-style: none;
+}
+details.acc-history > summary::-webkit-details-marker {
+  display: none;
+}
+@media (max-width: 960px) {
+  .access-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- Search: the phone-only facet toggle never shows on a desktop ---------- */
+/* Both halves of the toggle leave the tree on a desktop; an sr-only checkbox with a
+   hidden label would be a control without a name. */
+.search-filters .filters-label,
+.search-filters .filters-toggle {
+  display: none;
+}
+@media (max-width: 900px) {
+  .search-filters .filters-label {
+    display: inline-flex;
+  }
+  .search-filters .filters-toggle {
+    display: block;
+  }
+}
+.search-ai-card {
+  border-color: var(--ai-line);
+  background: linear-gradient(180deg, var(--ai-tint), rgba(255, 255, 255, 0.92) 70%);
+}
+.search-ai-head svg {
+  color: var(--ai);
+}
+
+/* ---------- Dashboard: each KPI carries the colour of what it counts ---------- */
+.kpi .metric-label svg {
+  box-sizing: content-box;
+  padding: 6px;
+  border-radius: 9px;
+  background: var(--kpi-bg, rgba(59, 108, 246, 0.1));
+  color: var(--kpi-ink, var(--accent-ink));
+}
+.kpi:nth-child(2) {
+  --kpi-bg: rgba(124, 58, 237, 0.1);
+  --kpi-ink: #6d28d9;
+}
+.kpi:nth-child(3) {
+  --kpi-bg: var(--flow-review-tint);
+  --kpi-ink: var(--flow-review-ink);
+}
+.kpi:nth-child(4) {
+  --kpi-bg: rgba(14, 116, 144, 0.1);
+  --kpi-ink: #0e7490;
+}
+.kpi:nth-child(5) {
+  --kpi-bg: var(--ai-tint);
+  --kpi-ink: var(--ai-ink);
+}
+
+/* ---------- Audit: a colour per activity family ---------- */
+.audit-action.tone-ai {
+  --tone: var(--ai);
+}
+.audit-action.tone-green {
+  --tone: var(--flow-ok-ink);
+}
+.audit-action.tone-red {
+  --tone: var(--flow-block-ink);
+}
+.audit-action.tone-amber {
+  --tone: var(--flow-review-ink);
+}
+.audit-action.tone-blue {
+  --tone: var(--accent-ink);
+}
+
+/* ---------- Login: one surface language on both halves ---------- */
+.login-panel {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: saturate(160%) blur(18px);
+  -webkit-backdrop-filter: saturate(160%) blur(18px);
+}
+.login-sample .avatar.ai {
+  background: linear-gradient(135deg, var(--ai), var(--ai-2));
+}
+
+/* ---------- Toasts: what just happened, in the corner, for four seconds ---------- */
+.toaster {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 90;
+  display: grid;
+  gap: 8px;
+  width: min(360px, calc(100vw - 36px));
+  pointer-events: none;
+}
+.toast {
+  pointer-events: auto;
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px 10px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--toast-line, rgba(15, 23, 42, 0.08));
+  background: var(--glass-strong);
+  box-shadow: var(--sh-lg);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  animation: rise 0.2s var(--ease) both;
+}
+.toast.leaving {
+  animation: fall 0.18s var(--ease) both;
+}
+.toast-ic {
+  width: 26px;
+  height: 26px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  background: var(--toast-bg, var(--flow-ok-tint));
+  color: var(--toast-ink, var(--flow-ok-ink));
+}
+.toast-ok {
+  --toast-line: rgba(15, 157, 110, 0.3);
+}
+.toast-info {
+  --toast-bg: rgba(59, 108, 246, 0.12);
+  --toast-ink: var(--accent-ink);
+  --toast-line: rgba(59, 108, 246, 0.3);
+}
+.toast-warn {
+  --toast-bg: var(--flow-review-tint);
+  --toast-ink: var(--flow-review-ink);
+  --toast-line: rgba(217, 119, 6, 0.35);
+}
+.toast-error {
+  --toast-bg: var(--flow-block-tint);
+  --toast-ink: var(--flow-block-ink);
+  --toast-line: rgba(224, 48, 79, 0.35);
+}
+.toast-x {
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted-2);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.toast-x:hover {
+  background: rgba(15, 23, 42, 0.06);
+  color: var(--ink);
+}
+
+/* ---------- Motion: one small rise when a page arrives ---------- */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes fall {
+  to {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.main > *,
+.reader-area > * {
+  animation: rise 0.22s var(--ease) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .main > *,
+  .reader-area > *,
+  .bell-panel,
+  .toast {
+    animation: none;
+  }
+}
+
+/* ---------- Empty pages with a single action use the same empty state as lists ---------- */
+.empty-state .btn {
+  margin-top: 14px;
+}
+
+/* ---------- Small forms: a fieldset is a label group, not a box ---------- */
+.access-form fieldset,
+fieldset.field-lbl {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+fieldset.field-lbl > legend {
+  padding: 0;
+  margin-bottom: 6px;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--ink-2);
+}
+.btn-danger,
+.btn-danger:hover {
+  background: linear-gradient(135deg, #f0506e, #d92d4a);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 8px 20px -8px rgba(224, 48, 79, 0.6);
+}
+
+/* ---------- Taxonomy: the hygiene proposal is the assistant's, the label chips are L2 ---------- */
+.hygiene {
+  background: linear-gradient(180deg, var(--ai-tint), rgba(124, 92, 246, 0.03));
+  border-color: var(--ai-line);
+}
+.hygiene-h svg {
+  color: var(--ai);
+}
+.label-chip {
+  background: var(--sunken);
+  border-color: var(--sunken-line);
+}
+.label-chip:hover,
+.label-chip.tag-on {
+  background: #fff;
+  border-color: var(--accent);
+}
+
+/* ---------- Login: the two notes under the form are one quiet line ---------- */
+.privacy-note svg {
+  vertical-align: -3px;
+  margin-right: 4px;
+  color: var(--muted-2);
+}
+.privacy-note code {
+  font-size: 11px;
+}
+.login-card .btn .sub.tiny {
+  font-weight: 500;
+}

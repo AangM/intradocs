@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ROLES, ROLE_LABELS, type Role } from '@intradocs/core';
 import { Icon } from './icon';
+import { toast } from './toast';
 /**
  * Role and category scope for one account, edited in a native <dialog>: it floats above
  * the (horizontally scrolling) table instead of unfolding inside a cell, closes on
@@ -44,6 +45,7 @@ export function UserAssignment({
       const v = await r.json();
       if (!r.ok) throw new Error(v.error ?? 'Perubahan ditolak.');
       dialog.current?.close();
+      toast('Role & cakupan disimpan');
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Tidak dapat menyimpan.');

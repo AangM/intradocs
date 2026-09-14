@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { toast } from './toast';
 
 /** Approve or decline one request. A note is required either way; SQL enforces it too. */
 export function AccessRequestDecision({ id }: { id: string }) {
@@ -20,6 +21,7 @@ export function AccessRequestDecision({ id }: { id: string }) {
       });
       const v = (await r.json()) as { error?: string };
       if (!r.ok) throw new Error(v.error ?? 'Keputusan gagal disimpan.');
+      toast(approve ? 'Permintaan disetujui' : 'Permintaan ditolak', approve ? 'ok' : 'warn');
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Koneksi gagal.');
@@ -48,7 +50,7 @@ export function AccessRequestDecision({ id }: { id: string }) {
           Setujui
         </button>
         <button
-          className="btn btn-sm"
+          className="btn btn-sm btn-r"
           disabled={busy || note.trim().length < 5}
           onClick={() => void decide(false)}
         >

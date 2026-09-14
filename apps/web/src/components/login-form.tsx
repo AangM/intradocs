@@ -93,10 +93,10 @@ export function LoginForm({ returnTo }: { returnTo: string }) {
       <button className="btn full-width" type="button" disabled aria-describedby="sso-note">
         <Icon name="shield" size={16} />
         Masuk dengan SSO
+        <span id="sso-note" className="sub tiny">
+          · belum terhubung pada build lokal
+        </span>
       </button>
-      <p id="sso-note" className="sub tiny">
-        SSO direncanakan; belum terhubung pada build lokal.
-      </p>
     </form>
   );
 }

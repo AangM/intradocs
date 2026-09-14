@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { ReviewInfo, ApprovalQueueItem } from '@intradocs/db/workflow';
 import { formatDate, formatRelative, initials } from '@intradocs/core';
 import { Icon } from './icon';
+import { toast } from './toast';
 import { ClassificationBadge, CategoryTag } from './shared';
 
 /**
@@ -51,6 +52,7 @@ export function ApprovalDetail({
       const v = await r.json();
       if (!r.ok) throw new Error(v.error ?? 'Perubahan gagal.');
       setMessage(success);
+      toast(success);
       router.refresh();
     } catch (e) {
       setError(

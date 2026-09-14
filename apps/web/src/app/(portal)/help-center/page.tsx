@@ -24,6 +24,18 @@ const STARTER_TOPICS: ReadonlyArray<{ label: string; question: string }> = [
   { label: 'Rotasi kunci API', question: 'Kapan kunci API laboratorium harus dirotasi?' },
 ];
 
+/** The catalogue's badge classes, so a format looks the same on every list. */
+const FT_CLASS: Record<string, string> = {
+  MD: 'md',
+  TXT: 'txt',
+  PDF: 'pdf',
+  DOCX: 'doc',
+  XLSX: 'xls',
+  HTML: 'html',
+  PPTX: 'pptx',
+};
+const FT_LABEL: Record<string, string> = { DOCX: 'DOC', XLSX: 'XLS', PPTX: 'PPT' };
+
 export default async function HelpCenter() {
   const actor = await requireActor();
   const [categories, docs, popular, measuredTopics, required, counts] = await Promise.all([
@@ -57,24 +69,33 @@ export default async function HelpCenter() {
       ? `/ai-assistant?ask=1&q=${encodeURIComponent(t.question)}`
       : `/search?q=${encodeURIComponent(t.label)}`;
   // Things waiting on this person, shown only when there are any.
-  const attention: Array<{ href: string; icon: string; label: string; n: number }> = [
+  const attention: Array<{
+    href: string;
+    icon: string;
+    label: string;
+    n: number;
+    tone: string;
+  }> = [
     {
       href: '/admin/approval',
       icon: 'check-c',
       label: 'pengajuan menunggu review Anda',
       n: counts.approvals,
+      tone: 'attn-review',
     },
     {
       href: '/notifikasi',
       icon: 'bell',
       label: 'notifikasi belum dibaca',
       n: counts.notifications,
+      tone: 'attn-notif',
     },
     {
       href: '/katalog?status=mine',
       icon: 'edit',
       label: 'draft Anda belum diajukan',
       n: counts.drafts,
+      tone: 'attn-draft',
     },
   ].filter((a) => a.n > 0);
   const latest = docs.items.slice(0, 5);
@@ -167,7 +188,7 @@ export default async function HelpCenter() {
               Menunggu Anda
             </span>
             {attention.map((a) => (
-              <Link key={a.href} href={a.href} className="attn-i" prefetch={false}>
+              <Link key={a.href} href={a.href} className={`attn-i ${a.tone}`} prefetch={false}>
                 <Icon name={a.icon} size={14} />
                 <strong>{a.n}</strong> {a.label}
                 <Icon name="arrow-r" size={12} className="attn-go" />
@@ -223,7 +244,7 @@ export default async function HelpCenter() {
           {categories.map((c) => (
             <Link
               key={c.id}
-              className={`cat tone-${c.color}`}
+              className={`cat tone-${c.color} ${c.documentCount ? '' : 'is-empty'}`}
               href={`/katalog?category=${c.id}`}
               prefetch={false}
             >
@@ -263,7 +284,9 @@ export default async function HelpCenter() {
               {latest.length ? (
                 latest.map((d) => (
                   <Link key={d.id} className="home-row" href={documentHref(d)} prefetch={false}>
-                    <span className="ft ft-md">MD</span>
+                    <span className={`ft ft-${FT_CLASS[d.format] ?? 'txt'}`}>
+                      {FT_LABEL[d.format] ?? d.format}
+                    </span>
                     <span className="home-row-b">
                       <span className="home-row-t">{d.title}</span>
                       <span className="home-row-m">

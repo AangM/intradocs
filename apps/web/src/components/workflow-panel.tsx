@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { ReviewInfo, VersionSummary } from '@intradocs/db/workflow';
 import { formatDate, ROLE_LABELS, type Role } from '@intradocs/core';
 import { Icon } from './icon';
+import { toast } from './toast';
 
 type Finding = { rule: string; severity: string; line: number };
 export function WorkflowPanel({
@@ -54,6 +55,7 @@ export function WorkflowPanel({
       const v = await r.json();
       if (!r.ok) throw new Error(v.error ?? 'Perubahan gagal.');
       setMessage(success);
+      toast(success);
       router.refresh();
     } catch (e) {
       setError(

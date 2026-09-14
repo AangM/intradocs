@@ -246,3 +246,50 @@ dan pada perangkat tanpa hover), dan konfirmasi terjadi **di dalam baris** ("Hap
 ini? Hapus / Batal") tanpa dialog native. Tes e2e `portal.spec.ts` menghapus percakapan sambil
 menolak setiap dialog native, desktop dan ponsel. 350 percakapan sisa eval/probe dibersihkan
 dari akun demo.
+
+## Delta U13 — peran warna, empat lapisan, status yang terlihat (14 September 2026)
+
+Review desktop 1440×900 atas 30+ layar untuk lima role menemukan tiga sebab "monoton": satu
+hue biru-violet untuk semua peran (aksi, nav, tautan, avatar, AI, KPI), kartu putih di dalam
+kartu putih, dan blur pada kartu yang tidak punya apa-apa untuk dikaburkan. Ditambah: tidak ada
+toast, bel hanya titik, dan tiga halaman masih mentah. Lapisan baru `apps/web/src/app/depth.css`
+(dimuat terakhir) menetapkan:
+
+- **Peran warna.** `--accent` (satu aksi utama per layar, nav aktif, tautan); `--ai` gradien
+  violet→magenta khusus asisten (tombol Tanya AI di topbar, hero, avatar, kartu AI di search dan
+  reader, saran perapian taksonomi, baris audit `rag.*`); `--flow-review/ok/block/draft` untuk
+  posisi dalam alur — chip status, tint baris, ikon notifikasi, timeline; enam warna kategori
+  tetap. Badge format satu keluarga tint (`.ft-md` indigo, bukan kotak hitam).
+- **Empat lapisan.** L0 latar dengan tiga orb (dua dingin, satu hangat di kanan bawah); L1
+  kartu 92 % putih **tanpa blur**; L2 _sunken_ untuk apa pun di dalam kartu (`.card .card`,
+  kartu asisten dan kartu masukan di artikel, preview approval, chip label); L3 hanya yang
+  melayang (topbar, sidebar, menu, dialog, composer, popover bel, toast) yang diblur. Dialog role
+  tidak lagi berbingkai ganda.
+- **Fokal.** "Tanya AI" di topbar jadi ikon saja di home (hero sudah punya); "Nonaktifkan" ×7
+  jadi tersier (teks merah, bingkai saat hover) dengan konfirmasi inline, bukan `confirm()`;
+  kategori kosong di home meredup; peringkat #1 saja yang bergradien.
+- **Status.** Toast global (`components/toast.tsx`, empat nada, 4 detik) setelah favorit,
+  tandai dibaca, ajukan/putuskan akses, keputusan review, submit, role, status akun. Popover
+  bel (5 terbaru, ikon+warna per jenis, "Tandai semua" → `POST /api/notifications`). Halaman
+  Notifikasi: ikon per jenis, titik belum-dibaca, grup Hari ini / 7 hari / Sebelumnya, tanda ✓
+  per baris, "Tandai semua dibaca". "Menunggu Anda" di home jadi strip chip berwarna
+  (review amber, notifikasi biru, draft slate), hilang bila kosong.
+- **Reader.** Latar `doc-main` transparan (kartu terpisah dari tanah), teks isi 15,5 px/1,76,
+  measure 800 px; kartu "Tanya asisten" L2 ber-tint AI; draf ringkasan model terlipat
+  (`details`) — hanya pemilik yang membukanya.
+- **Halaman mentah.** Bandingkan versi memakai shell dokumen (rail kiri + satu kartu), ringkasan
+  diff sebagai chip +/−, empty state bila baru satu versi. Permintaan Akses dua kolom (daftar
+  kiri, form ≤380 px kanan), chip status berwarna, level akses sebagai chip pilihan, yang sudah
+  diputus pindah ke "Riwayat keputusan". Tombol "Filter" khusus ponsel tidak lagi bocor ke
+  desktop (`.search-filters label{display:grid}` menimpa `display:none`). "Filter tidak valid"
+  memakai empty state.
+- **Motion.** Satu `rise` 220 ms saat halaman tiba; dihormati `prefers-reduced-motion`.
+- **Teks.** Login: SSO + akun demo + privasi jadi dua baris; penjelas di kartu asisten dan
+  draf ringkasan dipangkas; bantuan form akses satu kalimat.
+
+Perbaikan ikutan: daftar bernomor yang diselingi bullet oleh model kini terus dihitung
+(`answer-text.tsx` memberi `start`), bukan "1., 1."; `WeknoraParseConverter` memakai field
+eksplisit agar `node --test` (strip-only TypeScript) bisa memuatnya. Gate a11y tetap lulus
+(desktop + ponsel) setelah dua koreksi: toggle facet keluar dari pohon di desktop, titik
+belum-dibaca `aria-hidden` + teks sr-only, `--flow-ok-ink` #086b4a agar chip hijau tetap
+4,5:1 di baris yang di-hover.

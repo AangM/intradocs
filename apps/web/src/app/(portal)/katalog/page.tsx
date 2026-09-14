@@ -48,13 +48,14 @@ export default async function Catalog({
   } catch {
     return (
       <div className="pad">
-        <PageHeading
-          title="Filter tidak valid"
-          subtitle="Gunakan kata kunci maksimal 200 karakter dan pilihan filter yang tersedia."
-        />
-        <Link href="/katalog" className="btn">
-          Reset filter
-        </Link>
+        <PageHeading title="Katalog Dokumen" subtitle="Semua dokumen dalam cakupan akses Anda." />
+        <Empty title="Filter tidak valid">
+          Gunakan kata kunci maksimal 200 karakter dan pilihan filter yang tersedia.
+          <br />
+          <Link href="/katalog" className="btn btn-sm">
+            Reset filter
+          </Link>
+        </Empty>
       </div>
     );
   }

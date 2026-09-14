@@ -5,6 +5,8 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import { hasCapability, initials, ROLE_LABELS, type Actor, type Capability } from '@intradocs/core';
 import type { Category } from '@intradocs/db/queries';
 import { Icon } from './icon';
+import { Toaster, toast } from './toast';
+import { NOTIFICATION_KINDS, type NotificationItem } from './notification-kinds';
 const navigation: Array<{
   href: string;
   label: string;
@@ -110,6 +112,7 @@ export function Shell({
   categories,
   aiOn = false,
   counts = {},
+  recent = [],
   children,
 }: {
   actor: Actor;
@@ -118,6 +121,8 @@ export function Shell({
   aiOn?: boolean;
   /** Badge per nav href (unread notifications, pending reviews, own drafts); zero hides it. */
   counts?: Record<string, number>;
+  /** The newest few notifications, for the bell popover; the page has the full list. */
+  recent?: NotificationItem[];
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -129,7 +134,33 @@ export function Shell({
   const collapsed = useSyncExternalStore(subscribeSide, readSide, () => false);
   const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState('');
+  const [markingAll, setMarkingAll] = useState(false);
   const reader = pathname.startsWith('/dokumen/');
+  const unread = counts['/notifikasi'] ?? 0;
+  // Closes the bell and account popovers on navigation, the way a menu is expected to.
+  useEffect(() => {
+    document
+      .querySelectorAll<HTMLDetailsElement>('details.bell-menu[open], details.account-menu[open]')
+      .forEach((d) => d.removeAttribute('open'));
+  }, [pathname]);
+  async function markAllRead() {
+    if (markingAll) return;
+    setMarkingAll(true);
+    try {
+      const r = await fetch('/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      if (!r.ok) throw new Error();
+      toast('Semua notifikasi ditandai dibaca');
+      router.refresh();
+    } catch {
+      toast('Gagal menandai notifikasi', 'error');
+    } finally {
+      setMarkingAll(false);
+    }
+  }
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
@@ -233,28 +264,76 @@ export function Shell({
         {aiOn && (
           <Link
             href="/ai-assistant"
-            className={`btn btn-sm topbar-ask ${pathname === '/ai-assistant' ? 'btn-on' : ''}`}
+            className={`btn btn-sm topbar-ask ${pathname === '/ai-assistant' ? 'btn-on' : ''} ${pathname === '/help-center' ? 'compact' : ''}`}
             prefetch={false}
             aria-label="Tanya AI"
+            title="Tanya AI"
             onClick={() => setOpen(false)}
           >
             <Icon name="spark" size={15} />
             <span>Tanya AI</span>
           </Link>
         )}
-        <Link
-          href="/notifikasi"
-          className="icon-btn topbar-bell"
-          aria-label={
-            (counts['/notifikasi'] ?? 0) > 0
-              ? `Notifikasi, ${counts['/notifikasi']} belum dibaca`
-              : 'Notifikasi'
-          }
-          prefetch={false}
-        >
-          <Icon name="bell" size={18} />
-          {(counts['/notifikasi'] ?? 0) > 0 && <span className="dot-badge" />}
-        </Link>
+        <details className="bell-menu">
+          <summary
+            className="icon-btn topbar-bell"
+            aria-label={unread > 0 ? `Notifikasi, ${unread} belum dibaca` : 'Notifikasi'}
+          >
+            <Icon name="bell" size={18} />
+            {unread > 0 && <span className="dot-badge" />}
+          </summary>
+          <div className="bell-panel" role="group" aria-label="Notifikasi terbaru">
+            <div className="bell-head">
+              <span>
+                Notifikasi
+                {unread > 0 && <span className="pill p-blue">{unread} baru</span>}
+              </span>
+              {unread > 0 && (
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  disabled={markingAll}
+                  onClick={() => void markAllRead()}
+                >
+                  <Icon name="check" size={13} />
+                  Tandai semua
+                </button>
+              )}
+            </div>
+            {recent.length ? (
+              <ul className="bell-list">
+                {recent.map((n) => {
+                  const kind = NOTIFICATION_KINDS[n.kind] ?? NOTIFICATION_KINDS.default!;
+                  return (
+                    <li key={n.id} className={n.read ? '' : 'unread'}>
+                      <Link
+                        href={`/dokumen/${n.documentId}/${encodeURIComponent(n.slug)}?version=${n.versionId}`}
+                        prefetch={false}
+                      >
+                        <span className={`nt-ic ${kind.tone}`}>
+                          <Icon name={kind.icon} size={14} />
+                        </span>
+                        <span>
+                          <span className="nt-t">{n.title}</span>
+                          <span className="nt-m">
+                            {kind.label} · {n.when}
+                          </span>
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="bell-empty">Belum ada notifikasi.</p>
+            )}
+            <div className="bell-foot">
+              <Link href="/notifikasi" prefetch={false}>
+                Lihat semua notifikasi
+              </Link>
+            </div>
+          </div>
+        </details>
         <details className="account-menu">
           <summary aria-label={`Akun: ${actor.name}`}>
             <span className="avatar">{initials(actor.name)}</span>
@@ -294,6 +373,7 @@ export function Shell({
           {error}
         </p>
       )}
+      <Toaster />
       <div className="body">
         {!reader && open && (
           <button

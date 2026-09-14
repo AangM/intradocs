@@ -93,11 +93,16 @@ export function toConvertedText(markdown: string): ConvertedText {
 
 export class WeknoraParseConverter implements DocumentConverter {
   private kbId: string | null = null;
-  constructor(
-    private readonly client: WeknoraClient,
-    private readonly fallback: DocumentConverter,
-    private readonly timeoutMs = 90_000,
-  ) {}
+  private readonly client: WeknoraClient;
+  private readonly fallback: DocumentConverter;
+  private readonly timeoutMs: number;
+  // Explicit fields, not parameter properties: Node's strip-only TypeScript loader (the
+  // unit tests run under `node --test`) refuses the shorthand.
+  constructor(client: WeknoraClient, fallback: DocumentConverter, timeoutMs = 90_000) {
+    this.client = client;
+    this.fallback = fallback;
+    this.timeoutMs = timeoutMs;
+  }
 
   async convert(file: UploadFile, signal?: AbortSignal): Promise<ConvertedText> {
     if (!(WEKNORA_PARSE_FORMATS as readonly string[]).includes(file.format))

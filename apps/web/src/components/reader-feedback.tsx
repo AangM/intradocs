@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Icon } from './icon';
+import { toast } from './toast';
 
 async function send(url: string, body: unknown) {
   const r = await fetch(url, {
@@ -29,9 +30,10 @@ export function FavoriteButton({
     try {
       await send(`/api/documents/${documentId}/favorite`, { favorite: !favorite });
       setFavorite(!favorite);
+      toast(favorite ? 'Dihapus dari favorit' : 'Disimpan ke favorit', favorite ? 'info' : 'ok');
       router.refresh();
     } catch {
-      /* the button keeps its previous state; nothing else to show for a failed toggle */
+      toast('Favorit gagal disimpan', 'error');
     } finally {
       setBusy(false);
     }
@@ -82,6 +84,7 @@ export function ReaderFeedback({
           ? 'Terima kasih; jawaban Anda tersimpan untuk pemilik dokumen.'
           : 'Terima kasih; masukan Anda tersimpan untuk pemilik dokumen.',
       );
+      toast('Masukan tersimpan');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Gagal menyimpan feedback.');
     } finally {

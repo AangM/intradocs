@@ -70,8 +70,7 @@ export function DocumentInsights({
         {hasQuestions && (
           <>
             <p className="sub tiny">
-              Pertanyaan yang, menurut model lokal, dijawab oleh dokumen ini. Jawabannya tetap
-              disusun dari kutipan yang divalidasi — atau asisten berkata tidak tahu.
+              Pertanyaan yang dijawab dokumen ini — jawabannya selalu dari kutipan yang divalidasi.
             </p>
             <ul className="insight-questions">
               {state.questions.map((question) => (
@@ -89,14 +88,15 @@ export function DocumentInsights({
           </>
         )}
         {hasSummary && (
-          <div className="insight-summary">
-            <h3 className="h4">
-              Draf ringkasan dari model <span className="pill p-amber">belum ditinjau</span>
-            </h3>
+          <details className="insight-summary">
+            <summary>
+              <Icon name="edit" size={13} />
+              Draf ringkasan dari model
+              <span className="pill p-amber">belum ditinjau</span>
+            </summary>
             <p className="sub tiny">
-              Dibuat mesin dari isi versi ini; bisa keliru atau berbahasa campur. Tidak pernah
-              tampil kepada pembaca. Pakai sebagai bahan saat membuat revisi — ringkasan resmi hanya
-              berubah lewat revisi yang direview.
+              Dibuat mesin dari isi versi ini; bisa keliru. Tidak tampil kepada pembaca — bahan
+              untuk revisi, yang tetap lewat review.
             </p>
             <blockquote
               className="insight-draft"
@@ -128,7 +128,7 @@ export function DocumentInsights({
                 <span className="sub tiny">Versi ini belum punya ringkasan resmi.</span>
               )}
             </div>
-          </div>
+          </details>
         )}
       </div>
     </section>

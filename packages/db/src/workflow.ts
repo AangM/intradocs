@@ -341,10 +341,11 @@ export async function readerPreferences(actorId: string, id: string, vid: string
       ).rows[0] ?? null,
   }));
 }
-export async function listNotifications(actorId: string) {
+export async function listNotifications(actorId: string, limit = 100) {
   return withActor(actorId, async ({ client }) => {
     const { rows } = await client.query(
-      'SELECT n.*,v.title,d.id AS document_id,d.slug FROM app.notifications n JOIN app.document_versions v ON v.id=n.version_id JOIN app.documents d ON d.id=v.document_id WHERE n.user_id=app.actor_id() ORDER BY n.created_at DESC LIMIT 100',
+      'SELECT n.*,v.title,d.id AS document_id,d.slug FROM app.notifications n JOIN app.document_versions v ON v.id=n.version_id JOIN app.documents d ON d.id=v.document_id WHERE n.user_id=app.actor_id() ORDER BY n.created_at DESC LIMIT $1',
+      [Math.min(Math.max(1, Math.trunc(limit)), 100)],
     );
     return rows.map((n) => ({
       id: n.id as string,
@@ -369,6 +370,15 @@ export async function markNotificationRead(actorId: string, id: string) {
       ).rowCount
     )
       throw new WorkflowError('Notifikasi tidak tersedia.', 404);
+  });
+}
+/** Every unread notification of the actor becomes read now; returns how many changed. */
+export async function markAllNotificationsRead(actorId: string): Promise<number> {
+  return withActor(actorId, async ({ client }) => {
+    const r = await client.query(
+      'UPDATE app.notifications SET read_at=now() WHERE user_id=app.actor_id() AND read_at IS NULL',
+    );
+    return r.rowCount ?? 0;
   });
 }
 export async function ownerFeedback(actorId: string) {

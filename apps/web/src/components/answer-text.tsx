@@ -21,7 +21,7 @@ export function AnswerText({ text }: { text: string }) {
           );
         if (block.kind === 'ol')
           return (
-            <ol key={i}>
+            <ol key={i} start={block.start}>
               {block.items.map((item, j) => (
                 <li key={j}>{inline(item)}</li>
               ))}
@@ -43,7 +43,7 @@ type Block =
   | { kind: 'p'; text: string }
   | { kind: 'quote'; text: string }
   | { kind: 'ul'; items: string[] }
-  | { kind: 'ol'; items: string[] };
+  | { kind: 'ol'; items: string[]; start: number };
 
 function splitBlocks(text: string): Block[] {
   const blocks: Block[] = [];
@@ -74,7 +74,17 @@ function splitBlocks(text: string): Block[] {
       const item = (bullet ?? numbered)![1]!;
       const last = blocks[blocks.length - 1];
       if (last && last.kind === kind) last.items.push(item);
-      else blocks.push({ kind, items: [item] });
+      else if (kind === 'ul') blocks.push({ kind, items: [item] });
+      else {
+        // A numbered list the model interrupts with bullets ("1. Pemeriksaan: - a - b
+        // 1. Retensi") is one list to the reader: keep counting instead of restarting.
+        const previous = [...blocks].reverse().find((b) => b.kind !== 'ul');
+        const start =
+          previous && previous.kind === 'ol' && last?.kind === 'ul'
+            ? previous.start + previous.items.length
+            : 1;
+        blocks.push({ kind, items: [item], start });
+      }
       continue;
     }
     paragraph.push(line);
