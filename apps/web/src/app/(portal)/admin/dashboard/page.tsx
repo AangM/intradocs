@@ -12,6 +12,9 @@ import { SortSelect } from '@/components/sort-select';
  * trail or a table under this actor's RLS. Charts are CSS on those counts; nothing is
  * smoothed, projected or compared to a made-up target.
  */
+async function currentTime() {
+  return new Date();
+}
 export default async function Dashboard({
   searchParams,
 }: {
@@ -26,6 +29,8 @@ export default async function Dashboard({
         .trim()
         .slice(0, 80) || null;
   const data = await dashboardData(actor.id, days, unit);
+  // Server component: "today" is fixed once per request, like the data it frames.
+  const now = await currentTime();
   const aiOn = aiStatus().retrieval !== 'off';
   const canUpload = hasCapability(actor, 'documents.upload');
   const aiAsked = data.ai.retrievals + data.ai.answers + data.ai.abstained;
@@ -33,9 +38,16 @@ export default async function Dashboard({
   const href = (d: number, u: string | null) =>
     `/admin/dashboard?days=${d}${u ? `&unit=${encodeURIComponent(u)}` : ''}`;
 
-  // Bars: the last 14 days of the period (or all of it when shorter), scaled to the
-  // busiest day so the tallest bar always reaches the top of the chart.
-  const series = data.activity.slice(-14);
+  // Bars: the last 14 days of the period (or all of it when shorter) as a real timeline
+  // -- quiet days are drawn as empty columns rather than skipped -- scaled to the busiest
+  // day so the tallest bar always reaches the top of the chart.
+  const byDay = new Map(data.activity.map((r) => [r.day, r]));
+  const span = Math.min(14, days);
+  const series = Array.from({ length: span }, (_, i) => {
+    const d = new Date(now.getTime() - (span - 1 - i) * 86_400_000);
+    const day = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Jakarta' }).format(d);
+    return byDay.get(day) ?? { day, reads: 0, asks: 0 };
+  });
   const peak = Math.max(1, ...series.map((r) => Math.max(r.reads, r.asks)));
   const status = [
     { name: 'Published', value: data.summary.active, color: 'var(--green)' },
@@ -153,7 +165,7 @@ export default async function Dashboard({
                 <i style={{ background: 'var(--blue-600)' }} /> Pembacaan dokumen
               </span>
               <span>
-                <i style={{ background: '#a5b4fc' }} /> Pertanyaan ke AI
+                <i style={{ background: 'var(--ai)' }} /> Pertanyaan ke AI
               </span>
             </div>
           </div>

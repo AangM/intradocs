@@ -92,7 +92,9 @@ export default async function Audit() {
                     <tr key={`${e.id}-${i}`}>
                       <td>
                         <span className={`audit-action tone-${label.tone}`}>
-                          <Icon name={label.icon} size={14} />
+                          <span className="audit-ic">
+                            <Icon name={label.icon} size={14} />
+                          </span>
                           {label.text}
                         </span>
                       </td>

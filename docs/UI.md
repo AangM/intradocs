@@ -335,3 +335,14 @@ admin memakai `document_id IN (SELECT … WHERE app.can_read_document(id))` — 
 sekali per statement (hashed SubPlan) alih-alih per baris; pada ~3.500 event audit,
 dashboard Andi sebelumnya melewati `statement_timeout` 5 s (503), kini ±160 ms. Gate a11y +
 keyboard, portal e2e, HTTP 101, unit 315 lulus.
+
+**Putaran ketiga (14 September 2026, setelah uji pengguna).** Kunjungan ulang tiap halaman
+di build produksi: sambutan asisten kini di tengah thread kosong (bukan menempel atas dengan
+ruang kosong di bawah); halaman approval tanpa pilihan menampilkan empat aturan reviewer
+sebagai tile (bukan daftar bernomor + paragraf); ikon audit dalam tile ber-tint per keluarga;
+grafik aktivitas dashboard menjadi garis waktu 14 hari penuh (hari sunyi digambar kosong,
+bukan dilewati) dengan seri AI berwarna violet; bantuan metadata di unggah ber-tint AI; empty
+state tingkat halaman (masukan, akses ditolak, satu versi) berdiri di kartu kaca. Data uji:
+`tests/http/versions.test.ts` kini menghapus notifikasi dan draft sisa alurnya sendiri
+(dokumen "Uji versi" tetap dicabut karena audit trail merujuknya), sehingga "Draft & Revisi
+Saya" milik contributor demo bersih dari 5 baris "Dicabut".

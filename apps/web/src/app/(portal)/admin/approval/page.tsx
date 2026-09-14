@@ -149,34 +149,60 @@ export default async function Approval({
       </aside>
       <section className="appr-detail-wrap" aria-label="Detail pengajuan">
         {detail ?? (
-          <div className="pad">
-            <section className="card">
-              <div className="card-h">
-                <Icon name="shield" />
-                <h2 className="h3">Checklist reviewer</h2>
+          <div className="pad appr-idle">
+            {/* Nothing selected (or nothing to review): the four rules of a review as
+                four tiles, and the step a decision sets in motion -- glanceable, not a
+                paragraph to read. */}
+            <div className="appr-idle-head">
+              <span className="nt-ic nt-review" aria-hidden="true">
+                <Icon name="shield" size={16} />
+              </span>
+              <div>
+                <h2 className="h3">
+                  {rows.length ? 'Pilih pengajuan di kiri' : 'Tidak ada yang menunggu Anda'}
+                </h2>
+                <p className="sub">Empat hal yang diperiksa reviewer sebelum memutuskan.</p>
               </div>
-              <div className="card-b">
-                <ol className="review-timeline">
-                  <li>
-                    Bandingkan hasil Markdown, original, dan lampiran. Periksa angka, unit, dan
-                    urutan langkah.
-                  </li>
-                  <li>
-                    Tinjau temuan keamanan. False positive memerlukan justifikasi; private key harus
-                    dihapus melalui versi baru.
-                  </li>
-                  <li>Isi alasan minimal 10 karakter ketika meminta revisi atau menolak.</li>
-                  <li>
-                    Setujui hanya tahap Anda. Kritikal dan kategori berisiko memerlukan dua reviewer
-                    berbeda.
-                  </li>
-                </ol>
-                <Notice>
-                  Persetujuan final memasukkan versi ke antrean indeks. Dokumen baru terlihat
-                  sesudah publikasi atomik selesai. Worker gagal tidak berarti sukses publikasi.
-                </Notice>
-              </div>
-            </section>
+            </div>
+            <div className="appr-rules">
+              {[
+                {
+                  icon: 'file',
+                  t: 'Bandingkan hasil & asli',
+                  d: 'Markdown, berkas original, lampiran — angka, unit, urutan langkah.',
+                },
+                {
+                  icon: 'lock',
+                  t: 'Tinjau temuan keamanan',
+                  d: 'False positive butuh justifikasi; private key dihapus lewat versi baru.',
+                },
+                {
+                  icon: 'msg',
+                  t: 'Beri alasan',
+                  d: 'Minimal 10 karakter saat meminta revisi atau menolak.',
+                },
+                {
+                  icon: 'users',
+                  t: 'Setujui tahap Anda saja',
+                  d: 'Kritikal & kategori berisiko: dua reviewer berbeda.',
+                },
+              ].map((r, i) => (
+                <div className="appr-rule" key={r.t}>
+                  <span className="appr-rule-n">{i + 1}</span>
+                  <span className="appr-rule-ic">
+                    <Icon name={r.icon} size={15} />
+                  </span>
+                  <div>
+                    <div className="appr-rule-t">{r.t}</div>
+                    <div className="appr-rule-d">{r.d}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <Notice>
+              Persetujuan final memasukkan versi ke antrean indeks; dokumen tampil setelah publikasi
+              selesai.
+            </Notice>
           </div>
         )}
       </section>

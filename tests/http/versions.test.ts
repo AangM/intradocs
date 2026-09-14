@@ -116,8 +116,33 @@ before(async () => {
   await publish(revision.versionId);
 });
 after(async () => {
-  // Leave the catalogue as it was found: the document was created by this suite.
+  // Leave the catalogue as it was found: the document was created by this suite. The
+  // audit trail keeps the document (append-only, FK), but the review notifications and
+  // the rolled-back draft would otherwise pile up in the demo accounts.
   await db.query('UPDATE app.documents SET withdrawn=true WHERE id=$1', [first.documentId]);
+  await db.query(
+    'DELETE FROM app.notifications WHERE version_id IN (SELECT id FROM app.document_versions WHERE document_id=$1)',
+    [first.documentId],
+  );
+  const drafts = await db.query<{ id: string }>(
+    "SELECT v.id FROM app.document_versions v JOIN app.documents d ON d.id=v.document_id WHERE d.id=$1 AND v.publication_state='unpublished' AND v.review_state='draft' AND d.current_version_id<>v.id",
+    [first.documentId],
+  );
+  for (const { id } of drafts.rows) {
+    for (const t of [
+      'version_sources',
+      'version_attachments',
+      'version_findings',
+      'upload_requests',
+      'rag_export_queue',
+      'index_generations',
+      'lexical_chunks',
+      'read_history',
+      'document_feedback',
+    ])
+      await db.query(`DELETE FROM app.${t} WHERE version_id=$1`, [id]);
+    await db.query('DELETE FROM app.document_versions WHERE id=$1', [id]);
+  }
   await db.query('DELETE FROM auth."rateLimit"');
   await db.end();
 });
