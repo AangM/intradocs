@@ -22,6 +22,14 @@ import { DocumentInsights } from '@/components/document-insights';
 import { RequiredReadingMark } from '@/components/required-reading-mark';
 import { reviewInfo, versionSummaries, readerPreferences } from '@intradocs/db/workflow';
 import { findSensitiveContent } from '@intradocs/core/workflow';
+/** Older versions in the side panel, in a reader's words rather than the state enum. */
+const VERSION_STATE: Record<string, string> = {
+  approved: 'versi lama',
+  draft: 'draft',
+  in_review: 'menunggu review',
+  changes_requested: 'perlu revisi',
+  rejected: 'ditolak',
+};
 export default async function Reader({
   params,
   searchParams,
@@ -328,7 +336,9 @@ export default async function Reader({
                       v{v.label}
                     </Link>
                     <span className="sub tiny">
-                      {v.active ? formatDate(v.createdAt) : v.reviewState}
+                      {v.active
+                        ? formatDate(v.createdAt)
+                        : (VERSION_STATE[v.reviewState] ?? v.reviewState)}
                     </span>
                   </li>
                 ))}

@@ -1445,3 +1445,20 @@ tbody tr:hover td {
 .legend i:nth-child(1) {
   border-radius: 3px;
 }
+/* Diff table: narrow gutters, the text takes the rest */
+.diff-col-num {
+  width: 52px;
+}
+.diff-col-sign {
+  width: 22px;
+}
+.diff-hunk td {
+  padding: 3px 8px;
+  line-height: 1.55;
+}
+.diff-num {
+  background: rgba(15, 23, 42, 0.035);
+}
+.diff-hunk + .diff-hunk {
+  margin-top: 10px;
+}

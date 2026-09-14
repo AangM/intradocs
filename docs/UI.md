@@ -346,3 +346,15 @@ state tingkat halaman (masukan, akses ditolak, satu versi) berdiri di kartu kaca
 `tests/http/versions.test.ts` kini menghapus notifikasi dan draft sisa alurnya sendiri
 (dokumen "Uji versi" tetap dicabut karena audit trail merujuknya), sehingga "Draft & Revisi
 Saya" milik contributor demo bersih dari 5 baris "Dicabut".
+
+**Data demo (14 September 2026): revisi nyata dokumen VPN.** Lewat API aplikasi sendiri
+(`var/vpn-revision.mts`): Rizky mengunggah revisi "Konfigurasi VPN" dengan bagian baru "Jika
+perangkat authenticator hilang" dan verifikasi DNS, mengajukannya ke Andi, Andi menyetujui
+dengan alasan, worker menerbitkan dan mengindeks. Hasilnya: reader menampilkan v1.1 aktif +
+v1.0 "versi lama", tombol **Bandingkan versi** muncul dan diff-nya terbaca (+11/−1 baris), dan
+asisten kini menjawab pertanyaan authenticator dari bagian baru itu. Dua perbaikan ikutan:
+**migrasi 037** — label revisi mengikuti skema dokumen (`1.0`→`1.1`, `3.2`→`3.3`; dokumen yang
+mulai di `0.1` tetap `0.2`, `0.3`) lewat `app.next_label()`, karena `'0.'||n` membuat revisi
+pertama dokumen seed "1.0" berlabel "0.2"; dan tabel diff memakai `<colgroup>` — dengan
+`table-layout: fixed`, caption `sr-only` (display:block) membuat Chrome membagi empat kolom
+sama lebar sehingga nomor baris memakan separuh tabel.

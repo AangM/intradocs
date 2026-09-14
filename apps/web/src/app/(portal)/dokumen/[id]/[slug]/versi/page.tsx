@@ -186,6 +186,14 @@ export default async function VersionCompare({
               <caption className="sr-only">
                 Perubahan mulai baris {hunk.leftStart} pada versi lama
               </caption>
+              {/* Fixed layout reads its column widths from here; without a colgroup the
+                  visually-hidden caption made Chrome split every column equally. */}
+              <colgroup>
+                <col className="diff-col-num" />
+                <col className="diff-col-num" />
+                <col className="diff-col-sign" />
+                <col />
+              </colgroup>
               <tbody>
                 {hunk.lines.map((line, index) => (
                   <tr className={`diff-${line.op}`} key={`${line.left}-${line.right}-${index}`}>
