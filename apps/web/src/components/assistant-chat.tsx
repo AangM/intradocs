@@ -408,7 +408,9 @@ export function AssistantChat({
             {conversations.map((c) =>
               confirmDelete === c.id ? (
                 <li key={c.id} className="confirm" role="group" aria-label="Konfirmasi hapus">
-                  <span className="chat-conv-q">Hapus percakapan ini?</span>
+                  <span className="chat-conv-q" title={c.title}>
+                    Hapus “{c.title.length > 22 ? `${c.title.slice(0, 22)}…` : c.title}”?
+                  </span>
                   <button
                     type="button"
                     className="chat-conv-yes"

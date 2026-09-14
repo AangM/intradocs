@@ -99,6 +99,12 @@ function writeSide(collapsed: boolean) {
   }
   window.dispatchEvent(new Event(SIDE_EVENT));
 }
+function subscribeNothing() {
+  return () => {};
+}
+function readMac(): boolean {
+  return /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+}
 function subscribeSide(onChange: () => void) {
   window.addEventListener(SIDE_EVENT, onChange);
   window.addEventListener('storage', onChange);
@@ -135,6 +141,9 @@ export function Shell({
   const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState('');
   const [markingAll, setMarkingAll] = useState(false);
+  // The shortcut hint names the key the person actually has; the server renders the
+  // Windows/Linux form and a Mac swaps it in on hydration.
+  const mac = useSyncExternalStore(subscribeNothing, readMac, () => false);
   const reader = pathname.startsWith('/dokumen/');
   const unread = counts['/notifikasi'] ?? 0;
   // Closes the bell and account popovers on navigation, the way a menu is expected to.
@@ -258,7 +267,9 @@ export function Shell({
             placeholder="Cari dokumen…"
             maxLength={200}
           />
-          <kbd className="kbd">⌘K</kbd>
+          <kbd className="kbd" aria-hidden="true">
+            {mac ? '⌘ K' : 'Ctrl K'}
+          </kbd>
         </form>
         <div className="spacer" />
         {aiOn && (

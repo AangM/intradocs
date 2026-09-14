@@ -293,3 +293,45 @@ eksplisit agar `node --test` (strip-only TypeScript) bisa memuatnya. Gate a11y t
 (desktop + ponsel) setelah dua koreksi: toggle facet keluar dari pohon di desktop, titik
 belum-dibaca `aria-hidden` + teks sr-only, `--flow-ok-ink` #086b4a agar chip hijau tetap
 4,5:1 di baris yang di-hover.
+
+## Delta U14 — material kaca yang terlihat (14 September 2026)
+
+Setelah U13 masih terasa satu bidang putih: tint 3–10 % di atas latar 96 % putih tidak
+membedakan navbar, sidebar, tombol, dan kartu. Lapisan ketiga
+`apps/web/src/app/glass.css` (dimuat terakhir) mengerjakan **material**, bukan warna peran:
+
+- **Latar berwarna nyata** — mesh empat orb (biru 34 %, violet 30 %, peach 20 %, teal 18 %)
+  di atas #edf1fb, `background-attachment: fixed`, sehingga kaca punya sesuatu untuk
+  dibiaskan dan tepi putih punya tempat berpijak.
+- **Satu resep kaca**: gradien putih 82→68 % (kartu) atau 90→78 % (melayang),
+  `saturate(180%) blur(22px)`, highlight specular 1 px di tepi atas, ring gelap 8 %, dua
+  bayangan (dekat 2 px, jauh 36 px). Nested tetap _sunken_ (4 % gelap, tanpa blur).
+- **Navbar**: search `position:absolute` di tengah sejati (lebar `min(560px, 38vw)`; kembali
+  ke aliran flex di bawah 1100 px); kbd **Ctrl K** (⌘ K hanya di Mac, dibaca lewat
+  `useSyncExternalStore` saat hidrasi); bel, akun, dan hamburger jadi pil kaca berbingkai;
+  Tanya AI pil violet; garis bawah 10 % + bayangan.
+- **Sidebar**: panel ber-tint indigo 86→72 %, border kanan 10 %, bayangan ke kanan; item
+  aktif pil putih dengan ring biru + bar kiri; hover putih 75 %; kartu status lingkungan;
+  laci ponsel 97 % (tidak tembus).
+- **Kontrol**: `.btn` sekunder = kaca 98→88 % + border 14 % + bayangan + highlight; primer
+  gradien + ring + glow; hijau/merah bahaya sama polanya; tersier merah tetap ghost. Input
+  border 16 % dengan ring fokus 4 px; `select` mempertahankan chevron (`background-color`,
+  bukan `background`). Chip, tag, summary-as-button, dan choice memakai kaca berbingkai.
+- **Tabel**: header 5 % kapital kecil, baris hover 6 % aksen, radius 14 px pada wrapper.
+- **Per halaman**: hero home = panel kaca 24 px dengan mesh sendiri + search 97 % dengan
+  bayangan jauh; kartu kategori memakai garis atas warna kategori (`--tone`) dan tile ikon
+  `color-mix`; reader = rail kiri kartu kaca _sticky_, artikel kertas 94 %, TOC/riwayat
+  kartu; login = kartu kaca melayang di atas mesh (panel kanan transparan); asisten = rail
+  ber-tint violet, judul gradien, gelembung user violet, composer kaca tebal + bayangan
+  jauh; approval = rail ber-tint amber, item aktif ring amber; pengguna = garis atas warna
+  role; dashboard = tile KPI kaca; **Pengaturan** = kartu profil + grid tile fakta dengan
+  ikon dan chip status (menggantikan daftar `dl`).
+- **Teks**: catatan login jadi satu paragraf dengan ikon; SSO satu baris di bawah tombol.
+
+Perbaikan ikutan dari pengujian: konfirmasi hapus percakapan menyebut judulnya
+(`Hapus “Backup”?`) sehingga baris tetap dikenali; tes e2e menunggu respons DELETE lewat
+`expect.poll` (sebelumnya balapan). **Migrasi 036**: policy `audit_read` untuk knowledge
+admin memakai `document_id IN (SELECT … WHERE app.can_read_document(id))` — dievaluasi
+sekali per statement (hashed SubPlan) alih-alih per baris; pada ~3.500 event audit,
+dashboard Andi sebelumnya melewati `statement_timeout` 5 s (503), kini ±160 ms. Gate a11y +
+keyboard, portal e2e, HTTP 101, unit 315 lulus.

@@ -115,6 +115,14 @@ test('a conversation can be deleted from the history rail without a native dialo
     .click();
   await page.getByRole('button', { name: 'Hapus', exact: true }).click();
   await expect(rows).toHaveCount(before - 1);
-  const gone = await page.request.get(`/api/rag/conversations/${conversationId}`);
-  expect(gone.status()).toBe(404);
+  // The row leaves the rail as soon as the server confirms; poll the API rather than
+  // racing the request that the click started.
+  await expect
+    .poll(
+      async () => (await page.request.get(`/api/rag/conversations/${conversationId}`)).status(),
+      {
+        timeout: 10_000,
+      },
+    )
+    .toBe(404);
 });

@@ -90,8 +90,10 @@ export default async function Login({
           <LoginForm returnTo={safeReturnTo(params.returnTo)} />
           <p className="privacy-note">
             <Icon name="help" size={14} />
-            Akun demo ada di <code>var/demo-accounts.json</code>; tidak ada pendaftaran publik.
-            Jangan masukkan password atau data perusahaan yang nyata.
+            <span>
+              Akun demo ada di <code>var/demo-accounts.json</code>; tidak ada pendaftaran publik.
+              Jangan masukkan password atau data perusahaan yang nyata.
+            </span>
           </p>
         </div>
       </section>
