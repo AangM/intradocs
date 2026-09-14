@@ -111,12 +111,22 @@ export function InviteUser({
       </button>
       {open && (
         <section className="card invite-card" aria-label="Undang pengguna">
-          <div className="card-h">
-            <h2 className="h3">Undangan lokal</h2>
-            <span className="sub tiny">
-              Tanpa email dan tanpa SSO: tautan sekali pakai (72 jam) Anda sampaikan sendiri.
-              Pengguna hanya menetapkan password; role dan cakupan sudah Anda putuskan di sini.
-            </span>
+          <div className="card-h invite-head">
+            <div>
+              <h2 className="h3">Undangan lokal</h2>
+              <span className="sub tiny">
+                Tautan sekali pakai (72 jam) yang Anda sampaikan sendiri; pengguna hanya menetapkan
+                password.
+              </span>
+            </div>
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label="Tutup"
+              onClick={() => setOpen(false)}
+            >
+              <Icon name="x" size={15} />
+            </button>
           </div>
           {link ? (
             <div className="card-b">
@@ -163,7 +173,7 @@ export function InviteUser({
             >
               <fieldset disabled={busy} className="workflow-fields">
                 <div className="grid g2">
-                  <label>
+                  <label className="field-lbl">
                     Nama
                     <input
                       className="inp"
@@ -174,7 +184,7 @@ export function InviteUser({
                       onChange={(e) => setForm({ ...form, name: e.target.value })}
                     />
                   </label>
-                  <label>
+                  <label className="field-lbl">
                     Email
                     <input
                       className="inp"
@@ -185,7 +195,7 @@ export function InviteUser({
                       onChange={(e) => setForm({ ...form, email: e.target.value })}
                     />
                   </label>
-                  <label>
+                  <label className="field-lbl">
                     Unit kerja
                     <input
                       className="inp"
@@ -197,7 +207,7 @@ export function InviteUser({
                       onChange={(e) => setForm({ ...form, unit: e.target.value })}
                     />
                   </label>
-                  <label>
+                  <label className="field-lbl">
                     Role
                     <select
                       className="inp"
@@ -214,26 +224,28 @@ export function InviteUser({
                     </select>
                   </label>
                 </div>
-                {canScopeAll && (
-                  <label className="row">
-                    <input
-                      type="checkbox"
-                      checked={form.scopeAll}
-                      onChange={(e) =>
-                        setForm({ ...form, scopeAll: e.target.checked, categoryIds: [] })
-                      }
-                    />
-                    Scope semua kategori
-                  </label>
-                )}
-                {!form.scopeAll && (
-                  <fieldset className="scope-picker">
-                    <legend className="sub tiny">Cakupan kategori</legend>
-                    {categories.map((c) => (
-                      <label key={c.id}>
+                <div className="field-lbl">
+                  Cakupan kategori
+                  <div className="choice-grid" role="group" aria-label="Cakupan kategori">
+                    {canScopeAll && (
+                      <label className="choice">
                         <input
                           type="checkbox"
-                          checked={form.categoryIds.includes(c.id)}
+                          checked={form.scopeAll}
+                          onChange={(e) =>
+                            setForm({ ...form, scopeAll: e.target.checked, categoryIds: [] })
+                          }
+                        />
+                        <Icon name="layers" size={13} />
+                        Semua kategori
+                      </label>
+                    )}
+                    {categories.map((c) => (
+                      <label className="choice" key={c.id}>
+                        <input
+                          type="checkbox"
+                          disabled={form.scopeAll}
+                          checked={form.scopeAll || form.categoryIds.includes(c.id)}
                           onChange={(e) =>
                             setForm({
                               ...form,
@@ -246,8 +258,8 @@ export function InviteUser({
                         {c.name}
                       </label>
                     ))}
-                  </fieldset>
-                )}
+                  </div>
+                </div>
                 {error && (
                   <p role="alert" className="inline-error">
                     {error}
@@ -255,10 +267,11 @@ export function InviteUser({
                 )}
                 <div className="reader-actions">
                   <button className="btn btn-p" type="submit">
+                    <Icon name="link" size={15} />
                     Buat tautan undangan
                   </button>
                   <button className="btn" type="button" onClick={() => setOpen(false)}>
-                    Tutup
+                    Batal
                   </button>
                 </div>
               </fieldset>

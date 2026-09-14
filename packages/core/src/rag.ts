@@ -706,14 +706,38 @@ export {
  *    caller can show it as what the material does say rather than throw it away.
  * Any other text is passed through untouched.
  */
+/**
+ * Sentences a small model sometimes copies out of its own instructions and appends to an
+ * otherwise good answer ("Riwayat percakapan hanya untuk memahami maksud pertanyaan, bukan
+ * sumber fakta."). They are instructions, not facts from a document, so they never reach
+ * the reader. Matched loosely (case, spacing) and removed as whole sentences.
+ */
+const PROMPT_ECHOES: RegExp[] = [
+  /riwayat percakapan\s+(?:hanya\s+)?(?:dipakai\s+)?untuk memahami maksud pertanyaan[^.!?\n]*[.!?]?/giu,
+  /(?:faktanya|fakta)\s+(?:tetap\s+)?hanya\s+dari materi(?: referensi)?[^.!?\n]*[.!?]?/giu,
+  /dokumen yang tersedia tidak membahas hal lain[.!?]?/giu,
+  /kata-kata penting \(negasi, angka, nama\) disalin persis[^.!?\n]*[.!?]?/giu,
+  /\[runtime context[^\]]*\]/giu,
+];
+export function stripPromptEchoes(text: string): string {
+  let out = text;
+  for (const pattern of PROMPT_ECHOES) out = out.replace(pattern, '');
+  return out
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/(^|\n)[ \t]*(?=\n|$)/g, '$1')
+    .trim();
+}
+
 export function resolveGeneratedAnswer(text: string): {
   answer: string;
   fellBack: boolean;
   /** What the model wrote after its decline sentence, when anything; never a fixed fallback's. */
   remainder: string;
 } {
-  const trimmed = text.trim();
-  if (trimmed === ABSTAIN_MESSAGE)
+  const trimmed = stripPromptEchoes(text);
+  // Nothing but echoed instructions is no answer at all: same path as a decline.
+  if (!trimmed || trimmed === ABSTAIN_MESSAGE)
     return { answer: NO_DIRECT_ANSWER_MESSAGE, fellBack: true, remainder: '' };
   if (MODEL_DECLINE_PATTERN.test(trimmed)) {
     // The decline sentence ends at its first period; the rest is the model's account of
@@ -726,7 +750,7 @@ export function resolveGeneratedAnswer(text: string): {
       remainder: remainder.length >= 40 && !MODEL_DECLINE_PATTERN.test(remainder) ? remainder : '',
     };
   }
-  return { answer: text, fellBack: false, remainder: '' };
+  return { answer: trimmed, fellBack: false, remainder: '' };
 }
 
 /* ------------------------------------------------------------------ *

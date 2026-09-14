@@ -246,6 +246,7 @@ export default async function Users() {
                   <td>
                     <UserAssignment
                       id={u.id}
+                      name={u.name}
                       initialRole={u.role}
                       scopeAll={u.scopeAll}
                       categoryIds={u.categoryIds}

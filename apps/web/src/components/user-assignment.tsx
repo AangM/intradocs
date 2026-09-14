@@ -1,7 +1,7 @@
 'use client';
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ROLES, ROLE_LABELS, type Role } from '@intradocs/core';
+import { ROLES, ROLE_LABELS, initials, type Role } from '@intradocs/core';
 import { Icon } from './icon';
 import { toast } from './toast';
 /**
@@ -11,6 +11,7 @@ import { toast } from './toast';
  */
 export function UserAssignment({
   id,
+  name,
   initialRole,
   scopeAll,
   categoryIds,
@@ -19,6 +20,8 @@ export function UserAssignment({
   own,
 }: {
   id: string;
+  /** Shown in the dialog title so the person being edited is never in doubt. */
+  name: string;
   initialRole: Role;
   scopeAll: boolean;
   categoryIds: string[];
@@ -87,7 +90,13 @@ export function UserAssignment({
           }}
         >
           <div className="dialog-head">
-            <h3 id={`assign-${id}`}>Role & cakupan</h3>
+            <div className="dialog-title">
+              <span className="avatar avatar-xs">{initials(name)}</span>
+              <div>
+                <h3 id={`assign-${id}`}>Role & cakupan</h3>
+                <span className="sub tiny">{name}</span>
+              </div>
+            </div>
             <button
               type="button"
               className="icon-btn"

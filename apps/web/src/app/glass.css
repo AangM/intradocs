@@ -1462,3 +1462,207 @@ tbody tr:hover td {
 .diff-hunk + .diff-hunk {
   margin-top: 10px;
 }
+/* Dialog title with the subject's avatar */
+.dialog-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dialog-title h3 {
+  margin: 0;
+}
+.dialog-title .sub {
+  display: block;
+  margin-top: 1px;
+}
+/* Invite popover: the same field language as the role dialog */
+.invite-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.invite-head .sub {
+  display: block;
+  margin-top: 2px;
+}
+.invite-card .workflow-fields {
+  gap: 14px;
+}
+/* The form's own padding, then one gap between rows -- the nested fieldset must not
+   add a second grid gap on top. */
+.invite-card form.card-b {
+  display: block;
+  padding: 16px 18px 18px;
+}
+.invite-card .grid.g2 {
+  gap: 12px;
+}
+.invite-card .field-lbl .inp {
+  width: 100%;
+}
+.invite-card .choice-grid {
+  margin-top: 2px;
+}
+.invite-card .choice {
+  white-space: nowrap;
+}
+.invite-card .choice .i {
+  flex: none;
+}
+.invite-card .reader-actions {
+  margin-top: 2px;
+}
+/* Taxonomy: label chips grouped by category */
+.label-groups {
+  display: grid;
+  gap: 14px;
+}
+.label-group-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 750;
+  color: var(--ink-2);
+}
+.label-group-h .category-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--tone, var(--muted));
+}
+.label-group-h .sub {
+  font-weight: 500;
+}
+/* Reader: the disclosure summaries are chips in the action row; a closed one has no box */
+.source-evidence,
+.editor-tools {
+  margin: 12px 0 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.source-evidence[open],
+.editor-tools[open] {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px solid rgba(15, 23, 42, 0.07);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.035);
+}
+.source-evidence[open] > summary,
+.editor-tools[open] > summary {
+  margin-bottom: 10px;
+}
+.source-evidence p {
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+.source-evidence code {
+  font-size: 11.5px;
+}
+/* Upload step 3: the preview is a sunken sheet, the confirmation a highlighted row */
+.upload-preview {
+  background: rgba(15, 23, 42, 0.035);
+  border: 1px solid rgba(15, 23, 42, 0.07);
+  border-radius: 12px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset;
+}
+.upload-check {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(217, 119, 6, 0.3);
+  background: var(--flow-review-tint);
+  font-weight: 600;
+}
+.upload-check:has(input:checked) {
+  border-color: rgba(15, 157, 110, 0.35);
+  background: var(--flow-ok-tint);
+}
+.upload-check input[type='checkbox'] {
+  accent-color: var(--flow-ok);
+}
+/* Reader: the assistant card's intro is a caption, not body text; question chips wrap
+   in two columns so five of them do not stack into a wall */
+.doc-wrap > .card[aria-label='Tanya asisten tentang dokumen ini'] .card-b > .sub.tiny {
+  font-size: 12.5px;
+  margin-bottom: 10px;
+}
+.insight-questions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.insight-questions li {
+  min-width: 0;
+}
+.insight-questions a {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  padding: 10px 12px;
+  font-size: 12.8px;
+  line-height: 1.45;
+  border-radius: 12px;
+}
+.insight-questions a .i {
+  flex: none;
+  margin-top: 2px;
+}
+@media (max-width: 760px) {
+  .insight-questions {
+    grid-template-columns: 1fr;
+  }
+}
+/* Workflow panel: each review step carries its state as a chip */
+.review-timeline .tl-step strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+.review-timeline .tl-step p {
+  margin: 6px 0 4px;
+  color: var(--ink-2);
+}
+.owner-actions .btn .i {
+  color: var(--accent);
+}
+/* Cards inside the article: captions keep caption size, not the prose size */
+.doc-wrap .card p.sub,
+.doc-wrap .card .sub.tiny,
+.doc-wrap .card .hint,
+.doc-wrap .card li,
+.doc-wrap .card .review-timeline p {
+  font-size: 12.8px;
+  line-height: 1.55;
+}
+.doc-wrap .card .review-timeline p {
+  font-size: 13.5px;
+}
+.doc-wrap .editor-tools-body > .card {
+  margin-top: 12px;
+}
+.doc-wrap .editor-tools-body > .card + details,
+.doc-wrap .editor-tools-body > details + .card {
+  margin-top: 12px;
+}
+/* A choice chip inside a form grid stays a row (the form's label rule makes labels grids) */
+.workflow-fields label.choice,
+.dialog-body label.choice {
+  display: inline-flex;
+  gap: 6px;
+  font-size: 12.5px;
+}
+/* Popovers float over busy content: near-opaque so nothing reads through the menu */
+.account-panel,
+.bell-panel,
+.fchip-menu,
+.invite-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.985), rgba(255, 255, 255, 0.955));
+}

@@ -358,3 +358,34 @@ mulai di `0.1` tetap `0.2`, `0.3`) lewat `app.next_label()`, karena `'0.'||n` me
 pertama dokumen seed "1.0" berlabel "0.2"; dan tabel diff memakai `<colgroup>` — dengan
 `table-layout: fixed`, caption `sr-only` (display:block) membuat Chrome membagi empat kolom
 sama lebar sehingga nomor baris memakan separuh tabel.
+
+**Putaran keempat (14 September 2026): keadaan interaktif.** Kunjungan per halaman kali ini
+membuka menu, dialog, form, dan panel yang terlipat — bukan hanya tampilan awal:
+
+- **Undang Pengguna**: form popover memakai bahasa field yang sama dengan dialog role (label
+  tebal, chip cakupan dengan "Semua kategori", tombol × di kepala, "Batal" bukan "Tutup");
+  sebelumnya checkbox native dalam fieldset berbingkai dan legend yang bertumpuk.
+- **Dialog role** menyebut orangnya (avatar + nama) di kepala, jadi tidak ada keraguan siapa
+  yang sedang diubah.
+- **Kategori & Label**: chip label dikelompokkan per kategori (dua "Kritikal" dan dua
+  "Runbook" sebelumnya tampak duplikat tanpa penjelasan); membuka form kategori/label
+  menggulir ke form-nya (sebelumnya klik "+ Kategori baru" di atas tidak mengubah apa pun di
+  layar karena form muncul di bawah lipatan).
+- **Reader**: "Asal berkas & integritas" dan "Alat pemilik…" tidak lagi kotak berbingkai
+  saat tertutup — hanya chip; kotak muncul saat dibuka. Pertanyaan asisten dua kolom; teks
+  keterangan di kartu-kartu dalam artikel memakai ukuran keterangan, bukan ukuran prosa.
+  Panel alur: chip status per tahap (Disetujui/Ditolak/Minta revisi/Menunggu) + "Tahap n dari
+  N"; catatan "Publikasi: Indeks siap. Percobaan 1/5" dibuang bila sudah terbit (chip
+  Published di kepala sudah mengatakannya); versi lama terbaca "versi lama", bukan `approved`.
+- **Unggah langkah 3**: pratinjau _sunken_; baris konfirmasi "file contoh tanpa data nyata"
+  menjadi baris amber yang berubah hijau saat dicentang.
+- **Popover** (akun, bel, filter, undangan) hampir opak — sebelumnya tombol dan chip di
+  belakangnya terbaca menembus menu.
+- **Asisten**: kalimat yang disalin model dari instruksinya sendiri ("Riwayat percakapan
+  hanya untuk memahami maksud pertanyaan, bukan sumber fakta.") dibuang sebelum jawaban
+  ditampilkan (`stripPromptEchoes`, `packages/core/src/rag.ts`); jawaban yang tinggal
+  gema saja mengambil jalur "tidak ada jawaban langsung".
+- **Notifikasi**: **migrasi 038** — notifikasi "Anda ditugaskan mereview" ditandai dibaca
+  saat reviewer memutuskan atau pengajuan dibatalkan revisi baru; sebelumnya badge Andi
+  menunjukkan 6 dengan satu item di antrean. Backlog seed Rizky (13 notifikasi "terbit"
+  dari data awal) ditandai dibaca; yang tersisa hanya yang relevan untuk demo.

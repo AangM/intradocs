@@ -26,6 +26,7 @@ import {
   NO_DIRECT_ANSWER_MESSAGE,
   MODEL_DECLINE_SENTENCE,
   resolveGeneratedAnswer,
+  stripPromptEchoes,
   type AllowedSource,
   type IndexEntry,
   type DesiredVersion,
@@ -686,4 +687,27 @@ test('two documents stating different quantities for the asked thing are reporte
     ]),
     [],
   );
+});
+
+test('sentences the model copies from its own instructions never reach the reader', () => {
+  // Seen on the demo machine: a correct three-step answer followed by the prompt's own
+  // "history is not a source of facts" line and a stray "tidak membahas hal lain".
+  const echoed = `Jika perangkat authenticator hilang:
+1. Hubungi administrator laboratorium agar token lama dicabut.
+2. Daftarkan authenticator baru melalui portal akun uji.
+
+Riwayat percakapan hanya untuk memahami maksud pertanyaan, bukan sumber fakta. Dokumen yang tersedia tidak membahas hal lain.`;
+  const cleaned = stripPromptEchoes(echoed);
+  assert(cleaned.endsWith('portal akun uji.'), cleaned);
+  assert(!/riwayat percakapan|sumber fakta|hal lain/i.test(cleaned));
+  assert.equal(resolveGeneratedAnswer(echoed).answer, cleaned);
+  // A real answer that happens to mention history in its own words is untouched.
+  const genuine = 'Riwayat versi menunjukkan v1.0 diganti v1.1 pada 14 September.';
+  assert.equal(stripPromptEchoes(genuine), genuine);
+  // Nothing but echoes is no answer: it takes the honest "no direct answer" path.
+  const empty = resolveGeneratedAnswer(
+    'Riwayat percakapan hanya untuk memahami maksud pertanyaan.',
+  );
+  assert.equal(empty.fellBack, true);
+  assert.equal(empty.answer, NO_DIRECT_ANSWER_MESSAGE);
 });

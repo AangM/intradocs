@@ -38,14 +38,22 @@ export function TaxonomyEditor({
   // the chips are what the page is about.
   const [categoryForm, setCategoryForm] = useState(false),
     [labelForm, setLabelForm] = useState(false);
+  // Forms open below the tree/list; bring them into view so a click on "+ Kategori baru"
+  // at the top never lands on an unchanged screen.
+  const reveal = (selector: string) =>
+    requestAnimationFrame(() =>
+      document.querySelector(selector)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }),
+    );
   const openCategory = (c: TaxonomyCategory) => {
     setCategory(c);
     setTighten(false);
     setCategoryForm(true);
+    reveal('.taxonomy-form-category');
   };
   const openLabel = (l: TaxonomyLabel) => {
     setLabel(l);
     setLabelForm(true);
+    reveal('.taxonomy-form-label');
   };
   const [dragging, setDragging] = useState<string | null>(null),
     [dropTarget, setDropTarget] = useState<string | null>(null);
@@ -247,7 +255,7 @@ export function TaxonomyEditor({
           </ul>
           {categoryForm && (
             <form
-              className="card-b workflow-fields taxonomy-form"
+              className="card-b workflow-fields taxonomy-form taxonomy-form-category"
               onSubmit={(e) => {
                 e.preventDefault();
                 void save('/api/taxonomy/categories', {
@@ -420,23 +428,65 @@ export function TaxonomyEditor({
               }
               onRemove={(l) => void save('/api/taxonomy/labels', { ...l, remove: true })}
             />
-            <div className="label-list">
-              {labels.map((l) => (
-                <button
-                  className={`tag label-chip tone-${l.color} ${label.id === l.id ? 'tag-on' : ''}`}
-                  key={l.id}
-                  onClick={() => openLabel(l)}
-                  title={`${l.name} · ${categories.find((c) => c.id === l.categoryId)?.name ?? ''}`}
-                >
-                  <i className="category-dot" />
-                  {l.name}
-                  <span className="n">{meta.labels[l.id]?.usedBy ?? 0}</span>
-                </button>
-              ))}
+            {/* Labels grouped under their category: the same name can exist in two
+                categories (a "Kritikal" for security and one for data), so a flat list
+                showed duplicates with no way to tell them apart. */}
+            <div className="label-groups">
+              {categories
+                .filter((c) => labels.some((l) => l.categoryId === c.id))
+                .map((c) => (
+                  <div className="label-group" key={c.id}>
+                    <div className="label-group-h">
+                      <i
+                        className={`category-dot tone-${meta.categories[c.id]?.color ?? 'blue'}`}
+                      />
+                      {c.name}
+                      <span className="sub tiny">
+                        {labels.filter((l) => l.categoryId === c.id).length} label
+                      </span>
+                    </div>
+                    <div className="label-list">
+                      {labels
+                        .filter((l) => l.categoryId === c.id)
+                        .map((l) => (
+                          <button
+                            className={`tag label-chip tone-${l.color} ${label.id === l.id ? 'tag-on' : ''}`}
+                            key={l.id}
+                            onClick={() => openLabel(l)}
+                            title={`${l.name} · ${c.name}`}
+                          >
+                            <i className="category-dot" />
+                            {l.name}
+                            <span className="n">{meta.labels[l.id]?.usedBy ?? 0}</span>
+                          </button>
+                        ))}
+                    </div>
+                  </div>
+                ))}
+              {labels.some((l) => !categories.some((c) => c.id === l.categoryId)) && (
+                <div className="label-group">
+                  <div className="label-group-h">Lainnya</div>
+                  <div className="label-list">
+                    {labels
+                      .filter((l) => !categories.some((c) => c.id === l.categoryId))
+                      .map((l) => (
+                        <button
+                          className={`tag label-chip tone-${l.color} ${label.id === l.id ? 'tag-on' : ''}`}
+                          key={l.id}
+                          onClick={() => openLabel(l)}
+                        >
+                          <i className="category-dot" />
+                          {l.name}
+                          <span className="n">{meta.labels[l.id]?.usedBy ?? 0}</span>
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )}
             </div>
             {labelForm && (
               <form
-                className="workflow-fields taxonomy-form"
+                className="workflow-fields taxonomy-form taxonomy-form-label"
                 onSubmit={(e) => {
                   e.preventDefault();
                   void save('/api/taxonomy/labels', {
