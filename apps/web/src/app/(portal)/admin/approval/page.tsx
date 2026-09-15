@@ -80,7 +80,7 @@ export default async function Approval({
 
   return (
     <div className="appr-page">
-      <aside className="appr-list" aria-label="Antrean pengajuan">
+      <aside className="appr-list" aria-label="Antrean pengajuan" tabIndex={0}>
         <div className="appr-list-head">
           <div className="row" style={{ justifyContent: 'space-between' }}>
             <h1 className="h3">Antrean Persetujuan</h1>
