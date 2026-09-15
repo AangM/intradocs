@@ -99,6 +99,14 @@ function writeSide(collapsed: boolean) {
   }
   window.dispatchEvent(new Event(SIDE_EVENT));
 }
+/** Every floating menu in the portal; inline disclosures (version history, source
+ * evidence, owner tools) are deliberately not listed. */
+const MENU_SELECTOR = 'details.fchip, details.row-menu, details.account-menu, details.bell-menu';
+function closeMenus(except?: Element | null) {
+  document.querySelectorAll<HTMLDetailsElement>(MENU_SELECTOR).forEach((d) => {
+    if (d.open && d !== except) d.open = false;
+  });
+}
 function subscribeNothing() {
   return () => {};
 }
@@ -176,10 +184,30 @@ export function Shell({
         e.preventDefault();
         document.querySelector<HTMLInputElement>('[data-global-search]')?.focus();
       }
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape') {
+        setOpen(false);
+        closeMenus();
+      }
+    };
+    // Floating menus are native <details>; the browser keeps every one you open. One
+    // open at a time, closed by a click anywhere else -- the behaviour of a menu.
+    const onToggle = (e: Event) => {
+      const el = e.target as HTMLElement | null;
+      if (!(el instanceof HTMLDetailsElement) || !el.open || !el.matches(MENU_SELECTOR)) return;
+      closeMenus(el);
+    };
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target as Element | null;
+      closeMenus(target?.closest(MENU_SELECTOR) ?? undefined);
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    document.addEventListener('toggle', onToggle, true);
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.removeEventListener('toggle', onToggle, true);
+      document.removeEventListener('pointerdown', onPointerDown);
+    };
   }, []);
   function toggleSide() {
     if (window.matchMedia('(max-width: 720px)').matches) {
