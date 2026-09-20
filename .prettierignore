@@ -12,3 +12,4 @@ playwright-report/
 
 .venv/
 apps/web/next-env.d.ts
+apps/worker/dist/

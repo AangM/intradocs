@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx src/index.ts"
+    "dev": "tsx src/index.ts",
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node24 --outfile=dist/index.js --banner:js=\"import{createRequire}from'node:module';const require=createRequire(import.meta.url);\""
   },
   "dependencies": {
     "@intradocs/core": "workspace:*",
@@ -12,6 +13,7 @@
     "pg": "8.23.0"
   },
   "devDependencies": {
-    "tsx": "4.23.13"
+    "tsx": "4.23.13",
+    "esbuild": "0.28.2"
   }
 }

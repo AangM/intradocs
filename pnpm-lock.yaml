@@ -108,6 +108,9 @@ importers:
         specifier: 12.27.0
         version: 12.27.0
     devDependencies:
+      esbuild:
+        specifier: 0.28.2
+        version: 0.28.2
       tsx:
         specifier: 4.23.13
         version: 4.23.13

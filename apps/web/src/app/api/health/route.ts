@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getPool } from '@intradocs/db';
 import { readAiConfig } from '@intradocs/core/ai-config';
+import { readRuntimeConfig } from '@intradocs/core/config';
 export const dynamic = 'force-dynamic';
 export async function GET() {
   try {
@@ -11,7 +12,7 @@ export async function GET() {
       // and belongs behind /api/rag/health instead.
       {
         status: 'ok',
-        profile: 'local-dev',
+        profile: readRuntimeConfig(process.env).profile,
         ai: readAiConfig(process.env).retrieval,
         release: '0.3.0',
       },

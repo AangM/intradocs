@@ -69,6 +69,27 @@ pnpm dev
 
 Migrasi bersifat additive. SQL yang sudah diterapkan tidak ditulis ulang. Jangan menjalankan `db:seed` untuk mereset data yang ada.
 
+## Deployment
+
+Build ini tidak lagi terkunci di laptop. Profil `staging` dan `production` ada, dan
+aturannya lebih ketat daripada `local-dev`: origin wajib https, cookie `Secure`, HSTS,
+secret 48+ karakter, database lintas host wajib TLS, storage wajib path absolut di luar
+webroot, dan akun demo menahan rilis. Konfigurasi divalidasi **saat proses start** —
+salah konfigurasi keluar dengan kode 78 dan masuk crash-loop, jadi rilis sebelumnya tetap
+melayani.
+
+```sh
+cp .env.production.example .env.production        # isi semua; tidak ada default
+docker build -t intradocs:0.3.0 .
+pnpm ops:preflight                                # gate rilis; exit 1 menahan deploy
+docker compose -f compose.prod.yaml --env-file .env.production up -d
+pnpm ops:bootstrap-admin --email anda@org.example --name "Nama" --unit "Divisi IT"
+```
+
+Runbook lengkap — persiapan, tiap rilis, alarm, rollback, kapasitas terukur, dan daftar
+hal yang masih menjadi keputusan organisasi (SSO, TLS, kebijakan data, OCR) — ada di
+[docs/DEPLOY.md](docs/DEPLOY.md).
+
 ## Operasi lokal (Q6, sebagian)
 
 ```sh
@@ -76,6 +97,10 @@ pnpm ops:ready                          # tabel kesiapan: DB, web, storage, Clam
 pnpm ops:backup                         # var/backups/<stamp>/{db.dump,storage.tar,manifest.json}; .env dan akun demo tidak ikut
 pnpm ops:verify-backup var/backups/<stamp>   # restore drill ke database uji + folder sementara; tidak menyentuh yang hidup
 pnpm ops:restore var/backups/<stamp> --yes   # menimpa DB dan storage lokal; app harus berhenti dulu
+pnpm ops:preflight                          # gate rilis: konfigurasi, migrasi, akun demo, backup terverifikasi
+pnpm ops:watch --interval 30 --grace 3      # alarm: satu baris per perubahan status, exit 1 saat down berulang
+pnpm ops:rollback-check v0.2.0              # apakah rollback kode saja aman, atau butuh restore database
+pnpm ops:loadtest --users 4 --seconds 20    # kapasitas terukur; exit 1 bila p95 melewati anggaran
 ```
 
 WeKnora tidak ikut di-backup: indeksnya turunan dari `app.rag_index_entries` + Markdown kanonik dan dibangun ulang oleh `pnpm weknora:sync`. Rollback rilis = checkout tag sebelumnya + `pnpm build`; migrasi hanya maju, jadi rollback skema berarti restore dari backup sebelum migrasi itu.

@@ -6,9 +6,13 @@ import { readRuntimeConfig } from '@intradocs/core/config';
 function createAuth() {
   const c = readRuntimeConfig(process.env);
   const appUrl = new URL(c.appUrl);
-  const loopbackOrigins = ['localhost', '127.0.0.1', '[::1]'].map(
-    (host) => `${appUrl.protocol}//${host}:${appUrl.port}`,
-  );
+  // The loopback aliases are a local-dev convenience (the demo is reached as both
+  // localhost and 127.0.0.1); a deployment trusts exactly one origin.
+  const loopbackOrigins = c.hardened
+    ? []
+    : ['localhost', '127.0.0.1', '[::1]'].map(
+        (host) => `${appUrl.protocol}//${host}:${appUrl.port}`,
+      );
   return betterAuth({
     appName: 'IntraDocs Local',
     baseURL: c.appUrl,
@@ -30,7 +34,8 @@ function createAuth() {
       max: 100,
       customRules: { '/sign-in/email': { window: 60, max: 5 } },
     },
-    advanced: { useSecureCookies: false },
+    // Secure cookies wherever the origin is https, which a hardened profile guarantees.
+    advanced: { useSecureCookies: c.hardened },
     databaseHooks: {
       session: {
         create: {

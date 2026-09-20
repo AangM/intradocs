@@ -16,6 +16,17 @@
 //                                           converter, WeKnora, Ollama) with the owner who
 //                                           is paged for each; exit 1 when a required
 //                                           dependency is down
+//   pnpm ops:preflight                      the release gate: every refusal that must
+//                                           happen before a deployment serves anyone --
+//                                           profile, TLS origin, secret strength, every
+//                                           migration applied, no demo accounts, a backup
+//                                           whose restore drill passed. Exit 1 on failure
+//   pnpm ops:watch [--interval 30]          the alarm: polls health, prints one line per
+//                                           state CHANGE, exits 1 once it has been down
+//                                           --grace times in a row
+//   pnpm ops:rollback-check <ref>           whether rolling the code back to a tag is safe
+//                                           on its own, or needs a database restore with
+//                                           it because migrations ran in between
 //
 // What a backup deliberately does NOT contain: WeKnora's own volumes. The knowledge base
 // is derived from app.rag_index_entries and the canonical Markdown; after a restore
@@ -33,6 +44,8 @@ import { ROOT, loadLocalEnv, localAdminUrl, PNPM, reportFailure } from './shared
 import { readRuntimeConfig } from '../packages/core/src/config.ts';
 import { converterOptions } from '../packages/core/src/converter.ts';
 
+/** A storage root must never sit under a served tree, whatever the profile. */
+const WEBROOT = /(^|[\\/])public([\\/]|$)/;
 const COUNT_TABLES = [
   'app.documents',
   'app.document_versions',
@@ -376,6 +389,12 @@ async function verify(): Promise<void> {
       )
         bad++;
     if (bad) throw new Error(`${bad} berkas storage tidak cocok dengan manifest.`);
+    // Record that the drill passed, in the backup itself: `ops:preflight` refuses a
+    // release whose newest backup has never been restored, and this stamp is the proof.
+    await writeFile(
+      path.join(dir, 'manifest.json'),
+      JSON.stringify({ ...manifest, verifiedAt: new Date().toISOString() }, null, 2) + '\n',
+    );
     console.log(
       `Backup ${path.relative(ROOT, dir)} terverifikasi: ${Object.keys(manifest.counts).length} tabel cocok, ${manifest.migrations.length} migrasi, ${manifest.storage.files} berkas storage cocok hash. Database uji dan folder sementara dihapus.`,
     );
@@ -475,6 +494,224 @@ async function ready(): Promise<void> {
   if (rows.some((r) => r.required && !r.ok)) process.exitCode = 1;
 }
 
+/**
+ * The release gate. Everything here is a refusal that must happen before a deployment
+ * takes its first request, and each check says what to do rather than only that it
+ * failed. On a local-dev profile the deployment-only checks are reported but not fatal:
+ * the point is that the same command, run against a real environment, is the thing that
+ * says "this may go live".
+ */
+async function preflight(): Promise<void> {
+  loadLocalEnv();
+  const checks: Array<{ name: string; ok: boolean; note: string; fatal: boolean }> = [];
+  const add = (name: string, ok: boolean, note: string, fatal = true) =>
+    checks.push({ name, ok, note, fatal });
+  let config: ReturnType<typeof readRuntimeConfig> | null = null;
+  try {
+    config = readRuntimeConfig(process.env);
+    add('Konfigurasi', true, `profil ${config.profile}${config.hardened ? ' (hardened)' : ''}`);
+  } catch (e) {
+    add('Konfigurasi', false, (e as Error).message);
+  }
+  const hardened = config?.hardened ?? false;
+  if (config) {
+    add('Origin', !hardened || config.appUrl.startsWith('https://'), config.appUrl);
+    add(
+      'Secret',
+      config.authSecret.length >= (hardened ? 48 : 32),
+      `${config.authSecret.length} karakter`,
+    );
+    add('Storage di luar webroot', !WEBROOT.test(config.storageRoot), config.storageRoot);
+  }
+  const admin = new Pool({ connectionString: localAdminUrl(), max: 1 });
+  try {
+    const applied = await admin.query<{ name: string }>('SELECT name FROM infra.migrations');
+    const onDisk = readdirSync(path.join(ROOT, 'packages/db/migrations')).filter((f) =>
+      f.endsWith('.sql'),
+    );
+    const missing = onDisk.filter((f) => !applied.rows.some((r) => r.name === f));
+    add(
+      'Migrasi',
+      missing.length === 0,
+      missing.length ? `belum diterapkan: ${missing.join(', ')}` : `${applied.rowCount} diterapkan`,
+    );
+    // Demo identities are fine locally and unacceptable anywhere else: their passwords
+    // are generated into a file this repository documents.
+    const demo = await admin.query<{ n: number }>(
+      "SELECT count(*)::int AS n FROM app.profiles WHERE email LIKE '%@example.test'",
+    );
+    add(
+      'Akun demo',
+      !hardened || demo.rows[0]!.n === 0,
+      hardened
+        ? `${demo.rows[0]!.n} akun @example.test (harus 0)`
+        : `${demo.rows[0]!.n} akun demo (wajar pada local-dev)`,
+      hardened,
+    );
+    const synthetic = await admin.query<{ n: number }>(
+      "SELECT count(*)::int AS n FROM app.document_versions v JOIN app.documents d ON d.current_version_id=v.id WHERE v.title ILIKE '%sintetis%' OR v.title ILIKE '%contoh%'",
+    );
+    add(
+      'Korpus sintetis',
+      !hardened || synthetic.rows[0]!.n === 0,
+      `${synthetic.rows[0]!.n} dokumen contoh`,
+      false,
+    );
+    const owner = await admin.query<{ n: number }>(
+      "SELECT count(*)::int AS n FROM app.profiles WHERE role='super_admin' AND active",
+    );
+    add('Super admin aktif', owner.rows[0]!.n >= 1, `${owner.rows[0]!.n} akun`);
+  } catch (e) {
+    add('Database', false, (e as Error).message.slice(0, 90));
+  } finally {
+    await admin.end();
+  }
+  // A deployment whose backup nobody has restored does not have a backup yet.
+  const backups = path.join(ROOT, 'var/backups');
+  const folders = existsSync(backups)
+    ? readdirSync(backups).filter((f) => existsSync(path.join(backups, f, 'manifest.json')))
+    : [];
+  let verified = '';
+  for (const f of folders.sort().reverse()) {
+    const manifest = JSON.parse(await readFile(path.join(backups, f, 'manifest.json'), 'utf8')) as {
+      verifiedAt?: string;
+    };
+    if (manifest.verifiedAt) {
+      verified = `${f} (drill ${manifest.verifiedAt})`;
+      break;
+    }
+  }
+  add(
+    'Backup terverifikasi',
+    Boolean(verified),
+    verified || 'jalankan pnpm ops:backup lalu pnpm ops:verify-backup <folder>',
+    hardened,
+  );
+  const width = Math.max(...checks.map((c) => c.name.length));
+  for (const c of checks)
+    console.log(
+      `${c.ok ? 'OK   ' : c.fatal ? 'GAGAL' : 'catat'} ${c.name.padEnd(width)}  ${c.note}`,
+    );
+  const failed = checks.filter((c) => !c.ok && c.fatal);
+  if (failed.length) {
+    console.error(`\n${failed.length} gate belum terpenuhi; rilis ditahan.`);
+    process.exitCode = 1;
+  } else console.log('\nSemua gate rilis terpenuhi.');
+}
+
+/**
+ * The alarm. `ops:ready` answers "is it up now"; this answers "tell me when that
+ * changes". One line per transition keeps a log quiet while things are healthy, and the
+ * exit code is what a supervisor, a cron wrapper or a pager script reacts to.
+ */
+async function watch(): Promise<void> {
+  const flag = (name: string, fallback: number) => {
+    const i = process.argv.indexOf(name);
+    const value = i > 0 ? Number(process.argv[i + 1]) : NaN;
+    return Number.isFinite(value) ? value : fallback;
+  };
+  const interval = Math.max(5, flag('--interval', 30)) * 1000;
+  const grace = Math.max(1, flag('--grace', 3));
+  loadLocalEnv();
+  const base = process.env.APP_URL!;
+  let lastOk: boolean | null = null;
+  let failures = 0;
+  const stamp = () => new Date().toISOString().replace('T', ' ').slice(0, 19);
+  for (;;) {
+    let note = '';
+    let ok = false;
+    try {
+      const r = await fetch(`${base}/api/health`, { signal: AbortSignal.timeout(8000) });
+      const body = (await r.json().catch(() => ({}))) as { release?: string; ai?: string };
+      ok = r.ok;
+      note = ok ? `release ${body.release} · ai ${body.ai}` : `HTTP ${r.status}`;
+    } catch (e) {
+      note = (e as Error).message.slice(0, 70);
+    }
+    if (ok !== lastOk) {
+      console.log(`${stamp()}  ${ok ? 'UP  ' : 'DOWN'}  ${note}`);
+      lastOk = ok;
+    }
+    failures = ok ? 0 : failures + 1;
+    if (failures >= grace) {
+      console.error(`${stamp()}  ALARM  ${failures}x berturut-turut gagal: ${note}`);
+      process.exitCode = 1;
+      return;
+    }
+    if (process.argv.includes('--once')) return;
+    await new Promise((done) => setTimeout(done, interval));
+  }
+}
+
+/**
+ * Is rolling the code back to `ref` safe on its own?
+ *
+ * Migrations are forward-only by design, so the dangerous rollback is the one that
+ * crosses a migration boundary: the old code meets a newer schema. This compares the
+ * migrations that exist in a git ref with the ones the database has applied and says
+ * which of the two rollbacks this is -- code alone, or code plus a restore from the
+ * backup taken before those migrations ran. It changes nothing; it answers a question
+ * that is otherwise answered by guessing at 3am.
+ *
+ *   pnpm ops:rollback-check v0.2.0
+ */
+async function rollbackCheck(): Promise<void> {
+  loadLocalEnv();
+  const ref = process.argv[3];
+  if (!ref) throw new Error('Sebutkan git ref-nya: pnpm ops:rollback-check <tag|commit>');
+  const listed = spawnSync('git', ['ls-tree', '--name-only', `${ref}:packages/db/migrations`], {
+    cwd: ROOT,
+    encoding: 'utf8',
+  });
+  if (listed.status !== 0)
+    throw new Error(`Tidak dapat membaca ${ref}: ${(listed.stderr || '').trim().slice(0, 120)}`);
+  const inRef = new Set(
+    listed.stdout
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l.endsWith('.sql')),
+  );
+  const admin = new Pool({ connectionString: localAdminUrl(), max: 1 });
+  let applied: string[];
+  try {
+    const r = await admin.query<{ name: string }>(
+      'SELECT name FROM infra.migrations ORDER BY name',
+    );
+    applied = r.rows.map((x) => x.name);
+  } finally {
+    await admin.end();
+  }
+  const ahead = applied.filter((name) => !inRef.has(name));
+  console.log(`Ref ${ref}: ${inRef.size} migrasi · database: ${applied.length} diterapkan`);
+  if (!ahead.length) {
+    console.log(
+      [
+        '',
+        'AMAN: rollback kode saja.',
+        `  docker compose -f compose.prod.yaml --env-file .env.production up -d`,
+        `  (dengan INTRADOCS_IMAGE=intradocs:${ref.replace(/^v/, '')})`,
+        '',
+        'Skema tidak berubah sejak ref itu, jadi kode lama bertemu skema yang sama.',
+      ].join('\n'),
+    );
+    return;
+  }
+  console.log(
+    [
+      '',
+      `HATI-HATI: database ${ahead.length} migrasi lebih maju daripada ${ref}:`,
+      ...ahead.map((n) => `  ${n}`),
+      '',
+      'Kode lama akan bertemu skema yang lebih baru. Pilih salah satu:',
+      '  1. Tetap di rilis sekarang dan perbaiki maju (paling sering benar).',
+      '  2. Rollback kode DAN restore database dari backup sebelum migrasi itu:',
+      '     pnpm ops:restore var/backups/<stamp-sebelum-migrasi> --yes',
+      '     Semua perubahan setelah backup itu hilang; pastikan itu keputusan sadar.',
+    ].join('\n'),
+  );
+  // Not an error: this is information for a decision, not a failed gate.
+}
+
 const action = process.argv[2];
 const run =
   action === 'backup'
@@ -485,10 +722,16 @@ const run =
         ? verify
         : action === 'ready'
           ? ready
-          : null;
+          : action === 'preflight'
+            ? preflight
+            : action === 'watch'
+              ? watch
+              : action === 'rollback-check'
+                ? rollbackCheck
+                : null;
 if (!run) {
   console.error(
-    'Gunakan: pnpm ops:backup | pnpm ops:verify-backup <folder> | pnpm ops:restore <folder> --yes | pnpm ops:ready',
+    'Gunakan: pnpm ops:backup | pnpm ops:verify-backup <folder> | pnpm ops:restore <folder> --yes | pnpm ops:ready | pnpm ops:preflight | pnpm ops:watch | pnpm ops:rollback-check <ref>',
   );
   process.exit(2);
 }

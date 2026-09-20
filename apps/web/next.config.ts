@@ -1,5 +1,10 @@
 import type { NextConfig } from 'next';
+// HSTS is not set here: headers() is evaluated at build time and the image is built
+// without a profile. src/proxy.ts adds it per request when the running profile is
+// hardened -- a local demo must never send it (it would pin the browser to https on
+// localhost and break every other local project on that host).
 const config: NextConfig = {
+  output: process.env.NEXT_STANDALONE === '1' ? 'standalone' : undefined,
   poweredByHeader: false,
   // The floating dev badge sits over the sidebar footer in demos run with `pnpm dev`.
   devIndicators: false,
