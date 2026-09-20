@@ -30,7 +30,10 @@ export async function POST(request: Request) {
     if (!body || typeof body !== 'object' || Array.isArray(body))
       throw new InputError('Payload tidak valid.');
     const v = body as Record<string, unknown>;
-    const keys = Object.keys(v).sort().join(',');
+    const keys = Object.keys(v)
+      .filter((k) => k !== 'customRoleId')
+      .sort()
+      .join(',');
     if (keys !== 'categoryIds,email,name,role,scopeAll,unit')
       throw new InputError('Field undangan tidak lengkap.');
     const text = (value: unknown, min: number, max: number, label: string) => {
@@ -54,6 +57,8 @@ export async function POST(request: Request) {
       role: String(v.role),
       scopeAll: v.scopeAll,
       categoryIds: [...new Set(v.categoryIds.map(parseUuid))],
+      customRoleId:
+        v.customRoleId === undefined || v.customRoleId === null ? null : parseUuid(v.customRoleId),
     });
     const origin = readRuntimeConfig(process.env).appUrl.replace(/\/$/, '');
     return { id: created.id, link: `${origin}/undangan/${created.token}` };

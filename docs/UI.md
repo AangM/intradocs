@@ -389,3 +389,51 @@ membuka menu, dialog, form, dan panel yang terlipat — bukan hanya tampilan awa
   saat reviewer memutuskan atau pengajuan dibatalkan revisi baru; sebelumnya badge Andi
   menunjukkan 6 dengan satu item di antrean. Backlog seed Rizky (13 notifikasi "terbit"
   dari data awal) ditandai dibaca; yang tersisa hanya yang relevan untuk demo.
+
+## Delta U14 — role kustom (20 September 2026)
+
+**Keputusan desain.** PLAN.md §5 semula menaruh role kustom di luar rilis karena lima role
+bawaan tertanam di 41 ekspresi policy RLS (`app.actor_role()`), dan mengganti itu dengan tabel
+kemampuan berarti mendesain ulang lapisan izin database. Yang dibangun sekarang **tidak**
+menyentuh policy: sebuah role kustom adalah _nama_ di atas **satu role dasar** (Admin Knowledge,
+Reviewer, Contributor, atau Viewer) ditambah daftar kemampuan yang **dicabut**. Database tetap
+menegakkan role dasar (batas baca klasifikasi/cakupan/grant tidak berubah); aplikasi menolak
+kemampuan yang dicabut pada setiap permintaan lewat `requireActor`/`requireApiActor` — gerbang
+tunggal yang dipakai semua halaman dan route. Role kustom **tidak pernah menambah** apa pun:
+server menolak pencabutan kemampuan yang memang tidak dimiliki role dasarnya.
+
+- **Migrasi 039** — `app.custom_roles` (nama unik selama aktif, warna, deskripsi, `base_role`,
+  `denied_capabilities` ⊂ kemampuan, `revision`, `archived_at`), kolom `custom_role_id` di
+  `profiles` dan `invitations`, trigger yang memastikan role bawaan profil = `base_role` role
+  kustomnya, fungsi `save_custom_role` / `archive_custom_role` (super admin saja),
+  `assign_user(...,custom_role)`, `create_invitation(...,custom_role)`, `open_invitation`
+  mengembalikan nama role, `accept_invitation` mewarisi role kustom (yang sudah diarsip jatuh
+  ke role dasar). Role dasar **terkunci** selama ada pemegang; arsip ditolak selama ada pemegang
+  atau undangan terbuka. Audit: `role.created/updated/archived`. **Migrasi 040** — grant kolom
+  untuk `intradocs_workflow`.
+- **Core** — `effectiveCapabilities(role, denied)`, `Actor.capabilities` (dihitung
+  `loadActor` per permintaan, jadi perubahan definisi berlaku di halaman berikutnya tanpa
+  login ulang), `Actor.customRole`, `roleLabel(actor)`, `CAPABILITY_LABELS`,
+  `parseCustomRole` (`packages/core/src/roles.ts`).
+- **API** — `GET/POST /api/roles`, `PATCH/DELETE /api/roles/:id` (revisi optimistik → 409);
+  `POST /api/users/:id/assignment` dan `POST /api/invitations` menerima `customRoleId`.
+- **UI (S08)** — kartu role kustom di samping lima kartu bawaan: chip kemampuan yang
+  dipertahankan + chip merah dicoret untuk yang dicabut, jumlah pemegang, Edit/Arsipkan
+  (arsip nonaktif selama ada pemegang, konfirmasi inline); kartu "+ Role kustom baru" membuka
+  dialog kaca: nama, warna, deskripsi, role dasar (chip radio; terkunci bila ada pemegang),
+  checklist kemampuan yang dipertahankan (hanya kemampuan role dasar). Dialog penugasan dan
+  form undangan memuat `optgroup` "Role kustom" (`Nama · berbasis X`). Kolom Role di tabel
+  pengguna menampilkan nama kustom (ungu) + "berbasis X"; topbar, menu akun, Pengaturan, dan
+  halaman terima-undangan menampilkan nama kustom.
+- **Uji** — `tests/unit/roles.test.ts` (aritmetika kemampuan, parser, label);
+  `tests/http/roles.test.ts` lewat aplikasi nyata: hanya super admin yang mendefinisikan,
+  pencabutan di luar role dasar ditolak (400), role kustom harus cocok dengan role bawaan
+  saat ditugaskan (422), pemegang kehilangan `documents.upload` pada permintaan berikutnya
+  (403 di API, halaman unggah menolak) sementara `profiles.role` tetap `contributor`,
+  mengubah definisi memulihkannya tanpa login ulang, revisi basi → 409, arsip ditolak selama
+  dipegang, jejak audit `created → updated → archived`. Dicoba juga lewat UI: role
+  "Penulis SOP" (Reviewer tanpa Review & persetujuan) ditugaskan ke Dwi → topbar "Penulis
+  SOP", menu Antrean Persetujuan hilang, `/admin/approval` → Akses tidak tersedia.
+
+Yang sengaja **tidak** dibuat: role kustom yang _menambah_ kemampuan atau melampaui batas
+baca role dasarnya — itu tetap membutuhkan desain ulang policy dan review keamanan.

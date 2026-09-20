@@ -10,6 +10,7 @@
     "./uploads": "./src/uploads.ts",
     "./workflow": "./src/workflow.ts",
     "./taxonomy": "./src/taxonomy.ts",
+    "./roles": "./src/roles.ts",
     "./discovery": "./src/discovery.ts",
     "./rag": "./src/rag.ts",
     "./versions": "./src/versions.ts",

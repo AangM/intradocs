@@ -2,7 +2,14 @@
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import { hasCapability, initials, ROLE_LABELS, type Actor, type Capability } from '@intradocs/core';
+import {
+  hasCapability,
+  initials,
+  ROLE_LABELS,
+  roleLabel,
+  type Actor,
+  type Capability,
+} from '@intradocs/core';
 import type { Category } from '@intradocs/db/queries';
 import { Icon } from './icon';
 import { Toaster, toast } from './toast';
@@ -378,7 +385,7 @@ export function Shell({
             <span className="avatar">{initials(actor.name)}</span>
             <span className="who-text">
               <span className="nm">{actor.name}</span>
-              <span className="rl">{ROLE_LABELS[actor.role]}</span>
+              <span className="rl">{roleLabel(actor)}</span>
             </span>
             <Icon name="chev-d" size={14} className="account-caret" />
           </summary>
@@ -386,7 +393,8 @@ export function Shell({
             <div className="account-head">
               <strong>{actor.name}</strong>
               <span className="sub tiny">
-                {ROLE_LABELS[actor.role]} · {actor.unit}
+                {roleLabel(actor)}
+                {actor.customRole ? ` (${ROLE_LABELS[actor.role]})` : ''} · {actor.unit}
               </span>
               <span className="pill p-amber">Lokal · data sintetis</span>
             </div>

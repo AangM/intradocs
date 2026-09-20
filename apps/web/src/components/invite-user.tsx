@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import type { CustomRole } from '@intradocs/core';
 import { Icon } from './icon';
 
 interface Category {
@@ -13,6 +14,7 @@ export interface InvitationItem {
   name: string;
   unit: string;
   role: string;
+  roleLabel?: string | null;
   scopeAll: boolean;
   categories: string[];
   createdAt: string;
@@ -44,6 +46,7 @@ export function InviteUser({
   defaultUnit,
   canPickUnit,
   canScopeAll,
+  customRoles = [],
 }: {
   categories: Category[];
   invitations: InvitationItem[];
@@ -51,6 +54,7 @@ export function InviteUser({
   /** Super admins may invite into any unit; knowledge admins only their own. */
   canPickUnit: boolean;
   canScopeAll: boolean;
+  customRoles?: CustomRole[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -66,6 +70,11 @@ export function InviteUser({
     scopeAll: false,
     categoryIds: [] as string[],
   });
+  // "custom:<id>" in the select resolves to the custom role's base role plus its id.
+  const [choice, setChoice] = useState('viewer');
+  const chosenCustom = choice.startsWith('custom:')
+    ? customRoles.find((c) => c.id === choice.slice('custom:'.length))
+    : undefined;
 
   async function submit() {
     setBusy(true);
@@ -74,7 +83,11 @@ export function InviteUser({
       const r = await fetch('/api/invitations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          role: chosenCustom ? chosenCustom.baseRole : choice,
+          customRoleId: chosenCustom?.id ?? null,
+        }),
       });
       const body = (await r.json()) as { error?: string; link?: string };
       if (!r.ok || !body.link) throw new Error(body.error ?? 'Undangan gagal dibuat.');
@@ -211,16 +224,29 @@ export function InviteUser({
                     Role
                     <select
                       className="inp"
-                      value={form.role}
-                      onChange={(e) => setForm({ ...form, role: e.target.value })}
+                      value={choice}
+                      onChange={(e) => setChoice(e.target.value)}
                     >
-                      {Object.entries(ROLE_LABELS)
-                        .filter(([r]) => canScopeAll || r !== 'knowledge_admin')
-                        .map(([r, label]) => (
-                          <option key={r} value={r}>
-                            {label}
-                          </option>
-                        ))}
+                      <optgroup label="Role bawaan">
+                        {Object.entries(ROLE_LABELS)
+                          .filter(([r]) => canScopeAll || r !== 'knowledge_admin')
+                          .map(([r, label]) => (
+                            <option key={r} value={r}>
+                              {label}
+                            </option>
+                          ))}
+                      </optgroup>
+                      {customRoles.some((c) => canScopeAll || c.baseRole !== 'knowledge_admin') && (
+                        <optgroup label="Role kustom">
+                          {customRoles
+                            .filter((c) => canScopeAll || c.baseRole !== 'knowledge_admin')
+                            .map((c) => (
+                              <option key={c.id} value={`custom:${c.id}`}>
+                                {c.name} · berbasis {ROLE_LABELS[c.baseRole]}
+                              </option>
+                            ))}
+                        </optgroup>
+                      )}
                     </select>
                   </label>
                 </div>
@@ -299,7 +325,16 @@ export function InviteUser({
                       <tr key={i.id}>
                         <td>{i.name}</td>
                         <td>{i.email}</td>
-                        <td>{ROLE_LABELS[i.role] ?? i.role}</td>
+                        <td>
+                          {i.roleLabel ? (
+                            <>
+                              {i.roleLabel}{' '}
+                              <span className="sub tiny">· {ROLE_LABELS[i.role] ?? i.role}</span>
+                            </>
+                          ) : (
+                            (ROLE_LABELS[i.role] ?? i.role)
+                          )}
+                        </td>
                         <td>{i.scopeAll ? 'Semua kategori' : i.categories.join(', ') || '—'}</td>
                         <td>
                           <span className={`pill ${i.state === 'open' ? 'p-green' : 'p-grey'}`}>

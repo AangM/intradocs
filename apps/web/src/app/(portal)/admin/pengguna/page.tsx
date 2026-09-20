@@ -8,6 +8,8 @@ import { Icon } from '@/components/icon';
 import { UserStatus } from '@/components/user-status';
 import { InviteUser } from '@/components/invite-user';
 import { listInvitations } from '@intradocs/db/invitations';
+import { listCustomRoles } from '@intradocs/db/roles';
+import { CustomRoles } from '@/components/custom-roles';
 const detail: Record<Role, { icon: string; color: string; description: string }> = {
   super_admin: {
     icon: 'shield',
@@ -42,11 +44,15 @@ export default async function Users() {
   const users = await listUsers(actor);
   const manage = hasCapability(actor, 'users.manage');
   const invitations = await listInvitations(actor.id);
+  const customRoles = await listCustomRoles(actor.id);
+  const holders: Record<string, number> = {};
+  for (const u of users)
+    if (u.customRoleId) holders[u.customRoleId] = (holders[u.customRoleId] ?? 0) + 1;
   return (
     <div className="pad">
       <PageHeading
         title="Pengguna & Kontrol Akses (RBAC)"
-        subtitle={`${users.filter((u) => u.active).length} pengguna aktif terlihat · 5 role bawaan · identitas lokal`}
+        subtitle={`${users.filter((u) => u.active).length} pengguna aktif terlihat · 5 role bawaan${customRoles.length ? ` + ${customRoles.length} kustom` : ''} · identitas lokal`}
         actions={
           <div className="row invite-row">
             <button
@@ -63,6 +69,7 @@ export default async function Users() {
               defaultUnit={actor.unit}
               canPickUnit={actor.role === 'super_admin'}
               canScopeAll={actor.role === 'super_admin'}
+              customRoles={customRoles}
             />
           </div>
         }
@@ -84,13 +91,7 @@ export default async function Users() {
             <p className="rd">{detail[role].description}</p>
           </div>
         ))}
-        <div className="role-card role-pending">
-          <div>
-            <Icon name="plus" size={23} style={{ margin: '0 auto 8px' }} />
-            <strong>Role kustom</strong>
-            <span className="sub tiny">Di luar rilis ini</span>
-          </div>
-        </div>
+        <CustomRoles roles={customRoles} canManage={manage} userCounts={holders} />
       </div>
       <section className="card mb">
         <div className="card-h">
@@ -222,7 +223,14 @@ export default async function Users() {
                     </div>
                   </td>
                   <td>
-                    <span className="pill p-blue">{ROLE_LABELS[u.role]}</span>
+                    {u.customRoleName ? (
+                      <span className="role-cell">
+                        <span className="pill p-ai">{u.customRoleName}</span>
+                        <span className="sub tiny">berbasis {ROLE_LABELS[u.role]}</span>
+                      </span>
+                    ) : (
+                      <span className="pill p-blue">{ROLE_LABELS[u.role]}</span>
+                    )}
                   </td>
                   <td className="small-cell">{u.unit}</td>
                   <td>
@@ -248,6 +256,8 @@ export default async function Users() {
                       id={u.id}
                       name={u.name}
                       initialRole={u.role}
+                      initialCustomRoleId={u.customRoleId}
+                      customRoles={customRoles}
                       scopeAll={u.scopeAll}
                       categoryIds={u.categoryIds}
                       categories={categories}

@@ -1,5 +1,5 @@
 import { requireActor } from '@/lib/session';
-import { ROLE_LABELS, initials } from '@intradocs/core';
+import { ROLE_LABELS, initials, roleLabel } from '@intradocs/core';
 import { PageHeading, Notice } from '@/components/shared';
 import { Icon } from '@/components/icon';
 import { aiStatus } from '@/lib/rag';
@@ -30,7 +30,7 @@ export default async function Settings() {
       tone: 'nt-info',
       label: 'Akun Anda',
       value: actor.name,
-      note: `${ROLE_LABELS[actor.role]} · ${actor.unit}`,
+      note: `${roleLabel(actor)}${actor.customRole ? ` (berbasis ${ROLE_LABELS[actor.role]})` : ''} · ${actor.unit}`,
       chip: { text: 'Aktif', pill: 'p-green' },
     },
     {
@@ -90,7 +90,8 @@ export default async function Settings() {
         <div>
           <div className="settings-name">{actor.name}</div>
           <div className="sub">
-            {ROLE_LABELS[actor.role]} · {actor.unit}
+            {roleLabel(actor)}
+            {actor.customRole ? ` (berbasis ${ROLE_LABELS[actor.role]})` : ''} · {actor.unit}
           </div>
         </div>
         <span className="pill p-amber">Lokal · data sintetis</span>

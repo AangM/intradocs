@@ -17,6 +17,7 @@
     "./orphan-cleanup": "./src/orphan-cleanup.ts",
     "./workflow": "./src/workflow.ts",
     "./taxonomy": "./src/taxonomy.ts",
+    "./roles": "./src/roles.ts",
     "./converter": "./src/converter.ts",
     "./weknora-parse": "./src/weknora-parse.ts",
     "./ai-config": "./src/ai-config.ts",

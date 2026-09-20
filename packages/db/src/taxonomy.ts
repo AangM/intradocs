@@ -362,15 +362,16 @@ export async function exportTaxonomy(actorId: string): Promise<{
 export async function assignUser(
   actorId: string,
   target: string,
-  v: ReturnType<typeof parseAssignment>,
+  v: Omit<ReturnType<typeof parseAssignment>, 'customRoleId'> & { customRoleId?: string | null },
 ) {
   try {
     await withActor(actorId, async ({ client }) => {
-      await client.query('SELECT app.assign_user($1,$2,$3,$4::uuid[])', [
+      await client.query('SELECT app.assign_user($1,$2,$3,$4::uuid[],$5::uuid)', [
         target,
         v.role,
         v.scopeAll,
         v.categoryIds,
+        v.customRoleId ?? null,
       ]);
     });
   } catch (e) {

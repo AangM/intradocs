@@ -1,7 +1,7 @@
 'use client';
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ROLES, ROLE_LABELS, initials, type Role } from '@intradocs/core';
+import { ROLES, ROLE_LABELS, initials, type CustomRole, type Role } from '@intradocs/core';
 import { Icon } from './icon';
 import { toast } from './toast';
 /**
@@ -13,6 +13,8 @@ export function UserAssignment({
   id,
   name,
   initialRole,
+  initialCustomRoleId = null,
+  customRoles = [],
   scopeAll,
   categoryIds,
   categories,
@@ -23,19 +25,30 @@ export function UserAssignment({
   /** Shown in the dialog title so the person being edited is never in doubt. */
   name: string;
   initialRole: Role;
+  initialCustomRoleId?: string | null;
+  customRoles?: CustomRole[];
   scopeAll: boolean;
   categoryIds: string[];
   categories: { id: string; name: string }[];
   superAdmin: boolean;
   own: boolean;
 }) {
-  const [role, setRole] = useState(initialRole),
+  // One <select> lists built-in roles and custom roles together; a custom choice is
+  // "custom:<id>" and resolves to its base role plus the id on save.
+  const [choice, setChoice] = useState(
+      initialCustomRoleId ? `custom:${initialCustomRoleId}` : initialRole,
+    ),
     [all, setAll] = useState(scopeAll),
     [selected, setSelected] = useState(categoryIds),
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
   const dialog = useRef<HTMLDialogElement | null>(null);
   const router = useRouter();
+  const chosenCustom = choice.startsWith('custom:')
+    ? customRoles.find((c) => c.id === choice.slice('custom:'.length))
+    : undefined;
+  const role: Role = chosenCustom ? chosenCustom.baseRole : (choice as Role);
+  const customRoleId = chosenCustom?.id ?? null;
   async function save() {
     setBusy(true);
     setError('');
@@ -43,7 +56,12 @@ export function UserAssignment({
       const r = await fetch(`/api/users/${id}/assignment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role, scopeAll: all, categoryIds: all ? [] : selected }),
+        body: JSON.stringify({
+          role,
+          customRoleId,
+          scopeAll: all,
+          categoryIds: all ? [] : selected,
+        }),
       });
       const v = await r.json();
       if (!r.ok) throw new Error(v.error ?? 'Perubahan ditolak.');
@@ -109,16 +127,25 @@ export function UserAssignment({
           <fieldset disabled={busy} className="dialog-body">
             <label className="field-lbl">
               Role
-              <select
-                className="inp"
-                value={role}
-                onChange={(e) => setRole(e.target.value as Role)}
-              >
-                {roles.map((r) => (
-                  <option key={r} value={r}>
-                    {ROLE_LABELS[r]}
-                  </option>
-                ))}
+              <select className="inp" value={choice} onChange={(e) => setChoice(e.target.value)}>
+                <optgroup label="Role bawaan">
+                  {roles.map((r) => (
+                    <option key={r} value={r}>
+                      {ROLE_LABELS[r]}
+                    </option>
+                  ))}
+                </optgroup>
+                {customRoles.filter((c) => roles.includes(c.baseRole)).length > 0 && (
+                  <optgroup label="Role kustom">
+                    {customRoles
+                      .filter((c) => roles.includes(c.baseRole))
+                      .map((c) => (
+                        <option key={c.id} value={`custom:${c.id}`}>
+                          {c.name} · berbasis {ROLE_LABELS[c.baseRole]}
+                        </option>
+                      ))}
+                  </optgroup>
+                )}
               </select>
             </label>
             <div className="field-lbl">

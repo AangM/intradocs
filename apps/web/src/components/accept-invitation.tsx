@@ -20,7 +20,13 @@ export function AcceptInvitation({
   invitation,
 }: {
   token: string;
-  invitation: { email: string; name: string; unit: string; role: string };
+  invitation: {
+    email: string;
+    name: string;
+    unit: string;
+    role: string;
+    roleLabel?: string | null;
+  };
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -68,8 +74,8 @@ export function AcceptInvitation({
         <h2>Akun siap</h2>
         <p className="sub">
           Akun untuk <strong>{invitation.email}</strong> sudah aktif sebagai{' '}
-          {ROLE_LABELS[invitation.role] ?? invitation.role}. Masuk dengan password yang barusan Anda
-          tetapkan.
+          {invitation.roleLabel ?? ROLE_LABELS[invitation.role] ?? invitation.role}. Masuk dengan
+          password yang barusan Anda tetapkan.
         </p>
         <button
           type="button"
@@ -87,8 +93,8 @@ export function AcceptInvitation({
       <h2>Undangan bergabung</h2>
       <p className="sub">
         {invitation.name}, Anda diundang sebagai{' '}
-        <strong>{ROLE_LABELS[invitation.role] ?? invitation.role}</strong> di unit{' '}
-        <strong>{invitation.unit}</strong>. Tetapkan password untuk{' '}
+        <strong>{invitation.roleLabel ?? ROLE_LABELS[invitation.role] ?? invitation.role}</strong>{' '}
+        di unit <strong>{invitation.unit}</strong>. Tetapkan password untuk{' '}
         <strong>{invitation.email}</strong>.
       </p>
       <form onSubmit={submit} className="login-form">

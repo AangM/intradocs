@@ -31,6 +31,15 @@ export const CAPABILITIES = [
   'analytics.view',
 ] as const;
 export type Capability = (typeof CAPABILITIES)[number];
+export const CAPABILITY_LABELS: Record<Capability, string> = {
+  'documents.upload': 'Unggah & revisi dokumen',
+  'documents.review': 'Review & persetujuan',
+  'taxonomy.view': 'Kategori & label',
+  'users.view': 'Melihat pengguna',
+  'users.manage': 'Mengelola akun',
+  'audit.view': 'Audit log',
+  'analytics.view': 'Dashboard',
+};
 const permissions: Record<Role, readonly Capability[]> = {
   super_admin: CAPABILITIES,
   knowledge_admin: [
@@ -45,20 +54,54 @@ const permissions: Record<Role, readonly Capability[]> = {
   contributor: ['documents.upload'],
   viewer: [],
 };
+/** The capabilities a built-in role carries; the ceiling a custom role can only narrow. */
+export function roleCapabilities(role: Role): readonly Capability[] {
+  return permissions[role];
+}
+/**
+ * A custom role: a name over one built-in base role, minus the capabilities it denies.
+ * The database enforces the base role (every policy reads it); the application enforces
+ * the denials on every request through hasCapability. A custom role never adds anything.
+ */
+export interface CustomRole {
+  id: string;
+  name: string;
+  description: string;
+  color: string;
+  baseRole: Exclude<Role, 'super_admin'>;
+  deniedCapabilities: Capability[];
+  revision: number;
+  holders: number;
+}
+export const CUSTOM_ROLE_BASES = ['knowledge_admin', 'reviewer', 'contributor', 'viewer'] as const;
+export const ROLE_COLORS = ['blue', 'red', 'violet', 'green', 'amber', 'sky'] as const;
 export interface Actor {
   id: string;
   name: string;
   email: string;
+  /** The built-in role the database enforces; a custom role never changes it. */
   role: Role;
   unit: string;
   active: boolean;
   scopeAll: boolean;
+  /** Set when the person holds a custom role: its name is what the UI shows. */
+  customRole?: { id: string; name: string } | null;
+  /** Effective capabilities: the base role's minus the custom role's denials. */
+  capabilities?: readonly Capability[];
 }
 export function hasCapability(
-  actor: Pick<Actor, 'role' | 'active'>,
+  actor: Pick<Actor, 'role' | 'active'> & Partial<Pick<Actor, 'capabilities'>>,
   capability: Capability,
 ): boolean {
-  return actor.active && permissions[actor.role].includes(capability);
+  return actor.active && (actor.capabilities ?? permissions[actor.role]).includes(capability);
+}
+/** What the base role grants minus the denials; the single place that arithmetic lives. */
+export function effectiveCapabilities(role: Role, denied: readonly string[]): Capability[] {
+  return permissions[role].filter((c) => !denied.includes(c));
+}
+/** The name a person's role is shown under: the custom role's, else the built-in label. */
+export function roleLabel(actor: Pick<Actor, 'role'> & Partial<Pick<Actor, 'customRole'>>): string {
+  return actor.customRole?.name ?? ROLE_LABELS[actor.role];
 }
 export function initials(name: string): string {
   return name

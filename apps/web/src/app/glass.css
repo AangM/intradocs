@@ -1670,3 +1670,66 @@ tbody tr:hover td {
   box-shadow: inset 0 0 0 3px rgba(59, 108, 246, 0.35);
   outline: none;
 }
+/* ---------- Custom roles (S08) ---------- */
+.role-card.role-custom {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.role-caps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 2px;
+}
+.role-caps .pill {
+  font-size: 10.5px;
+}
+.role-caps .role-denied {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  text-decoration: line-through;
+  text-decoration-color: rgba(185, 28, 60, 0.6);
+}
+.role-actions {
+  margin-top: auto;
+  padding-top: 8px;
+  gap: 6px;
+}
+button.role-card.role-add {
+  cursor: pointer;
+  font: inherit;
+  text-align: center;
+  color: var(--accent-ink);
+  border: 1.5px dashed rgba(59, 108, 246, 0.4);
+  background: rgba(255, 255, 255, 0.5);
+  transition:
+    background 0.16s var(--ease),
+    border-color 0.16s var(--ease),
+    transform 0.16s var(--ease);
+}
+button.role-card.role-add:hover {
+  background: rgba(255, 255, 255, 0.9);
+  border-style: solid;
+  transform: translateY(-2px);
+}
+button.role-card.role-add .sub {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+}
+.role-cell {
+  display: inline-grid;
+  gap: 2px;
+  justify-items: start;
+}
+dialog.role-dialog {
+  width: min(560px, calc(100vw - 32px));
+}
+.role-dialog .field-lbl > .sub {
+  margin-top: 2px;
+}
+.role-dialog .dialog-title .nt-ic {
+  background: color-mix(in srgb, var(--tone) 14%, #fff);
+}

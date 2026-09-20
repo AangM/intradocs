@@ -1,9 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import { eq } from 'drizzle-orm';
-import { hasCapability, isRole, type Actor, type Classification } from '@intradocs/core';
+import {
+  effectiveCapabilities,
+  hasCapability,
+  isRole,
+  type Actor,
+  type Classification,
+} from '@intradocs/core';
 import type { CatalogQuery } from '@intradocs/core/validation';
 import { withActor } from './index.ts';
-import { profiles } from './schema.ts';
 export class AccessDenied extends Error {}
 export type Category = {
   id: string;
@@ -110,8 +114,28 @@ function mapDocument(r: RawDocument): DocumentDetail {
   };
 }
 export async function loadActor(id: string): Promise<Actor | null> {
-  return withActor(id, async ({ db }) => {
-    const [p] = await db.select().from(profiles).where(eq(profiles.id, id)).limit(1);
+  return withActor(id, async ({ client }) => {
+    // The custom role's denials are read here, on every request, so a change to a
+    // role definition reaches its holders at their next page -- no session to expire.
+    const { rows } = await client.query<{
+      id: string;
+      name: string;
+      email: string;
+      unit: string;
+      role: string;
+      active: boolean;
+      scope_all: boolean;
+      custom_role_id: string | null;
+      custom_role_name: string | null;
+      denied: string[] | null;
+    }>(
+      `SELECT p.id,p.name,p.email,p.unit,p.role,p.active,p.scope_all,
+              r.id AS custom_role_id,r.name AS custom_role_name,r.denied_capabilities AS denied
+       FROM app.profiles p LEFT JOIN app.custom_roles r ON r.id=p.custom_role_id AND r.archived_at IS NULL AND r.base_role=p.role
+       WHERE p.id=$1`,
+      [id],
+    );
+    const p = rows[0];
     if (!p || !p.active || !isRole(p.role)) return null;
     return {
       id: p.id,
@@ -120,7 +144,9 @@ export async function loadActor(id: string): Promise<Actor | null> {
       unit: p.unit,
       role: p.role,
       active: p.active,
-      scopeAll: p.scopeAll,
+      scopeAll: p.scope_all,
+      customRole: p.custom_role_id ? { id: p.custom_role_id, name: p.custom_role_name! } : null,
+      capabilities: effectiveCapabilities(p.role, p.denied ?? []),
     };
   });
 }
@@ -268,7 +294,12 @@ export async function readVersionFile(
     };
   });
 }
-export type UserItem = Actor & { categories: string[]; categoryIds: string[] };
+export type UserItem = Actor & {
+  categories: string[];
+  categoryIds: string[];
+  customRoleId: string | null;
+  customRoleName: string | null;
+};
 export async function listUsers(actor: Actor): Promise<UserItem[]> {
   if (!hasCapability(actor, 'users.view')) throw new AccessDenied();
   return withActor(actor.id, async ({ client }) => {
@@ -282,9 +313,13 @@ export async function listUsers(actor: Actor): Promise<UserItem[]> {
       scope_all: boolean;
       categories: string[];
       category_ids: string[];
+      custom_role_id: string | null;
+      custom_role_name: string | null;
     }>(`
-   SELECT p.*, ARRAY(SELECT category_id::text FROM app.category_grants WHERE user_id=p.id) AS category_ids, coalesce(ARRAY(SELECT c.name FROM app.category_grants g JOIN app.categories c ON c.id=g.category_id WHERE g.user_id=p.id ORDER BY c.name),'{}') AS categories
-   FROM app.profiles p ORDER BY p.name`);
+   SELECT p.*, ARRAY(SELECT category_id::text FROM app.category_grants WHERE user_id=p.id) AS category_ids, coalesce(ARRAY(SELECT c.name FROM app.category_grants g JOIN app.categories c ON c.id=g.category_id WHERE g.user_id=p.id ORDER BY c.name),'{}') AS categories,
+          r.name AS custom_role_name
+   FROM app.profiles p LEFT JOIN app.custom_roles r ON r.id=p.custom_role_id AND r.archived_at IS NULL
+   ORDER BY p.name`);
     return rows.map((p) => ({
       id: p.id,
       name: p.name,
@@ -295,6 +330,8 @@ export async function listUsers(actor: Actor): Promise<UserItem[]> {
       scopeAll: p.scope_all,
       categories: p.categories,
       categoryIds: p.category_ids,
+      customRoleId: p.custom_role_id,
+      customRoleName: p.custom_role_name,
     }));
   });
 }

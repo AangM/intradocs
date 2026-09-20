@@ -24,6 +24,8 @@ export interface InvitationInput {
   role: string;
   scopeAll: boolean;
   categoryIds: string[];
+  /** A custom role whose base must equal `role`; SQL checks that. */
+  customRoleId?: string | null;
 }
 
 /** Creates the row and returns the one-time token; the caller shows it once. */
@@ -35,7 +37,7 @@ export async function createInvitation(
   try {
     const id = await withActor(actorId, async ({ client }) => {
       const { rows } = await client.query<{ id: string }>(
-        'SELECT app.create_invitation($1,$2,$3,$4,$5,$6,$7::uuid[],$8::interval) AS id',
+        'SELECT app.create_invitation($1,$2,$3,$4,$5,$6,$7::uuid[],$8::interval,$9::uuid) AS id',
         [
           hashToken(token),
           input.email.trim().toLowerCase(),
@@ -45,6 +47,7 @@ export async function createInvitation(
           input.scopeAll,
           input.categoryIds,
           TTL,
+          input.customRoleId ?? null,
         ],
       );
       return rows[0]!.id;
@@ -63,6 +66,8 @@ export interface InvitationRow {
   name: string;
   unit: string;
   role: string;
+  /** The custom role's name when the invitation carries one. */
+  roleLabel: string | null;
   scopeAll: boolean;
   categories: string[];
   createdAt: string;
@@ -78,6 +83,7 @@ export async function listInvitations(actorId: string): Promise<InvitationRow[]>
       name: string;
       unit: string;
       role: string;
+      role_label: string | null;
       scope_all: boolean;
       categories: string[] | null;
       created_at: string;
@@ -87,6 +93,7 @@ export async function listInvitations(actorId: string): Promise<InvitationRow[]>
       expired: boolean;
     }>(
       `SELECT i.id,i.email,i.name,i.unit,i.role,i.scope_all,
+        (SELECT r.name FROM app.custom_roles r WHERE r.id=i.custom_role_id) AS role_label,
         (SELECT array_agg(c.name ORDER BY c.name) FROM app.categories c WHERE c.id=ANY(i.category_ids)) AS categories,
         i.created_at::text,i.expires_at::text,i.accepted_at::text,i.revoked_at::text,
         (i.expires_at<=now()) AS expired
@@ -98,6 +105,7 @@ export async function listInvitations(actorId: string): Promise<InvitationRow[]>
       name: r.name,
       unit: r.unit,
       role: r.role,
+      roleLabel: r.role_label,
       scopeAll: r.scope_all,
       categories: r.categories ?? [],
       createdAt: r.created_at,
@@ -123,16 +131,27 @@ export interface OpenInvitation {
   name: string;
   unit: string;
   role: string;
+  /** Custom role name, when the invitation carries one. */
+  roleLabel: string | null;
 }
 
 /** What the acceptance page may show; nothing for a token that is not open. */
 export async function openInvitation(token: string): Promise<OpenInvitation | null> {
   if (!/^[A-Za-z0-9_-]{40,50}$/.test(token)) return null;
-  const { rows } = await getPool('app').query<OpenInvitation>(
-    'SELECT id,email,name,unit,role FROM app.open_invitation($1)',
-    [hashToken(token)],
-  );
-  return rows[0] ?? null;
+  const { rows } = await getPool('app').query<
+    Omit<OpenInvitation, 'roleLabel'> & { role_label: string | null }
+  >('SELECT id,email,name,unit,role,role_label FROM app.open_invitation($1)', [hashToken(token)]);
+  const r = rows[0];
+  return r
+    ? {
+        id: r.id,
+        email: r.email,
+        name: r.name,
+        unit: r.unit,
+        role: r.role,
+        roleLabel: r.role_label,
+      }
+    : null;
 }
 
 /**
