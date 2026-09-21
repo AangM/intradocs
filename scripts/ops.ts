@@ -41,6 +41,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { Pool } from 'pg';
 import { ROOT, loadLocalEnv, localAdminUrl, PNPM, reportFailure } from './shared.ts';
+import { S3BlobStore } from '../packages/core/src/s3.ts';
 import { readRuntimeConfig } from '../packages/core/src/config.ts';
 import { converterOptions } from '../packages/core/src/converter.ts';
 
@@ -131,18 +132,27 @@ async function backup(): Promise<void> {
     )!;
     await writeFile(path.join(dir, 'db.dump'), dump);
     // 2. Storage: a tar of the blob root, streamed through tar on the host (Windows ships
-    //    bsdtar; Linux/macOS GNU tar) -- content hashes go in the manifest.
-    const storageRoot = path.resolve(ROOT, config.storageRoot);
-    const files = existsSync(storageRoot) ? walk(storageRoot) : [];
+    //    bsdtar; Linux/macOS GNU tar) -- content hashes go in the manifest. With an S3
+    //    bucket the blobs are not on this machine: the bucket's own versioning and
+    //    replication are the backup, and the manifest records which bucket that is so a
+    //    restore can refuse a mismatch.
+    const files: string[] = [];
     const hashes: Record<string, string> = {};
-    for (const f of files) hashes[f] = sha256(await readFile(path.join(storageRoot, f)));
-    // Relative paths on purpose: bsdtar on Windows reads "C:\..." as a remote host.
-    const tar = spawnSync(
-      'tar',
-      ['-cf', rel(path.join(dir, 'storage.tar')), '-C', config.storageRoot, '.'],
-      { cwd: ROOT, stdio: 'inherit' },
-    );
-    if (tar.status !== 0) throw new Error('tar gagal membuat storage.tar.');
+    if (config.storage.driver === 'filesystem') {
+      const storageRoot = path.resolve(ROOT, config.storage.root);
+      if (existsSync(storageRoot)) files.push(...walk(storageRoot));
+      for (const f of files) hashes[f] = sha256(await readFile(path.join(storageRoot, f)));
+      // Relative paths on purpose: bsdtar on Windows reads "C:\..." as a remote host.
+      const tar = spawnSync(
+        'tar',
+        ['-cf', rel(path.join(dir, 'storage.tar')), '-C', config.storage.root, '.'],
+        { cwd: ROOT, stdio: 'inherit' },
+      );
+      if (tar.status !== 0) throw new Error('tar gagal membuat storage.tar.');
+    } else
+      console.log(
+        `Storage S3 (${config.storage.bucket}) tidak ikut: versioning bucket adalah backupnya.`,
+      );
     // 3. Manifest: what was backed up, from what schema, with what counts.
     const migrations = (
       await admin.query<{ name: string; sha256: string }>(
@@ -154,7 +164,15 @@ async function backup(): Promise<void> {
       profile: process.env.APP_PROFILE,
       release: JSON.parse(await readFile(path.join(ROOT, 'package.json'), 'utf8')).version,
       database: { file: 'db.dump', sha256: sha256(dump), bytes: dump.length },
-      storage: { file: 'storage.tar', root: config.storageRoot, files: files.length, hashes },
+      storage:
+        config.storage.driver === 'filesystem'
+          ? { file: 'storage.tar', root: config.storage.root, files: files.length, hashes }
+          : {
+              file: null,
+              root: `s3://${config.storage.bucket}/${config.storage.prefix}`,
+              files: 0,
+              hashes,
+            },
       counts: await counts(admin),
       migrations,
       excluded: [
@@ -188,7 +206,7 @@ async function restore(): Promise<void> {
   const dir = path.resolve(ROOT, folder);
   const manifest = JSON.parse(await readFile(path.join(dir, 'manifest.json'), 'utf8')) as {
     database: { sha256: string };
-    storage: { root: string; hashes: Record<string, string>; files: number };
+    storage: { file: string | null; root: string; hashes: Record<string, string>; files: number };
     counts: Record<string, number>;
     migrations: Array<{ name: string }>;
   };
@@ -196,10 +214,12 @@ async function restore(): Promise<void> {
   if (sha256(dump) !== manifest.database.sha256)
     throw new Error('db.dump tidak cocok dengan manifest.');
   const config = readRuntimeConfig(process.env);
-  if (config.storageRoot !== manifest.storage.root)
-    throw new Error(
-      `Backup dibuat untuk STORAGE_ROOT=${manifest.storage.root}, bukan ${config.storageRoot}.`,
-    );
+  const storageName =
+    config.storage.driver === 'filesystem'
+      ? config.storage.root
+      : `s3://${config.storage.bucket}/${config.storage.prefix}`;
+  if (storageName !== manifest.storage.root)
+    throw new Error(`Backup dibuat untuk storage ${manifest.storage.root}, bukan ${storageName}.`);
   // 1. The app and worker must be down: a live server would keep writing into schemas
   //    that are about to be dropped, and hold connections that block the drop.
   const alive = await fetch(`${process.env.APP_URL}/api/health`, {
@@ -241,25 +261,29 @@ async function restore(): Promise<void> {
     ],
     dump,
   );
-  // 3. Storage: wipe the root and unpack the tar, then verify every hash.
-  const storageRoot = path.resolve(ROOT, config.storageRoot);
-  mkdirSync(storageRoot, { recursive: true });
-  rmSync(storageRoot, { recursive: true, force: true });
-  mkdirSync(storageRoot, { recursive: true });
-  const tar = spawnSync(
-    'tar',
-    ['-xf', rel(path.join(dir, 'storage.tar')), '-C', config.storageRoot],
-    { cwd: ROOT, stdio: 'inherit' },
-  );
-  if (tar.status !== 0) throw new Error('tar gagal mengekstrak storage.tar.');
-  let bad = 0;
-  for (const [f, h] of Object.entries(manifest.storage.hashes))
-    if (
-      !existsSync(path.join(storageRoot, f)) ||
-      sha256(await readFile(path.join(storageRoot, f))) !== h
-    )
-      bad++;
-  if (bad) throw new Error(`${bad} berkas storage tidak cocok dengan manifest setelah restore.`);
+  // 3. Storage: wipe the root and unpack the tar, then verify every hash. An S3 bucket
+  //    is not touched: the database now points at keys the bucket still holds (keys are
+  //    immutable and never reused), and rolling the bucket back is its own operation.
+  if (config.storage.driver === 'filesystem' && manifest.storage.file) {
+    const storageRoot = path.resolve(ROOT, config.storage.root);
+    mkdirSync(storageRoot, { recursive: true });
+    rmSync(storageRoot, { recursive: true, force: true });
+    mkdirSync(storageRoot, { recursive: true });
+    const tar = spawnSync(
+      'tar',
+      ['-xf', rel(path.join(dir, manifest.storage.file)), '-C', config.storage.root],
+      { cwd: ROOT, stdio: 'inherit' },
+    );
+    if (tar.status !== 0) throw new Error('tar gagal mengekstrak storage.tar.');
+    let bad = 0;
+    for (const [f, h] of Object.entries(manifest.storage.hashes))
+      if (
+        !existsSync(path.join(storageRoot, f)) ||
+        sha256(await readFile(path.join(storageRoot, f))) !== h
+      )
+        bad++;
+    if (bad) throw new Error(`${bad} berkas storage tidak cocok dengan manifest setelah restore.`);
+  } else console.log('Storage S3 tidak disentuh oleh restore; kunci bersifat immutable.');
   // 4. Migrations newer than the backup, then counts, then the WeKnora index.
   const migrate = spawnSync(PNPM, ['db:migrate'], {
     cwd: ROOT,
@@ -450,8 +474,13 @@ async function ready(): Promise<void> {
     const j = (await r.json()) as { release?: string; ai?: string };
     return `release ${j.release} · ai ${j.ai}`;
   });
-  await probe('Storage root', true, 'Developer B (data)', async () => {
-    const root = path.resolve(ROOT, readRuntimeConfig(process.env).storageRoot);
+  await probe('Storage', true, 'Developer B (data)', async () => {
+    const storage = readRuntimeConfig(process.env).storage;
+    if (storage.driver === 's3') {
+      await new S3BlobStore(storage, { timeoutMs: 5000 }).probe();
+      return `bucket ${storage.bucket} menjawab`;
+    }
+    const root = path.resolve(ROOT, storage.root);
     if (!existsSync(root)) throw new Error('belum ada');
     return `${walk(root).length} berkas`;
   });
@@ -521,7 +550,25 @@ async function preflight(): Promise<void> {
       config.authSecret.length >= (hardened ? 48 : 32),
       `${config.authSecret.length} karakter`,
     );
-    add('Storage di luar webroot', !WEBROOT.test(config.storageRoot), config.storageRoot);
+    if (config.storage.driver === 'filesystem')
+      add('Storage di luar webroot', !WEBROOT.test(config.storage.root), config.storage.root);
+    else {
+      // The bucket answers with these credentials, or the release does not go out.
+      let ok = true;
+      let note = `s3://${config.storage.bucket} via ${config.storage.endpoint}`;
+      try {
+        await new S3BlobStore(config.storage, { timeoutMs: 5000 }).probe();
+      } catch (e) {
+        ok = false;
+        note += ` — ${e instanceof Error ? e.message : 'tidak menjawab'}`;
+      }
+      add('Bucket S3 menjawab', ok, note);
+      add(
+        'Endpoint S3 https',
+        config.storage.endpoint.startsWith('https://'),
+        config.storage.endpoint,
+      );
+    }
   }
   const admin = new Pool({ connectionString: localAdminUrl(), max: 1 });
   try {

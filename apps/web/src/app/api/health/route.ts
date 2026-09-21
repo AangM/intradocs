@@ -17,6 +17,7 @@ export async function GET() {
         // Mode only; issuer and client id stay out of an unauthenticated response.
         auth: readRuntimeConfig(process.env).sso ? 'oidc' : 'local',
         mail: readMailConfig(process.env, readRuntimeConfig(process.env).hardened).mode,
+        storage: readRuntimeConfig(process.env).storage.driver,
         ai: readAiConfig(process.env).retrieval,
         release: '0.3.0',
       },

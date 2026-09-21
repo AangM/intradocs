@@ -32,6 +32,14 @@ export function childEnvironment(
     'SMTP_URL',
     'RETENTION_GRACE_DAYS',
     'RETENTION_OVERDUE_DAYS',
+    'S3_ENDPOINT',
+    'S3_REGION',
+    'S3_BUCKET',
+    'S3_PREFIX',
+    'S3_ACCESS_KEY_ID',
+    'S3_SECRET_ACCESS_KEY',
+    'S3_FORCE_PATH_STYLE',
+    'S3_SSE',
   ];
   // Both processes talk to WeKnora: web for retrieval, worker for export. The key is a
   // server-side credential and reaches neither the browser bundle nor any response.
@@ -76,7 +84,7 @@ export function childEnvironment(
           'KNOWLEDGE_PORT',
           'KNOWLEDGE_TOKEN',
         ]
-      : ['WORKER_DATABASE_URL', 'STORAGE_ROOT', 'APP_URL'];
+      : ['WORKER_DATABASE_URL', 'STORAGE_DRIVER', 'STORAGE_ROOT', 'APP_URL'];
   const result: NodeJS.ProcessEnv = { NEXT_TELEMETRY_DISABLED: '1' };
   for (const key of [...operatingSystemKeys, ...shared, ...weknora, ...keys])
     if (source[key] !== undefined) result[key] = source[key];

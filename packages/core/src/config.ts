@@ -15,7 +15,22 @@ export interface RuntimeConfig {
    * one an admin invited, it never provisions a new account.
    */
   sso: SsoConfig | null;
+  /** Where the blobs live: a private directory, or an S3-compatible bucket. */
+  storage: StorageConfig;
 }
+export type StorageConfig =
+  | { driver: 'filesystem'; root: string }
+  | {
+      driver: 's3';
+      endpoint: string;
+      region: string;
+      bucket: string;
+      prefix: string;
+      accessKeyId: string;
+      secretAccessKey: string;
+      pathStyle: boolean;
+      sse: boolean;
+    };
 export interface SsoConfig {
   issuer: string;
   clientId: string;
@@ -100,8 +115,8 @@ export function readRuntimeConfig(env: Record<string, string | undefined>): Runt
     throw new ConfigurationError(
       'AI_PROVIDER hanya menerima off atau weknora-local. Provider cloud tidak diimplementasikan.',
     );
-  if (env.STORAGE_DRIVER !== 'filesystem')
-    throw new ConfigurationError('Adapter S3 belum diimplementasikan. Gunakan filesystem.');
+  if (env.STORAGE_DRIVER !== 'filesystem' && env.STORAGE_DRIVER !== 's3')
+    throw new ConfigurationError('STORAGE_DRIVER hanya menerima filesystem atau s3.');
   let app: URL;
   try {
     app = new URL(env.APP_URL ?? '');
@@ -141,18 +156,10 @@ export function readRuntimeConfig(env: Record<string, string | undefined>): Runt
   const sso = env.AUTH_MODE === 'oidc' ? readSso(env, hardened) : null;
   if (!env.INTRADOCS_ROOT) throw new ConfigurationError('INTRADOCS_ROOT belum diisi.');
   const storageRoot = env.STORAGE_ROOT ?? 'var/storage';
-  // Never inside the served tree, whatever the profile. Locally that means a private
-  // subfolder of var/; on a deployment an absolute path on a volume the web process
-  // owns, which must still not sit under a webroot.
-  if (/(^|[\\/])public([\\/]|$)/.test(storageRoot))
-    throw new ConfigurationError('STORAGE_ROOT tidak boleh berada di webroot.');
-  if (hardened) {
-    if (!/^(\/[^\0]*|[A-Za-z]:[\\/][^\0]*)$/.test(storageRoot))
-      throw new ConfigurationError('STORAGE_ROOT profil ini harus path absolut.');
-    if (/\.\./.test(storageRoot))
-      throw new ConfigurationError('STORAGE_ROOT tidak boleh memuat ..');
-  } else if (!/^var\/[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/.test(storageRoot))
-    throw new ConfigurationError('Storage lokal harus berada di subfolder privat var/.');
+  const storage: StorageConfig =
+    env.STORAGE_DRIVER === 's3'
+      ? readS3(env, hardened)
+      : { driver: 'filesystem', root: assertStorageRoot(storageRoot, hardened) };
   return {
     profile,
     appUrl: app.origin,
@@ -163,6 +170,79 @@ export function readRuntimeConfig(env: Record<string, string | undefined>): Runt
     authSecret,
     hardened,
     sso,
+    storage,
+  };
+}
+/**
+ * The filesystem root: never inside the served tree, whatever the profile. Locally that
+ * means a private subfolder of var/; on a deployment an absolute path on a volume the
+ * web process owns, which must still not sit under a webroot.
+ */
+function assertStorageRoot(storageRoot: string, hardened: boolean): string {
+  if (/(^|[\\/])public([\\/]|$)/.test(storageRoot))
+    throw new ConfigurationError('STORAGE_ROOT tidak boleh berada di webroot.');
+  if (hardened) {
+    if (!/^(\/[^\0]*|[A-Za-z]:[\\/][^\0]*)$/.test(storageRoot))
+      throw new ConfigurationError('STORAGE_ROOT profil ini harus path absolut.');
+    if (/\.\./.test(storageRoot))
+      throw new ConfigurationError('STORAGE_ROOT tidak boleh memuat ..');
+  } else if (!/^var\/[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/.test(storageRoot))
+    throw new ConfigurationError('Storage lokal harus berada di subfolder privat var/.');
+  return storageRoot;
+}
+/**
+ * STORAGE_DRIVER=s3: endpoint, region, bucket and a key pair; optional prefix; path-style
+ * on by default because MinIO and most self-hosted stores want it. The endpoint must be
+ * https on a deployment -- object bodies and the signing key's derivative go over it --
+ * and http only on the loopback of a local build (a MinIO in Docker).
+ */
+export function readS3(
+  env: Record<string, string | undefined>,
+  hardened: boolean,
+): Extract<StorageConfig, { driver: 's3' }> {
+  let endpoint: URL;
+  try {
+    endpoint = new URL(env.S3_ENDPOINT ?? '');
+  } catch {
+    throw new ConfigurationError('S3_ENDPOINT tidak valid.');
+  }
+  if (endpoint.pathname !== '/' || endpoint.search || endpoint.hash || endpoint.username)
+    throw new ConfigurationError(
+      'S3_ENDPOINT harus origin bersih (tanpa path, query, kredensial).',
+    );
+  if (
+    endpoint.protocol !== 'https:' &&
+    !(!hardened && endpoint.protocol === 'http:' && localHosts.has(endpoint.hostname))
+  )
+    throw new ConfigurationError(
+      'S3_ENDPOINT wajib https (http hanya untuk loopback pada build lokal).',
+    );
+  const bucket = env.S3_BUCKET ?? '';
+  if (!/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(bucket) || bucket.includes('..'))
+    throw new ConfigurationError('S3_BUCKET tidak valid.');
+  const region = env.S3_REGION ?? '';
+  if (!/^[a-z0-9-]{2,32}$/.test(region)) throw new ConfigurationError('S3_REGION tidak valid.');
+  const prefix = (env.S3_PREFIX ?? '').replace(/^\/+|\/+$/g, '');
+  if (prefix && (!/^[A-Za-z0-9_./-]+$/.test(prefix) || prefix.includes('..')))
+    throw new ConfigurationError('S3_PREFIX tidak valid.');
+  const accessKeyId = env.S3_ACCESS_KEY_ID ?? '';
+  const secretAccessKey = env.S3_SECRET_ACCESS_KEY ?? '';
+  if (accessKeyId.length < 3 || secretAccessKey.length < 8)
+    throw new ConfigurationError('S3_ACCESS_KEY_ID / S3_SECRET_ACCESS_KEY belum diisi.');
+  if (/replace|change.?me|example|minioadmin/i.test(secretAccessKey) && hardened)
+    throw new ConfigurationError('S3_SECRET_ACCESS_KEY masih nilai contoh.');
+  const pathStyle = (env.S3_FORCE_PATH_STYLE ?? 'true') !== 'false';
+  const sse = env.S3_SSE === 'true';
+  return {
+    driver: 's3',
+    endpoint: endpoint.origin,
+    region,
+    bucket,
+    prefix,
+    accessKeyId,
+    secretAccessKey,
+    pathStyle,
+    sse,
   };
 }
 /**
@@ -219,7 +299,10 @@ export function readRetentionWindows(env: Record<string, string | undefined>): {
     overdueDays: read('RETENTION_OVERDUE_DAYS', 30),
   };
 }
-export function readWorkerConfig(env: Record<string, string | undefined>): { databaseUrl: string } {
+export function readWorkerConfig(env: Record<string, string | undefined>): {
+  databaseUrl: string;
+  storage: StorageConfig;
+} {
   if (!isProfile(env.APP_PROFILE))
     throw new ConfigurationError(`APP_PROFILE harus salah satu dari ${PROFILES.join(', ')}.`);
   if (env.AI_PROVIDER !== 'off' && env.AI_PROVIDER !== 'weknora-local')
@@ -231,5 +314,19 @@ export function readWorkerConfig(env: Record<string, string | undefined>): { dat
       : assertDeployedDatabase(raw, env.DATABASE_PRIVATE_NETWORK === 'true');
   if (decodeURIComponent(u.username) !== 'intradocs_worker')
     throw new ConfigurationError('Worker wajib memakai role terpisah.');
-  return { databaseUrl: raw };
+  const hardened = env.APP_PROFILE !== 'local-dev';
+  if (
+    env.STORAGE_DRIVER !== undefined &&
+    env.STORAGE_DRIVER !== 'filesystem' &&
+    env.STORAGE_DRIVER !== 's3'
+  )
+    throw new ConfigurationError('STORAGE_DRIVER hanya menerima filesystem atau s3.');
+  const storage: StorageConfig =
+    env.STORAGE_DRIVER === 's3'
+      ? readS3(env, hardened)
+      : {
+          driver: 'filesystem',
+          root: assertStorageRoot(env.STORAGE_ROOT ?? 'var/storage', hardened),
+        };
+  return { databaseUrl: raw, storage };
 }

@@ -144,15 +144,43 @@ test('a database on the same machine as the app may skip TLS; anything remote ma
   assert.throws(() => assertDeployedDatabase('not-a-url'));
 });
 
-test('the worker keeps its own identity on a deployment too', () => {
+test('the worker keeps its own identity on a deployment too, and reads the same storage', () => {
+  const worker = readWorkerConfig({
+    APP_PROFILE: 'production',
+    AI_PROVIDER: 'weknora-local',
+    WORKER_DATABASE_URL:
+      'postgres://intradocs_worker:pw@db.example.test/intradocs?sslmode=verify-full',
+    STORAGE_ROOT: '/data/storage',
+  });
   assert.equal(
-    readWorkerConfig({
-      APP_PROFILE: 'production',
-      AI_PROVIDER: 'weknora-local',
-      WORKER_DATABASE_URL:
-        'postgres://intradocs_worker:pw@db.example.test/intradocs?sslmode=verify-full',
-    }).databaseUrl,
+    worker.databaseUrl,
     'postgres://intradocs_worker:pw@db.example.test/intradocs?sslmode=verify-full',
+  );
+  assert.deepEqual(worker.storage, { driver: 'filesystem', root: '/data/storage' });
+  // The same S3 variables the web reads; the worker writes the Markdown it publishes there.
+  const s3 = readWorkerConfig({
+    APP_PROFILE: 'production',
+    AI_PROVIDER: 'off',
+    WORKER_DATABASE_URL:
+      'postgres://intradocs_worker:pw@db.example.test/intradocs?sslmode=verify-full',
+    STORAGE_DRIVER: 's3',
+    S3_ENDPOINT: 'https://minio.internal:9000',
+    S3_REGION: 'ap-southeast-1',
+    S3_BUCKET: 'intradocs',
+    S3_ACCESS_KEY_ID: 'AKIAINTRADOCS',
+    S3_SECRET_ACCESS_KEY: 'Qx7Fv2Lm9Kd4Rt6Yh1Bn8Jw3Zs5Pc0Ae',
+  });
+  assert.equal(s3.storage.driver, 's3');
+  // A deployment without STORAGE_ROOT and without S3 has nowhere to write: refused.
+  assert.throws(
+    () =>
+      readWorkerConfig({
+        APP_PROFILE: 'production',
+        AI_PROVIDER: 'off',
+        WORKER_DATABASE_URL:
+          'postgres://intradocs_worker:pw@db.example.test/intradocs?sslmode=verify-full',
+      }),
+    ConfigurationError,
   );
   // The app's own role is not the worker's, and a remote worker connection needs TLS.
   assert.throws(() =>

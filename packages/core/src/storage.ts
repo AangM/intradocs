@@ -2,6 +2,8 @@ import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, realpath, readFile, open, link, unlink, lstat } from 'node:fs/promises';
 import path from 'node:path';
 import type { BlobStore, StoredFile } from './ports.ts';
+import type { StorageConfig } from './config.ts';
+import { S3BlobStore } from './s3.ts';
 export function validateStorageKey(key: string): string {
   if (
     !key ||
@@ -18,7 +20,8 @@ export function validateStorageKey(key: string): string {
 export function sha256(bytes: Uint8Array): string {
   return createHash('sha256').update(bytes).digest('hex');
 }
-function limitFor(key: string) {
+/** The byte ceiling per artefact kind, the same for every store. */
+export function limitFor(key: string) {
   return /\/(?:original|attachment-[1-4])\.(md|txt|pdf|docx|xlsx|html|pptx)$/.test(key)
     ? 50 * 1024 * 1024
     : 2 * 1024 * 1024;
@@ -101,4 +104,10 @@ export class LocalBlobStore implements BlobStore {
       throw new Error('Integritas artefak gagal.');
     return bytes;
   }
+}
+
+/** The one place a store is built from configuration; `rootDir` anchors a relative filesystem root. */
+export function createBlobStore(storage: StorageConfig, rootDir: string): BlobStore {
+  if (storage.driver === 's3') return new S3BlobStore(storage);
+  return new LocalBlobStore(path.resolve(rootDir, storage.root));
 }

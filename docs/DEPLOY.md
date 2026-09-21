@@ -21,7 +21,7 @@ konfigurasi menolak apa pun selain `http://localhost`. Sekarang ada dua profil l
 | Database             | hanya host lokal              | host mana pun, tetapi **wajib TLS** (`sslmode=verify-full`) — kecuali loopback, atau jaringan privat satu host yang **dinyatakan tertulis** lewat `DATABASE_PRIVATE_NETWORK=true` |
 | Role database        | app/auth/worker terpisah      | sama, tetap ditolak bila memakai owner                                                                                                                                            |
 | Secret               | ≥ 32 karakter                 | ≥ **48** karakter, ditolak bila mengandung kata yang dapat ditebak atau terlalu sedikit variasi                                                                                   |
-| `STORAGE_ROOT`       | subfolder `var/`              | **path absolut**, tidak boleh di webroot, tidak boleh memuat `..`                                                                                                                 |
+| `STORAGE_ROOT`       | subfolder `var/`              | **path absolut**, tidak boleh di webroot, tidak boleh memuat `..` — atau `STORAGE_DRIVER=s3` dengan endpoint https (§2e)                                                          |
 | Akun `@example.test` | wajar                         | **menahan rilis** (`ops:preflight`)                                                                                                                                               |
 
 Semua aturan ditegakkan `readRuntimeConfig` (`packages/core/src/config.ts`) dan diuji di
@@ -128,6 +128,34 @@ cakupan)`, bukan sel kosong), sel yang diawali `=`/`+`/`-`/`@` dinetralkan agar 
 dieksekusi spreadsheet. Setiap ekspor tercatat sebagai event `audit.exported` — auditor
 melihat siapa mengambil salinan dan kapan. JSON Lines cocok untuk SIEM: satu objek per
 event, header dan trailer terpisah.
+
+### 2e. Storage objek (S3) untuk lebih dari satu host
+
+`STORAGE_DRIVER=s3` memindahkan seluruh blob (original, Markdown, lampiran) ke bucket
+S3-compatible — AWS S3, MinIO, Ceph RGW — sehingga web dan worker tidak lagi harus berbagi
+volume; itulah prasyarat menjalankan lebih dari satu replika. Variabel: `S3_ENDPOINT`
+(https), `S3_REGION`, `S3_BUCKET`, `S3_PREFIX`, pasangan kunci, `S3_FORCE_PATH_STYLE`
+(default `true`, MinIO), `S3_SSE`. Yang perlu diketahui reviewer:
+
+- **Tanpa SDK.** Empat permintaan (PUT/GET/HEAD objek, HEAD bucket) ditandatangani
+  AWS SigV4 oleh kode di `packages/core/src/s3.ts`; penandatanganan diuji terhadap vektor
+  resmi AWS, dan `tests/integration/s3-live.test.ts` menjalankannya terhadap MinIO sungguhan
+  (`S3_TEST_ENDPOINT=…`).
+- **Kunci tetap immutable.** PUT memakai `If-None-Match: *` (AWS, MinIO): kunci yang sudah
+  ada tidak pernah ditimpa, isi yang berbeda ditolak. Store yang tidak mendukungnya (501)
+  jatuh ke HEAD-lalu-PUT — jaminan yang lebih sempit; catat store mana yang dipakai.
+- **Integritas.** Setiap PUT membawa `x-amz-checksum-sha256`; store menolak unggahan yang
+  rusak, dan setiap pembacaan diverifikasi terhadap hash di database seperti sebelumnya.
+- **Backup.** `ops:backup` tidak mengunduh bucket: aktifkan **versioning** (dan replikasi
+  bila ada) pada bucket — itulah backup blob; manifest mencatat bucket mana. `ops:restore`
+  tidak menyentuh bucket (kunci immutable, tidak pernah dipakai ulang). `ops:preflight` dan
+  `ops:ready` memeriksa bucket menjawab dengan kredensial yang diberikan.
+- **Hak kunci minimal:** `s3:PutObject`, `GetObject`, `HeadObject`/`ListBucket` untuk HEAD
+  bucket. Tidak perlu `DeleteObject` — aplikasi tidak pernah menghapus; `storage:gc`
+  hanya untuk filesystem, pada S3 gunakan lifecycle rule bucket bila diinginkan.
+- Migrasi dari filesystem ke S3 pada instalasi yang sudah berjalan: salin isi
+  `STORAGE_ROOT` ke `s3://bucket/prefix/` dengan struktur yang sama (`aws s3 sync` /
+  `mc mirror`), lalu ganti driver. Kunci di database tidak berubah.
 
 ---
 

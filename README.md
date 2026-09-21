@@ -123,6 +123,16 @@ SSO tidak pernah membuat akun. Untuk mencobanya di laptop: `pnpm idp:mock` (IdP 
 `OIDC_CLIENT_SECRET=mock-idp-secret-not-for-deployments`. Detail deployment di
 [docs/DEPLOY.md](docs/DEPLOY.md) §2a.
 
+## Storage objek (S3)
+
+`STORAGE_DRIVER=s3` menaruh semua blob di bucket S3-compatible (AWS S3, MinIO, Ceph) —
+prasyarat lebih dari satu replika. Tanpa SDK: SigV4 ditulis sendiri dan diuji terhadap
+vektor AWS serta MinIO sungguhan. Kunci tetap immutable (`If-None-Match: *`), setiap
+unggahan membawa checksum. Untuk mencoba di laptop:
+`docker run -d -p 127.0.0.1:9000:9000 -e MINIO_ROOT_USER=u -e MINIO_ROOT_PASSWORD=p quay.io/minio/minio server /data`,
+buat bucket, lalu `STORAGE_DRIVER=s3` + `S3_*` di `.env.local` (http hanya diterima untuk
+loopback). Rincian di [docs/DEPLOY.md](docs/DEPLOY.md) §2e.
+
 ## Ekspor audit log
 
 Audit Log bisa disaring per rentang tanggal dan aktivitas, lalu diekspor sebagai CSV atau
