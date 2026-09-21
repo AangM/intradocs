@@ -197,6 +197,28 @@ function readSso(env: Record<string, string | undefined>, hardened: boolean): Ss
   return { issuer: issuer.href.replace(/\/$/, ''), clientId, clientSecret, label };
 }
 
+/**
+ * The two windows retention runs on: how long after expiry an unreplaced document is
+ * archived, and how long after a missed review date the category's administrators are
+ * told. Defaults of a month each; bounded so a typo cannot archive everything tonight.
+ */
+export function readRetentionWindows(env: Record<string, string | undefined>): {
+  graceDays: number;
+  overdueDays: number;
+} {
+  const read = (key: string, fallback: number) => {
+    const raw = env[key];
+    if (raw === undefined || raw === '') return fallback;
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < 1 || n > 3650)
+      throw new ConfigurationError(`${key} harus bilangan bulat 1..3650 (hari).`);
+    return n;
+  };
+  return {
+    graceDays: read('RETENTION_GRACE_DAYS', 30),
+    overdueDays: read('RETENTION_OVERDUE_DAYS', 30),
+  };
+}
 export function readWorkerConfig(env: Record<string, string | undefined>): { databaseUrl: string } {
   if (!isProfile(env.APP_PROFILE))
     throw new ConfigurationError(`APP_PROFILE harus salah satu dari ${PROFILES.join(', ')}.`);

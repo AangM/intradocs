@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { requireActor } from '@/lib/session';
 import { dashboardData } from '@intradocs/db/discovery';
+import { retentionOverview } from '@intradocs/db/workflow';
+import { readRetentionWindows } from '@intradocs/core/config';
 import { PageHeading, Empty, documentHref } from '@/components/shared';
 import { Icon } from '@/components/icon';
 import { formatDate, formatNumber, formatRelative, hasCapability, initials } from '@intradocs/core';
@@ -29,6 +31,22 @@ export default async function Dashboard({
         .trim()
         .slice(0, 80) || null;
   const data = await dashboardData(actor.id, days, unit);
+  // What the retention policy will do next, in this administrator's scope. Taxonomy
+  // administrators (taxonomy.view) see it; the database limits it to their categories.
+  const windows = readRetentionWindows(process.env);
+  const retention = hasCapability(actor, 'taxonomy.view')
+    ? await retentionOverview(actor.id, windows)
+    : null;
+  const RETENTION_STATE = {
+    expired: { text: 'Kedaluwarsa', pill: 'p-red', verb: 'diarsipkan otomatis' },
+    overdue: {
+      text: 'Review terlewat',
+      pill: 'p-red',
+      verb: 'dieskalasi ke admin; terlewat sejak',
+    },
+    due: { text: 'Review jatuh tempo', pill: 'p-amber', verb: 'menunggu pemilik; jatuh tempo' },
+    soon: { text: 'Review 14 hari', pill: 'p-blue', verb: 'pengingat terkirim; review' },
+  } as const;
   // Server component: "today" is fixed once per request, like the data it frames.
   const now = await currentTime();
   const aiOn = aiStatus().retrieval !== 'off';
@@ -254,6 +272,69 @@ export default async function Dashboard({
         </section>
       </div>
 
+      {retention && (
+        <section className="card mb">
+          <div className="card-h">
+            <h2 className="h3">Retensi &amp; review berkala</h2>
+            <span className={`pill ${retention.length ? 'p-amber' : 'p-grey'} ml-auto`}>
+              {retention.length} dokumen
+            </span>
+          </div>
+          <div className="card-b">
+            <p className="sub tiny">
+              Kebijakan berjalan sendiri tiap jam: dokumen kedaluwarsa yang tidak diperbarui dalam{' '}
+              {windows.graceDays} hari diarsipkan; review yang terlewat lebih dari{' '}
+              {windows.overdueDays} hari dieskalasi ke admin kategori. Pemilik dapat mengonfirmasi
+              &ldquo;masih berlaku&rdquo; dari halaman dokumen.
+            </p>
+            {retention.length ? (
+              <div className="table-scroll" tabIndex={0} role="region" aria-label="Tabel retensi">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Status</th>
+                      <th>Dokumen</th>
+                      <th>Pemilik</th>
+                      <th>Kategori</th>
+                      <th>Tindakan kebijakan</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {retention.map((r) => {
+                      const s = RETENTION_STATE[r.state];
+                      return (
+                        <tr key={r.documentId}>
+                          <td>
+                            <span className={`pill ${s.pill}`}>{s.text}</span>
+                          </td>
+                          <td>
+                            <Link href={documentHref({ id: r.documentId, slug: r.slug })}>
+                              {r.title}
+                            </Link>
+                          </td>
+                          <td>{r.ownerLabel}</td>
+                          <td>{r.categoryName}</td>
+                          <td className="sub">
+                            {s.verb}{' '}
+                            <time dateTime={r.dueAt} title={formatDate(r.dueAt)}>
+                              {formatRelative(r.dueAt)}
+                            </time>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="sub">
+                Tidak ada dokumen yang mendekati review, terlewat, atau kedaluwarsa dalam cakupan
+                Anda.
+              </p>
+            )}
+          </div>
+        </section>
+      )}
       <div className="dash-row-3 mb">
         <section className="card">
           <div className="card-h">

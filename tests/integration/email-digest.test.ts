@@ -43,16 +43,14 @@ after(async () => {
 });
 
 const claim = (settle = '2 minutes', attempts = 5) =>
-  worker
-    .query('SELECT * FROM app.claim_email_digest($1::interval,$2)', [settle, attempts])
-    .then(
-      (r) =>
-        r.rows as Array<{
-          user_id: string;
-          email: string;
-          items: Array<{ id: string; kind: string; title: string }>;
-        }>,
-    );
+  worker.query('SELECT * FROM app.claim_email_digest($1::interval,$2)', [settle, attempts]).then(
+    (r) =>
+      r.rows as Array<{
+        user_id: string;
+        email: string;
+        items: Array<{ id: string; kind: string; title: string }>;
+      }>,
+  );
 
 test('the worker role can reach the digest functions and nothing else about notifications', async () => {
   await assert.rejects(

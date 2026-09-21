@@ -18,6 +18,12 @@ const LABELS: Record<string, { text: string; icon: string; tone: string }> = {
   'review.finding_resolved': { text: 'Temuan review diselesaikan', icon: 'check', tone: 'green' },
   'document.published': { text: 'Dipublikasikan', icon: 'zap', tone: 'green' },
   'document.withdrawn': { text: 'Dicabut dari publikasi', icon: 'lock', tone: 'amber' },
+  'document.reaffirmed': { text: 'Dikonfirmasi masih berlaku', icon: 'check-c', tone: 'green' },
+  'document.archived_by_policy': {
+    text: 'Diarsipkan otomatis (kebijakan retensi)',
+    icon: 'lock',
+    tone: 'red',
+  },
   'publication.retried': { text: 'Publikasi diulang', icon: 'refresh', tone: 'amber' },
   'document.rolled_back': { text: 'Versi dipulihkan sebagai draft', icon: 'clock', tone: 'amber' },
   'document.feedback': { text: 'Masukan pembaca', icon: 'msg', tone: 'grey' },

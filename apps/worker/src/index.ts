@@ -2,7 +2,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { Pool } from 'pg';
 import { PgBoss } from 'pg-boss';
-import { readWorkerConfig } from '@intradocs/core/config';
+import { readRetentionWindows, readWorkerConfig } from '@intradocs/core/config';
 import { LocalBlobStore } from '@intradocs/core/storage';
 import { processPublication } from '@intradocs/core/workflow';
 import { readAiConfig } from '@intradocs/core/ai-config';
@@ -48,8 +48,18 @@ async function start() {
   pool.on('error', () => console.error('Koneksi worker gagal.'));
   await boss.start();
   await boss.createQueue('review-reminders');
+  const retention = readRetentionWindows(process.env);
   await boss.work('review-reminders', async () => {
     await pool.query('SELECT app.enqueue_review_reminders()');
+    // The policy pass: archive what expired and was not replaced within the grace
+    // window, escalate reviews overdue past the other. Counts are the only output.
+    const { rows } = await pool.query<{ archived: number; escalated: number }>(
+      'SELECT * FROM app.apply_retention($1,$2)',
+      [retention.graceDays, retention.overdueDays],
+    );
+    const r = rows[0];
+    if (r && (r.archived > 0 || r.escalated > 0))
+      console.log(`Retensi: ${r.archived} diarsipkan, ${r.escalated} eskalasi review.`);
     // Search wording expires after 30 days while the counts stay, so the KPI tiles keep
     // working without the phrasing accumulating indefinitely.
     await pool.query('SELECT app.prune_search_queries()');

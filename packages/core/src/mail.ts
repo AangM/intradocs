@@ -92,6 +92,8 @@ export const DIGEST_KIND_LABELS: Record<string, string> = {
   expired: 'Kedaluwarsa',
   feedback: 'Masukan pembaca baru',
   index_failed: 'Indeks gagal — publikasi diulang otomatis',
+  archived: 'Diarsipkan otomatis — kedaluwarsa tanpa pembaruan',
+  review_overdue: 'Review terlewat — perlu tindak lanjut',
 };
 const escapeHtml = (s: string) =>
   s.replace(

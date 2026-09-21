@@ -27,6 +27,8 @@ before(async () => {
   // Already running from `pnpm idp:mock`? Fine; the test uses whichever answers.
   const health = (await (await fetch(base + '/api/health')).json()) as { auth?: string };
   enabled = health.auth === 'oidc';
+  // Links left by a manual run of the demo IdP would make "one link" ambiguous.
+  await db.query('DELETE FROM auth.account WHERE "providerId"=\'sso\'');
 });
 after(async () => {
   await idp?.close();

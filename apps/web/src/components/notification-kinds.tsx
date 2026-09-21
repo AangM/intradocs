@@ -1,5 +1,5 @@
 /**
- * The seven kinds app.notifications can hold (migration 005), each with the words a
+ * The kinds app.notifications can hold (migrations 005 and 042), each with the words a
  * reader would use, an icon, and the flow colour it belongs to: review (amber) for
  * things waiting on someone, ok (green) for things that went through, block (red) for
  * things that need attention now, info (blue) for the rest.
@@ -14,6 +14,16 @@ export const NOTIFICATION_KINDS: Record<string, { label: string; icon: string; t
   index_failed: {
     label: 'Indeks gagal — publikasi diulang otomatis',
     icon: 'refresh',
+    tone: 'nt-block',
+  },
+  archived: {
+    label: 'Diarsipkan otomatis — kedaluwarsa tanpa pembaruan',
+    icon: 'lock',
+    tone: 'nt-block',
+  },
+  review_overdue: {
+    label: 'Review terlewat — perlu tindak lanjut',
+    icon: 'alert',
     tone: 'nt-block',
   },
   default: { label: 'Pemberitahuan', icon: 'bell', tone: 'nt-info' },

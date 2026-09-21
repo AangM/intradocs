@@ -20,6 +20,7 @@ import { ReaderFeedback, FavoriteButton } from '@/components/reader-feedback';
 import { LabelSuggestions } from '@/components/label-suggestions';
 import { DocumentInsights } from '@/components/document-insights';
 import { RequiredReadingMark } from '@/components/required-reading-mark';
+import { ReaffirmButton } from '@/components/reaffirm-button';
 import { reviewInfo, versionSummaries, readerPreferences } from '@intradocs/db/workflow';
 import { findSensitiveContent } from '@intradocs/core/workflow';
 /** Older versions in the side panel, in a reader's words rather than the state enum. */
@@ -89,6 +90,15 @@ export default async function Reader({
   const reviewerStep = info?.steps.find((s) => s.reviewerId === actor.id && !s.decision);
   const ownerDraft =
     actor.id === doc.ownerId && doc.status === 'draft' && versions[0]?.id === doc.versionId;
+  // The owner's reaffirmation applies to the current published version whose review is
+  // within 30 days or past (the database enforces the same window); an expired version
+  // is past reaffirming and gets the expiry notice instead.
+  const reviewDue =
+    actor.id === doc.ownerId &&
+    doc.status === 'published' &&
+    !expired &&
+    doc.reviewAt !== null &&
+    Date.parse(doc.reviewAt) <= Date.now() + 30 * 86_400_000;
   // The workflow panel is open when this actor has something to do on this version;
   // otherwise it lives under the collapsed owner/reviewer tools below the article.
   const workflowOpen = Boolean(reviewerStep || ownerDraft);
@@ -184,6 +194,13 @@ export default async function Reader({
                 ))}
               </span>
             </div>
+            {reviewDue && doc.reviewAt && (
+              <ReaffirmButton
+                versionId={doc.versionId}
+                reviewAt={formatDate(doc.reviewAt)}
+                overdue={Date.parse(doc.reviewAt) <= Date.now()}
+              />
+            )}
             {doc.status === 'withdrawn' ? (
               <Notice kind="warn">
                 <strong>Publikasi dicabut.</strong> Akses histori ini hanya untuk pemilik atau

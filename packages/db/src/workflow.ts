@@ -199,6 +199,50 @@ export async function resolveFinding(
 export async function retryPublication(actorId: string, vid: string) {
   await mutate(actorId, 'SELECT app.retry_publication($1)', [vid]);
 }
+/**
+ * The owner confirms the current published version is still valid: the review date
+ * moves forward by the category's cadence (never past the expiry). Returns the new date.
+ */
+export async function reaffirmVersion(actorId: string, versionId: string): Promise<string> {
+  const r = await mutate(actorId, 'SELECT app.reaffirm_version($1) AS review_at', [versionId]);
+  return (r.rows[0].review_at as Date).toISOString();
+}
+export type RetentionState = 'soon' | 'due' | 'overdue' | 'expired';
+export interface RetentionRow {
+  state: RetentionState;
+  documentId: string;
+  slug: string;
+  title: string;
+  ownerLabel: string;
+  categoryName: string;
+  reviewAt: string | null;
+  expiresAt: string | null;
+  /** When the policy acts: the review date, or expiry + grace for an expired one. */
+  dueAt: string;
+}
+/** Administrators' view of what retention will do next, within their scope. */
+export async function retentionOverview(
+  actorId: string,
+  windows: { graceDays: number; overdueDays: number },
+): Promise<RetentionRow[]> {
+  return withActor(actorId, async ({ client }) => {
+    const { rows } = await client.query('SELECT * FROM app.retention_overview($1,$2)', [
+      windows.graceDays,
+      windows.overdueDays,
+    ]);
+    return rows.map((r) => ({
+      state: r.state as RetentionState,
+      documentId: r.document_id as string,
+      slug: r.slug as string,
+      title: r.title as string,
+      ownerLabel: r.owner_label as string,
+      categoryName: r.category_name as string,
+      reviewAt: r.review_at?.toISOString() ?? null,
+      expiresAt: r.expires_at?.toISOString() ?? null,
+      dueAt: (r.due_at as Date).toISOString(),
+    }));
+  });
+}
 export async function withdrawDocument(actorId: string, id: string, reason: string) {
   await mutate(actorId, 'SELECT app.withdraw_document($1,$2)', [id, reason]);
 }

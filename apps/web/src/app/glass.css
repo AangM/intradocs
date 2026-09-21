@@ -1176,6 +1176,44 @@ tbody tr:hover td {
   line-height: 1.5;
 }
 
+/* The owner's "still valid" strip above a document whose review is near. */
+.reaffirm {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  margin: 12px 0;
+  border-radius: 14px;
+  border: 1px solid var(--flow-review-line, rgba(217, 119, 6, 0.3));
+  background: var(--flow-review-tint, rgba(217, 119, 6, 0.08));
+  color: var(--ink);
+}
+.reaffirm > svg {
+  color: var(--flow-review, #d97706);
+}
+.reaffirm.is-overdue {
+  border-color: rgba(220, 38, 38, 0.3);
+  background: rgba(220, 38, 38, 0.07);
+}
+.reaffirm.is-overdue > svg {
+  color: var(--red);
+}
+.reaffirm-b {
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+}
+@media (max-width: 640px) {
+  .reaffirm {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .reaffirm > .btn {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
 /* A switch: the one editable thing on the settings page. */
 .email-switch {
   margin-top: 6px;

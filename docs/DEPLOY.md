@@ -99,6 +99,24 @@ per kejadian. Worker yang mengirim; web hanya menampilkan statusnya.
 - Di laptop: `MAIL_MODE=file` menulis setiap email sebagai `.eml` ke `var/outbox/`
   (ditolak pada profil deployment).
 
+### 2c. Retensi yang berjalan sendiri
+
+Setiap kategori sudah punya kadens review (`review_days`); pengaju menetapkan tanggal
+review dan, bila perlu, kedaluwarsa. Yang kini terjadi tanpa ada yang mengingat, dijalankan
+worker tiap jam:
+
+| Keadaan                                                     | Yang terjadi                                                                                                                                                       |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Review ≤ 14 hari lagi                                       | Pengingat ke pemilik (sudah ada).                                                                                                                                  |
+| Review jatuh tempo / terlewat                               | Pemilik melihat strip "Masih berlaku" di halaman dokumen: satu klik memajukan tanggal review sebesar kadens kategori **tanpa versi baru**, tercatat di audit.      |
+| Review terlewat > `RETENTION_OVERDUE_DAYS`                  | Eskalasi ke admin kategori (lonceng + email), sekali per tanggal review.                                                                                           |
+| Kedaluwarsa                                                 | Tidak terbaca dan keluar dari indeks AI (sudah ada).                                                                                                               |
+| Kedaluwarsa > `RETENTION_GRACE_DAYS` tanpa draf/revisi baru | **Diarsipkan otomatis**: dicabut seperti pencabutan manual, alasan tersimpan di versi, audit `document.archived_by_policy` atas nama pemilik, pemilik diberi tahu. |
+
+Yang tidak dilakukan: menghapus berkas. Arsip tetap ada untuk pemilik dan auditor; penghapusan
+fisik adalah kebijakan penyimpanan organisasi (§6). Dashboard admin menampilkan keempat
+keadaan di atas dalam cakupan admin tersebut.
+
 ---
 
 ## 3. Setiap rilis
@@ -186,7 +204,7 @@ Tidak satu pun bisa diselesaikan dari repositori ini, dan tidak satu pun disembu
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Pendaftaran klien OIDC**     | Kodenya ada (§2a): `AUTH_MODE=oidc` menambahkan tombol SSO yang mengautentikasi akun yang sudah diundang. Yang harus diberikan organisasi: issuer, client id/secret, dan persetujuan security. Sinkronisasi direktori (SCIM) **tidak** ada. |
 | **Sertifikat TLS & DNS**       | Dimiliki tim infrastruktur; aplikasi mensyaratkan https tetapi tidak memegang sertifikat.                                                                                                                                                   |
-| **Kebijakan data**             | Klasifikasi, retensi, dan siapa yang boleh menyetujui apa adalah keputusan pemilik dokumen, bukan default.                                                                                                                                  |
+| **Kebijakan data**             | Klasifikasi, kadens review per kategori, dua jendela retensi (§2c), dan siapa yang boleh menyetujui apa adalah keputusan pemilik dokumen; default 30 hari hanya titik awal. Penghapusan fisik arsip tidak diotomatiskan.                    |
 | **Review security & ops**      | Tinjauan pihak ketiga atas RLS, header, dan runbook ini.                                                                                                                                                                                    |
 | **UAT pemilik domain**         | Q4: mutu jawaban AI pada korpus **nyata**, bukan sintetis.                                                                                                                                                                                  |
 | **OCR (PDF pindai, DOC lama)** | Butuh layanan `docreader` WeKnora ±4 GB; jalurnya sama dengan PPTX (WEKNORA.md §27), yang kurang hanya memori di host. Sampai itu ada, unggahan PDF pindai ditolak dengan pesan jelas — bukan diterima diam-diam lalu kosong.               |

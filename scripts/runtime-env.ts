@@ -30,6 +30,8 @@ export function childEnvironment(
     'MAIL_FROM',
     'MAIL_OUTBOX_DIR',
     'SMTP_URL',
+    'RETENTION_GRACE_DAYS',
+    'RETENTION_OVERDUE_DAYS',
   ];
   // Both processes talk to WeKnora: web for retrieval, worker for export. The key is a
   // server-side credential and reaches neither the browser bundle nor any response.

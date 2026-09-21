@@ -123,6 +123,14 @@ SSO tidak pernah membuat akun. Untuk mencobanya di laptop: `pnpm idp:mock` (IdP 
 `OIDC_CLIENT_SECRET=mock-idp-secret-not-for-deployments`. Detail deployment di
 [docs/DEPLOY.md](docs/DEPLOY.md) §2a.
 
+## Retensi otomatis
+
+Worker menjalankan kebijakan tiap jam: dokumen yang kedaluwarsa dan tidak diperbarui dalam
+masa tenggang diarsipkan dengan alasan tercatat, review yang terlewat lama dieskalasi ke
+admin kategori, dan pemilik bisa mengonfirmasi "masih berlaku" dari halaman dokumen tanpa
+mengunggah versi baru. Jendelanya `RETENTION_GRACE_DAYS` / `RETENTION_OVERDUE_DAYS` (default
+30). Rincian di [docs/DEPLOY.md](docs/DEPLOY.md) §2c.
+
 ## Email pemberitahuan
 
 Isi lonceng juga bisa dikirim ke kotak masuk sebagai ringkasan per orang (`MAIL_MODE=smtp`
