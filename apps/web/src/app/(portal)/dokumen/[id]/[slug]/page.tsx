@@ -31,6 +31,10 @@ const VERSION_STATE: Record<string, string> = {
   changes_requested: 'perlu revisi',
   rejected: 'ditolak',
 };
+/** The request's clock, taken once so the render itself stays pure. */
+async function currentTime(): Promise<number> {
+  return Date.now();
+}
 export default async function Reader({
   params,
   searchParams,
@@ -93,12 +97,14 @@ export default async function Reader({
   // The owner's reaffirmation applies to the current published version whose review is
   // within 30 days or past (the database enforces the same window); an expired version
   // is past reaffirming and gets the expiry notice instead.
+  // "Now" is read once per request, outside render, like the data it is compared to.
+  const now = await currentTime();
   const reviewDue =
     actor.id === doc.ownerId &&
     doc.status === 'published' &&
     !expired &&
     doc.reviewAt !== null &&
-    Date.parse(doc.reviewAt) <= Date.now() + 30 * 86_400_000;
+    Date.parse(doc.reviewAt) <= now + 30 * 86_400_000;
   // The workflow panel is open when this actor has something to do on this version;
   // otherwise it lives under the collapsed owner/reviewer tools below the article.
   const workflowOpen = Boolean(reviewerStep || ownerDraft);
@@ -198,7 +204,7 @@ export default async function Reader({
               <ReaffirmButton
                 versionId={doc.versionId}
                 reviewAt={formatDate(doc.reviewAt)}
-                overdue={Date.parse(doc.reviewAt) <= Date.now()}
+                overdue={Date.parse(doc.reviewAt) <= now}
               />
             )}
             {doc.status === 'withdrawn' ? (

@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 
 /**
  * Runtime headers a profile-agnostic image cannot bake in at build time.
@@ -10,7 +10,7 @@ import { NextResponse, type NextRequest } from 'next/server';
  */
 const HARDENED = new Set(['staging', 'production']);
 
-export function proxy(_request: NextRequest) {
+export function proxy() {
   const response = NextResponse.next();
   if (HARDENED.has(process.env.APP_PROFILE ?? ''))
     response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
