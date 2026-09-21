@@ -73,7 +73,25 @@ for (const [label, patch] of [
   ['storage under a webroot', { STORAGE_ROOT: '/srv/intradocs/public/files' }],
   ['relative storage', { STORAGE_ROOT: 'var/storage' }],
   ['storage escaping its volume', { STORAGE_ROOT: '/var/lib/../../etc' }],
-  ['SSO claimed but unimplemented', { AUTH_MODE: 'oidc' }],
+  ['oidc without an issuer', { AUTH_MODE: 'oidc' }],
+  [
+    'oidc with an http issuer',
+    {
+      AUTH_MODE: 'oidc',
+      OIDC_ISSUER: 'http://idp.example.org',
+      OIDC_CLIENT_ID: 'intradocs',
+      OIDC_CLIENT_SECRET: 'x'.repeat(40),
+    },
+  ],
+  [
+    'oidc with a short client secret',
+    {
+      AUTH_MODE: 'oidc',
+      OIDC_ISSUER: 'https://idp.example.org/realms/org',
+      OIDC_CLIENT_ID: 'intradocs',
+      OIDC_CLIENT_SECRET: 'short',
+    },
+  ],
   ['a cloud model provider', { AI_PROVIDER: 'gemini' }],
   ['an S3 driver', { STORAGE_DRIVER: 's3' }],
 ] as const)
@@ -150,5 +168,46 @@ test('the worker keeps its own identity on a deployment too', () => {
       AI_PROVIDER: 'off',
       WORKER_DATABASE_URL: 'postgres://intradocs_worker:pw@db.example.test/x',
     }),
+  );
+});
+
+test('AUTH_MODE=oidc needs issuer, client id and secret, and the issuer must be https', () => {
+  const oidc = {
+    ...deployed,
+    AUTH_MODE: 'oidc',
+    OIDC_ISSUER: 'https://idp.example.test/realms/org/',
+    OIDC_CLIENT_ID: 'intradocs',
+    OIDC_CLIENT_SECRET: 'Qx7Fv2Lm9Kd4Rt6Yh1Bn8Jw3Zs5Pc0Ae7Gu2Iv4Ol6M',
+    OIDC_LABEL: 'Akun Korporat',
+  };
+  const c = readRuntimeConfig(oidc);
+  assert.deepEqual(c.sso, {
+    issuer: 'https://idp.example.test/realms/org',
+    clientId: 'intradocs',
+    clientSecret: oidc.OIDC_CLIENT_SECRET,
+    label: 'Akun Korporat',
+  });
+  assert.equal(readRuntimeConfig({ ...oidc, OIDC_LABEL: '' }).sso?.label, 'SSO perusahaan');
+  assert.equal(readRuntimeConfig(deployed).sso, null);
+  // Locally an http issuer on the loopback is allowed, so the flow can be run against
+  // a Keycloak or the test IdP without certificates; any other http issuer is not.
+  const local = {
+    ...oidc,
+    APP_PROFILE: 'local-dev',
+    APP_URL: 'http://localhost:3000',
+    DATABASE_URL: 'postgres://intradocs_app:pw@localhost/intradocs',
+    AUTH_DATABASE_URL: 'postgres://intradocs_auth:pw@localhost/intradocs',
+    INTRADOCS_ROOT: 'C:/x',
+    STORAGE_ROOT: 'var/storage',
+    OIDC_ISSUER: 'http://localhost:3099',
+  };
+  assert.equal(readRuntimeConfig(local).sso?.issuer, 'http://localhost:3099');
+  assert.throws(
+    () => readRuntimeConfig({ ...local, OIDC_ISSUER: 'http://idp.example.test' }),
+    ConfigurationError,
+  );
+  assert.throws(
+    () => readRuntimeConfig({ ...oidc, OIDC_ISSUER: 'https://idp.example.test/?x=1' }),
+    ConfigurationError,
   );
 });

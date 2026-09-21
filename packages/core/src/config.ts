@@ -9,6 +9,19 @@ export interface RuntimeConfig {
   authSecret: string;
   /** True for staging and production: HSTS, secure cookies, no demo affordances. */
   hardened: boolean;
+  /**
+   * The organisation's OpenID Connect provider, when AUTH_MODE=oidc. Identities are
+   * still created by invitation: SSO only proves that the person at the keyboard is the
+   * one an admin invited, it never provisions a new account.
+   */
+  sso: SsoConfig | null;
+}
+export interface SsoConfig {
+  issuer: string;
+  clientId: string;
+  clientSecret: string;
+  /** Button label on the login page, e.g. the IdP's name. */
+  label: string;
 }
 export class ConfigurationError extends Error {}
 const localHosts = new Set(['localhost', '127.0.0.1', '[::1]']);
@@ -79,10 +92,8 @@ export function readRuntimeConfig(env: Record<string, string | undefined>): Runt
       `APP_PROFILE harus salah satu dari ${PROFILES.join(', ')}; tidak ada default.`,
     );
   const hardened = profile !== 'local-dev';
-  // SSO is not implemented in any profile: a deployment runs on local identities and
-  // admin invitations, and says so, rather than pretending an IdP is wired up.
-  if (env.AUTH_MODE !== 'local')
-    throw new ConfigurationError('SSO/OIDC belum diimplementasikan; AUTH_MODE harus local.');
+  if (env.AUTH_MODE !== 'local' && env.AUTH_MODE !== 'oidc')
+    throw new ConfigurationError('AUTH_MODE hanya menerima local atau oidc.');
   // Off by default. The only alternative is a WeKnora the operator started deliberately;
   // no cloud provider, no fallback and no billing path exists here.
   if (env.AI_PROVIDER !== 'off' && env.AI_PROVIDER !== 'weknora-local')
@@ -127,6 +138,7 @@ export function readRuntimeConfig(env: Record<string, string | undefined>): Runt
   if (a.host !== b.host || a.pathname !== b.pathname)
     throw new ConfigurationError('Auth dan aplikasi harus memakai database yang sama.');
   const authSecret = assertSecret(env.BETTER_AUTH_SECRET, hardened ? 48 : 32);
+  const sso = env.AUTH_MODE === 'oidc' ? readSso(env, hardened) : null;
   if (!env.INTRADOCS_ROOT) throw new ConfigurationError('INTRADOCS_ROOT belum diisi.');
   const storageRoot = env.STORAGE_ROOT ?? 'var/storage';
   // Never inside the served tree, whatever the profile. Locally that means a private
@@ -150,7 +162,39 @@ export function readRuntimeConfig(env: Record<string, string | undefined>): Runt
     authDatabaseUrl,
     authSecret,
     hardened,
+    sso,
   };
+}
+/**
+ * AUTH_MODE=oidc needs the three things every OIDC relying party needs and nothing
+ * else: discovery does the rest. The issuer must be https on a deployment; locally an
+ * http issuer on the loopback (a Keycloak or the test IdP) is allowed so the flow can be
+ * exercised without certificates.
+ */
+function readSso(env: Record<string, string | undefined>, hardened: boolean): SsoConfig {
+  let issuer: URL;
+  try {
+    issuer = new URL(env.OIDC_ISSUER ?? '');
+  } catch {
+    throw new ConfigurationError('OIDC_ISSUER tidak valid.');
+  }
+  if (issuer.search || issuer.hash || issuer.username || issuer.password)
+    throw new ConfigurationError('OIDC_ISSUER harus URL issuer bersih.');
+  if (
+    issuer.protocol !== 'https:' &&
+    !(!hardened && issuer.protocol === 'http:' && localHosts.has(issuer.hostname))
+  )
+    throw new ConfigurationError(
+      'OIDC_ISSUER wajib https (http hanya untuk loopback pada build lokal).',
+    );
+  const clientId = env.OIDC_CLIENT_ID ?? '';
+  if (!clientId.trim()) throw new ConfigurationError('OIDC_CLIENT_ID belum diisi.');
+  const clientSecret = env.OIDC_CLIENT_SECRET ?? '';
+  if (clientSecret.length < (hardened ? 32 : 16))
+    throw new ConfigurationError('OIDC_CLIENT_SECRET terlalu pendek.');
+  const label = (env.OIDC_LABEL ?? '').trim() || 'SSO perusahaan';
+  if (label.length > 40) throw new ConfigurationError('OIDC_LABEL maksimal 40 karakter.');
+  return { issuer: issuer.href.replace(/\/$/, ''), clientId, clientSecret, label };
 }
 
 export function readWorkerConfig(env: Record<string, string | undefined>): { databaseUrl: string } {

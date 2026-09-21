@@ -114,6 +114,15 @@ WeKnora tidak ikut di-backup: indeksnya turunan dari `app.rag_index_entries` + M
 5. Sesudah persetujuan final, worker membangun indeks. Pembaca baru melihat versi setelah `ready/published`; versi aktif lama tetap tersedia bila revisi sedang diproses atau gagal.
 6. Cari kata di dalam isi; filter metadata, simpan favorit, beri feedback. Revisi, pencabutan, expiry, dan perubahan scope/grant berlaku pada query berikutnya termasuk download.
 
+## SSO lewat OpenID Connect
+
+`AUTH_MODE=oidc` menambahkan tombol "Masuk dengan <IdP>" untuk akun yang sudah diundang;
+SSO tidak pernah membuat akun. Untuk mencobanya di laptop: `pnpm idp:mock` (IdP tiruan di
+`http://localhost:3099`, memilih nama = "masuk"), lalu di `.env.local` set `AUTH_MODE=oidc`,
+`OIDC_ISSUER=http://localhost:3099`, `OIDC_CLIENT_ID=intradocs-local`,
+`OIDC_CLIENT_SECRET=mock-idp-secret-not-for-deployments`. Detail deployment di
+[docs/DEPLOY.md](docs/DEPLOY.md) §2a.
+
 ## Isi demo yang lebih penuh
 
 `pnpm demo:content` mengisi portal lewat aplikasi sendiri (unggah → scan → konversi →

@@ -58,7 +58,7 @@ export default async function Users() {
             <button
               className="btn"
               disabled
-              title="SSO/AD berada di luar rilis lokal ini: butuh IdP organisasi dan persetujuan security."
+              title="Sinkronisasi direktori (SCIM) tidak ada: identitas masuk lewat undangan, SSO hanya mengautentikasi akun yang sudah diundang."
             >
               <Icon name="refresh" size={16} />
               Sinkron SSO

@@ -3,10 +3,12 @@ import { ROLE_LABELS, initials, roleLabel } from '@intradocs/core';
 import { PageHeading, Notice } from '@/components/shared';
 import { Icon } from '@/components/icon';
 import { aiStatus } from '@/lib/rag';
+import { readRuntimeConfig } from '@intradocs/core/config';
 
 export default async function Settings() {
   const actor = await requireActor();
   const ai = aiStatus();
+  const sso = readRuntimeConfig(process.env).sso;
   const aiOn = ai.retrieval !== 'off';
   const aiLabel = !aiOn
     ? 'Belum diaktifkan'
@@ -52,17 +54,26 @@ export default async function Settings() {
       icon: 'lock',
       tone: 'nt-review',
       label: 'Autentikasi',
-      value: 'Email & password lokal',
-      note: 'Better Auth · tanpa pendaftaran publik.',
+      value: sso ? 'SSO perusahaan + email & password' : 'Email & password lokal',
+      note: 'Better Auth · tanpa pendaftaran publik; akun dibuat lewat undangan.',
     },
-    {
-      icon: 'globe',
-      tone: 'nt-block',
-      label: 'SSO perusahaan',
-      value: 'Belum terhubung',
-      note: 'Identitas lokal dan undangan admin.',
-      chip: { text: 'Direncanakan', pill: 'p-amber' },
-    },
+    sso
+      ? {
+          icon: 'globe',
+          tone: 'nt-ok',
+          label: 'SSO perusahaan',
+          value: sso.label,
+          note: 'OpenID Connect · akun tetap dibuat lewat undangan admin.',
+          chip: { text: 'Terhubung', pill: 'p-green' },
+        }
+      : {
+          icon: 'globe',
+          tone: 'nt-block',
+          label: 'SSO perusahaan',
+          value: 'Belum terhubung',
+          note: 'Siap dipakai: AUTH_MODE=oidc dengan IdP organisasi.',
+          chip: { text: 'Menunggu IdP', pill: 'p-amber' },
+        },
     {
       icon: 'db',
       tone: 'nt-ok',

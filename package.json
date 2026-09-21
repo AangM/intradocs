@@ -39,6 +39,7 @@
     "ops:preflight": "tsx scripts/ops.ts preflight",
     "ops:bootstrap-admin": "tsx scripts/bootstrap-admin.ts",
     "demo:content": "tsx scripts/demo-content.ts",
+    "idp:mock": "tsx scripts/mock-idp.ts",
     "ops:watch": "tsx scripts/ops.ts watch",
     "ops:loadtest": "tsx scripts/loadtest.ts",
     "ops:rollback-check": "tsx scripts/ops.ts rollback-check",

@@ -3,6 +3,7 @@ import { currentActor } from '@/lib/session';
 import { safeReturnTo } from '@intradocs/core/validation';
 import { LoginForm } from '@/components/login-form';
 import { Icon } from '@/components/icon';
+import { readRuntimeConfig } from '@intradocs/core/config';
 export const dynamic = 'force-dynamic';
 export default async function Login({
   searchParams,
@@ -11,6 +12,16 @@ export default async function Login({
 }) {
   if (await currentActor()) redirect('/help-center');
   const params = await searchParams;
+  const sso = readRuntimeConfig(process.env).sso;
+  // Better Auth sends the callback's failure back here as ?error=...; the only case a
+  // person can act on is "nobody invited this address", so that is the one named.
+  const errorCode = typeof params.error === 'string' ? params.error : '';
+  const ssoError =
+    params.sso === 'gagal' || errorCode
+      ? /signup_disabled|account_not_found|user_not_found/i.test(errorCode)
+        ? 'Akun SSO ini belum diundang ke IntraDocs. Minta undangan dari admin.'
+        : 'Masuk lewat SSO tidak berhasil. Coba lagi atau hubungi admin.'
+      : '';
   return (
     <main className="login-page">
       <section className="login-story">
@@ -87,7 +98,11 @@ export default async function Login({
           <span className="pill p-blue">SELAMAT DATANG</span>
           <h1>Masuk ke IntraDocs</h1>
           <p className="sub">Pakai akun demo dari setup lokal Anda.</p>
-          <LoginForm returnTo={safeReturnTo(params.returnTo)} />
+          <LoginForm
+            returnTo={safeReturnTo(params.returnTo)}
+            sso={sso?.label ?? null}
+            ssoError={ssoError}
+          />
           <p className="privacy-note">
             <Icon name="help" size={14} />
             <span>

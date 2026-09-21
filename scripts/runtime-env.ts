@@ -52,6 +52,10 @@ export function childEnvironment(
       ? [
           'APP_URL',
           'AUTH_MODE',
+          'OIDC_ISSUER',
+          'OIDC_CLIENT_ID',
+          'OIDC_CLIENT_SECRET',
+          'OIDC_LABEL',
           'STORAGE_DRIVER',
           'STORAGE_ROOT',
           'DATABASE_URL',

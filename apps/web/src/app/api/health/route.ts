@@ -13,6 +13,8 @@ export async function GET() {
       {
         status: 'ok',
         profile: readRuntimeConfig(process.env).profile,
+        // Mode only; issuer and client id stay out of an unauthenticated response.
+        auth: readRuntimeConfig(process.env).sso ? 'oidc' : 'local',
         ai: readAiConfig(process.env).retrieval,
         release: '0.3.0',
       },

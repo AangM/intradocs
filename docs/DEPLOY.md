@@ -59,6 +59,26 @@ sekali, lalu menolak berjalan lagi selama masih ada super admin aktif — jadi p
 tidak bisa dipakai diam-diam untuk menambah pemilik kedua. Pengguna berikutnya diundang
 dari portal. Tidak ada korpus contoh: isi pertama adalah milik organisasi.
 
+### 2a. SSO (OpenID Connect), bila organisasi memilikinya
+
+`AUTH_MODE=oidc` plus `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` (dan `OIDC_LABEL`
+untuk teks tombol). Di IdP, daftarkan klien _confidential_ dengan redirect URI
+`https://<APP_URL>/api/auth/callback/sso`, alur _authorization code + PKCE_, scope
+`openid email profile`. Yang perlu dipahami reviewer:
+
+- **SSO tidak membuat akun.** Subjek IdP ditautkan ke akun yang emailnya sudah diundang
+  admin (email harus terverifikasi di IdP); alamat yang belum diundang ditolak di callback
+  dengan pesan jelas, dan akun nonaktif tetap ditolak walau IdP menjaminnya. Role dan
+  kategori tetap keputusan portal, bukan klaim IdP.
+- `id_token` diverifikasi terhadap JWKS discovery (`requireIdTokenVerification`); IdP
+  yang discovery-nya tidak memuat JWKS ditolak.
+- Password lokal tetap berfungsi berdampingan — itu jalur darurat admin bila IdP mati.
+- IdP yang tidak terjangkau membuat tombol SSO menjawab 503 yang bisa diulang, bukan
+  merusak sesi yang ada; portal mengecek discovery lagi pada percobaan berikutnya.
+- Untuk mencoba alurnya tanpa IdP: `pnpm idp:mock` menjalankan IdP tiruan di
+  `http://localhost:3099` (hanya `local-dev` yang menerima issuer http), dan
+  `tests/http/sso.test.ts` memverifikasi kelima kasus di atas terhadapnya.
+
 ---
 
 ## 3. Setiap rilis
@@ -142,15 +162,15 @@ terpisah (satu generasi pada satu waktu di mesin rujukan).
 
 Tidak satu pun bisa diselesaikan dari repositori ini, dan tidak satu pun disembunyikan:
 
-| Hal                            | Kenapa bukan pekerjaan kode                                                                                                                                                                                                   |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **SSO/OIDC**                   | Butuh IdP organisasi dan persetujuan security. `AUTH_MODE` hanya menerima `local`; tombol SSO di portal nonaktif dan mengatakannya. Sampai itu ada, identitas dibuat lewat undangan admin.                                    |
-| **Sertifikat TLS & DNS**       | Dimiliki tim infrastruktur; aplikasi mensyaratkan https tetapi tidak memegang sertifikat.                                                                                                                                     |
-| **Kebijakan data**             | Klasifikasi, retensi, dan siapa yang boleh menyetujui apa adalah keputusan pemilik dokumen, bukan default.                                                                                                                    |
-| **Review security & ops**      | Tinjauan pihak ketiga atas RLS, header, dan runbook ini.                                                                                                                                                                      |
-| **UAT pemilik domain**         | Q4: mutu jawaban AI pada korpus **nyata**, bukan sintetis.                                                                                                                                                                    |
-| **OCR (PDF pindai, DOC lama)** | Butuh layanan `docreader` WeKnora ±4 GB; jalurnya sama dengan PPTX (WEKNORA.md §27), yang kurang hanya memori di host. Sampai itu ada, unggahan PDF pindai ditolak dengan pesan jelas — bukan diterima diam-diam lalu kosong. |
-| **Backup off-site**            | `ops:backup` menulis ke disk lokal. Menyalinnya ke luar mesin adalah kebijakan penyimpanan organisasi.                                                                                                                        |
+| Hal                            | Kenapa bukan pekerjaan kode                                                                                                                                                                                                                 |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Pendaftaran klien OIDC**     | Kodenya ada (§2a): `AUTH_MODE=oidc` menambahkan tombol SSO yang mengautentikasi akun yang sudah diundang. Yang harus diberikan organisasi: issuer, client id/secret, dan persetujuan security. Sinkronisasi direktori (SCIM) **tidak** ada. |
+| **Sertifikat TLS & DNS**       | Dimiliki tim infrastruktur; aplikasi mensyaratkan https tetapi tidak memegang sertifikat.                                                                                                                                                   |
+| **Kebijakan data**             | Klasifikasi, retensi, dan siapa yang boleh menyetujui apa adalah keputusan pemilik dokumen, bukan default.                                                                                                                                  |
+| **Review security & ops**      | Tinjauan pihak ketiga atas RLS, header, dan runbook ini.                                                                                                                                                                                    |
+| **UAT pemilik domain**         | Q4: mutu jawaban AI pada korpus **nyata**, bukan sintetis.                                                                                                                                                                                  |
+| **OCR (PDF pindai, DOC lama)** | Butuh layanan `docreader` WeKnora ±4 GB; jalurnya sama dengan PPTX (WEKNORA.md §27), yang kurang hanya memori di host. Sampai itu ada, unggahan PDF pindai ditolak dengan pesan jelas — bukan diterima diam-diam lalu kosong.               |
+| **Backup off-site**            | `ops:backup` menulis ke disk lokal. Menyalinnya ke luar mesin adalah kebijakan penyimpanan organisasi.                                                                                                                                      |
 
 Pilot boleh dimulai tanpa SSO dan tanpa OCR; keduanya tercatat sebagai batasan yang
 diketahui, bukan kejutan.
