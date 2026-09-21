@@ -466,10 +466,13 @@ test("a vote is the owner's alone, is counted without text, and feeds the gap ag
   if (!aiOn) return;
   const siti = await login(IDS.viewer);
   const budi = await login(IDS.super);
-  const question = 'Bagaimana prosedur pemesanan tiket pesawat dinas ke luar negeri?';
+  // A topic no corpus in this repository touches -- not the fixture, and not the demo
+  // content either (`pnpm demo:content` adds a ticketing portal and "ajukan tiket" steps,
+  // which is why the question is not about travel tickets).
+  const question = 'Bagaimana cara mengklaim asuransi kendaraan dinas yang rusak?';
   const asked = await call('POST', '/api/rag/chat', siti, { question });
   assert.equal(asked.status, 200, JSON.stringify(asked.body));
-  assert.equal(asked.body.abstained, true, 'the fixture has nothing on travel bookings');
+  assert.equal(asked.body.abstained, true, 'no corpus here says anything about vehicle insurance');
   const turnId = asked.body.turnId as string;
   const conversationId = asked.body.conversationId as string;
   try {

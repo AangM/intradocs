@@ -114,6 +114,17 @@ WeKnora tidak ikut di-backup: indeksnya turunan dari `app.rag_index_entries` + M
 5. Sesudah persetujuan final, worker membangun indeks. Pembaca baru melihat versi setelah `ready/published`; versi aktif lama tetap tersedia bila revisi sedang diproses atau gagal.
 6. Cari kata di dalam isi; filter metadata, simpan favorit, beri feedback. Revisi, pencabutan, expiry, dan perubahan scope/grant berlaku pada query berikutnya termasuk download.
 
+## Isi demo yang lebih penuh
+
+`pnpm demo:content` mengisi portal lewat aplikasi sendiri (unggah → scan → konversi →
+review → publikasi, dengan RLS dan jejak audit sungguhan) sehingga tidak ada halaman yang
+kosong saat demo: 18 dokumen sintetis di keenam kategori dan enam format (MD, TXT, HTML,
+DOCX, XLSX, PDF), item di antrean Andi, Dwi, dan Budi, satu permintaan revisi, satu
+penolakan, satu draf belum diajukan, masukan pembaca untuk pemilik, dua permintaan akses
+menunggu keputusan, bacaan wajib bertenggat, favorit dan riwayat baca Siti, serta beberapa
+percakapan asisten. Aman dijalankan ulang (judul yang sudah ada dilewati); `--no-ai`
+melewati percakapan asisten.
+
 ## Demo AI Assistant dan fitur V1 (butuh profil `weknora`)
 
 Jalankan `pnpm weknora:setup` sekali, isi `AI_PROVIDER=weknora-local` (dan `AI_GENERATION=weknora-local` bila ingin jawaban tersusun, bukan hanya sumber; pin model penjawab dengan `pnpm weknora:generation <model>`), lalu restart `pnpm dev`. Pada laptop 8 GB tanpa GPU matikan profil `knowledge` (ClamAV/converter) selama demo AI; pada laptop ber-GPU keduanya berjalan bersama.
