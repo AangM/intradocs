@@ -117,6 +117,18 @@ Yang tidak dilakukan: menghapus berkas. Arsip tetap ada untuk pemilik dan audito
 fisik adalah kebijakan penyimpanan organisasi (§6). Dashboard admin menampilkan keempat
 keadaan di atas dalam cakupan admin tersebut.
 
+### 2d. Ekspor audit log
+
+Halaman Audit Log kini menyaring rentang tanggal dan aktivitas, dan tombol **Ekspor CSV** /
+**JSON Lines** (`GET /api/reports/audit?from&to&action&format`) mengunduh seluruh rentang —
+maksimal satu tahun dan 50.000 baris, dengan trailer yang menyebut jumlah baris (dan bila
+terpotong). Aturan yang sama dengan halaman: hanya pemegang `audit.view`, nama orang dan
+judul dokumen hanya bila pengekspor sendiri boleh melihatnya (selebihnya `(di luar
+cakupan)`, bukan sel kosong), sel yang diawali `=`/`+`/`-`/`@` dinetralkan agar tidak
+dieksekusi spreadsheet. Setiap ekspor tercatat sebagai event `audit.exported` — auditor
+melihat siapa mengambil salinan dan kapan. JSON Lines cocok untuk SIEM: satu objek per
+event, header dan trailer terpisah.
+
 ---
 
 ## 3. Setiap rilis

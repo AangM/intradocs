@@ -1176,6 +1176,29 @@ tbody tr:hover td {
   line-height: 1.5;
 }
 
+/* Audit filter: dates, an action, one button; wraps on narrow screens. */
+.audit-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 14px;
+}
+.audit-filter label {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted-2);
+}
+.audit-filter .inp {
+  min-width: 160px;
+}
+.audit-filter .inline-error {
+  flex-basis: 100%;
+  margin: 0;
+}
+
 /* The owner's "still valid" strip above a document whose review is near. */
 .reaffirm {
   display: grid;

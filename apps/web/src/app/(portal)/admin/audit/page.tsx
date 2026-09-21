@@ -3,57 +3,7 @@ import { requireActor } from '@/lib/session';
 import { listAudit } from '@intradocs/db/queries';
 import { PageHeading, Empty } from '@/components/shared';
 import { Icon } from '@/components/icon';
-
-/** Every action the audit table can hold, in the words a person would use. */
-const LABELS: Record<string, { text: string; icon: string; tone: string }> = {
-  'document.read': { text: 'Dokumen dibuka', icon: 'eye', tone: 'grey' },
-  'document.download': { text: 'Unduhan diminta', icon: 'download', tone: 'grey' },
-  'document.uploaded': { text: 'Dokumen diunggah', icon: 'upload', tone: 'blue' },
-  'upload.rejected': { text: 'Unggahan ditolak', icon: 'alert', tone: 'red' },
-  'document.submitted': { text: 'Diajukan untuk review', icon: 'flow', tone: 'blue' },
-  'document.revised': { text: 'Revisi dibuat', icon: 'edit', tone: 'blue' },
-  'review.approve': { text: 'Review: disetujui', icon: 'check-c', tone: 'green' },
-  'review.changes_requested': { text: 'Review: minta revisi', icon: 'refresh', tone: 'amber' },
-  'review.reject': { text: 'Review: ditolak', icon: 'x', tone: 'red' },
-  'review.finding_resolved': { text: 'Temuan review diselesaikan', icon: 'check', tone: 'green' },
-  'document.published': { text: 'Dipublikasikan', icon: 'zap', tone: 'green' },
-  'document.withdrawn': { text: 'Dicabut dari publikasi', icon: 'lock', tone: 'amber' },
-  'document.reaffirmed': { text: 'Dikonfirmasi masih berlaku', icon: 'check-c', tone: 'green' },
-  'document.archived_by_policy': {
-    text: 'Diarsipkan otomatis (kebijakan retensi)',
-    icon: 'lock',
-    tone: 'red',
-  },
-  'publication.retried': { text: 'Publikasi diulang', icon: 'refresh', tone: 'amber' },
-  'document.rolled_back': { text: 'Versi dipulihkan sebagai draft', icon: 'clock', tone: 'amber' },
-  'document.feedback': { text: 'Masukan pembaca', icon: 'msg', tone: 'grey' },
-  'document.access_changed': { text: 'Grant akses dokumen diubah', icon: 'shield', tone: 'amber' },
-  'taxonomy.changed': { text: 'Taksonomi diubah', icon: 'tag', tone: 'blue' },
-  'user.activated': { text: 'Akun diaktifkan', icon: 'users', tone: 'green' },
-  'user.deactivated': { text: 'Akun dinonaktifkan', icon: 'users', tone: 'red' },
-  'user.assignment_changed': { text: 'Role / cakupan diubah', icon: 'users', tone: 'amber' },
-  'user.invited': { text: 'Undangan dibuat', icon: 'plus', tone: 'blue' },
-  'user.invitation_revoked': { text: 'Undangan dicabut', icon: 'x', tone: 'grey' },
-  'user.invitation_accepted': {
-    text: 'Undangan diterima, akun aktif',
-    icon: 'check-c',
-    tone: 'green',
-  },
-  'access.requested': { text: 'Permintaan akses diajukan', icon: 'lock', tone: 'blue' },
-  'access.decided': { text: 'Permintaan akses diputuskan', icon: 'check', tone: 'green' },
-  'rag.exported': { text: 'Versi diindeks untuk AI', icon: 'db', tone: 'ai' },
-  'rag.unindexed': { text: 'Versi dikeluarkan dari index AI', icon: 'db', tone: 'ai' },
-  'rag.retrieval': { text: 'AI: sumber diambil', icon: 'spark', tone: 'ai' },
-  'rag.chat': { text: 'AI: jawaban disusun', icon: 'spark', tone: 'ai' },
-  'rag.abstained': { text: 'AI: tidak dijawab (tanpa sumber sah)', icon: 'spark', tone: 'amber' },
-  'rag.citation_rejected': { text: 'AI: kutipan ditolak validasi', icon: 'shield', tone: 'amber' },
-  'rag.answer_helpful': { text: 'AI: jawaban dinilai membantu', icon: 'thumb', tone: 'green' },
-  'rag.answer_unhelpful': {
-    text: 'AI: jawaban dinilai tidak membantu',
-    icon: 'thumb',
-    tone: 'amber',
-  },
-};
+import { AUDIT_ACTIONS, auditLabel, parseAuditFilter } from '@intradocs/core/audit-export';
 
 function formatWhen(iso: string): string {
   return new Intl.DateTimeFormat('id-ID', {
@@ -65,15 +15,77 @@ function formatWhen(iso: string): string {
   }).format(new Date(iso));
 }
 
-export default async function Audit() {
+export default async function Audit({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const actor = await requireActor('audit.view');
-  const events = await listAudit(actor);
+  const params = await searchParams;
+  const pick = (k: string) => (typeof params[k] === 'string' ? (params[k] as string) : null);
+  // The filter is the export's: the same range and action feed the file, so what the
+  // page shows and what the file holds never disagree. A bad value falls back to the
+  // default 30 days rather than failing the page.
+  let filter;
+  let filterError = '';
+  try {
+    filter = parseAuditFilter({ from: pick('from'), to: pick('to'), action: pick('action') });
+  } catch (e) {
+    filterError = e instanceof Error ? e.message : 'Filter tidak valid.';
+    filter = parseAuditFilter({});
+  }
+  const events = await listAudit(actor, filter);
+  const fromDay = filter.from.toISOString().slice(0, 10);
+  const toDay = filter.to.toISOString().slice(0, 10);
+  const query = new URLSearchParams({ from: fromDay, to: toDay });
+  if (filter.action) query.set('action', filter.action);
   return (
     <div className="pad">
       <PageHeading
         title="Audit Log"
-        subtitle="Siapa melakukan apa, kapan — 100 aktivitas terbaru dalam cakupan Anda."
+        subtitle="Siapa melakukan apa, kapan — 100 aktivitas terbaru dalam rentang dan cakupan Anda."
+        actions={
+          <div className="row">
+            <a className="btn" href={`/api/reports/audit?${query}&format=csv`} download>
+              <Icon name="download" size={14} />
+              Ekspor CSV
+            </a>
+            <a className="btn" href={`/api/reports/audit?${query}&format=jsonl`} download>
+              <Icon name="download" size={14} />
+              JSON Lines
+            </a>
+          </div>
+        }
       />
+      <form method="get" className="card card-b audit-filter" aria-label="Filter audit">
+        <label>
+          Dari
+          <input className="inp" type="date" name="from" defaultValue={fromDay} max={toDay} />
+        </label>
+        <label>
+          Sampai
+          <input className="inp" type="date" name="to" defaultValue={toDay} />
+        </label>
+        <label>
+          Aktivitas
+          <select className="inp" name="action" defaultValue={filter.action ?? ''}>
+            <option value="">Semua aktivitas</option>
+            {Object.entries(AUDIT_ACTIONS).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v.text}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button className="btn btn-p" type="submit">
+          Terapkan
+        </button>
+        {filterError && (
+          <p role="alert" className="inline-error">
+            {filterError} Menampilkan 30 hari terakhir.
+          </p>
+        )}
+      </form>
       <div className="card">
         {events.length ? (
           <div
@@ -93,7 +105,7 @@ export default async function Audit() {
               </thead>
               <tbody>
                 {events.map((e, i) => {
-                  const label = LABELS[e.action] ?? { text: e.action, icon: 'act', tone: 'grey' };
+                  const label = auditLabel(e.action);
                   return (
                     <tr key={`${e.id}-${i}`}>
                       <td>
@@ -122,15 +134,17 @@ export default async function Audit() {
             </table>
           </div>
         ) : (
-          <Empty title="Belum ada event terlihat">
-            Buka dokumen atau unduh Markdown untuk menghasilkan event akses.
+          <Empty title="Tidak ada event pada rentang ini">
+            Perlebar rentang tanggal atau pilih aktivitas lain. Membuka dokumen atau mengunduh
+            Markdown menghasilkan event akses.
           </Empty>
         )}
       </div>
       <p className="sub tiny mt20">
         Setiap baris adalah permintaan yang telah lolos otorisasi. Objek hanya ditampilkan bila Anda
-        sendiri boleh membacanya; nama pengguna hanya bila profilnya dalam scope Anda. Retensi
-        otomatis belum aktif.
+        sendiri boleh membacanya; nama pengguna hanya bila profilnya dalam scope Anda. Ekspor memuat
+        seluruh rentang (maksimal satu tahun, 50.000 baris) dengan aturan yang sama, dan ekspor itu
+        sendiri tercatat sebagai event.
       </p>
     </div>
   );

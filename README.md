@@ -123,6 +123,13 @@ SSO tidak pernah membuat akun. Untuk mencobanya di laptop: `pnpm idp:mock` (IdP 
 `OIDC_CLIENT_SECRET=mock-idp-secret-not-for-deployments`. Detail deployment di
 [docs/DEPLOY.md](docs/DEPLOY.md) §2a.
 
+## Ekspor audit log
+
+Audit Log bisa disaring per rentang tanggal dan aktivitas, lalu diekspor sebagai CSV atau
+JSON Lines (maksimal setahun, 50.000 baris, trailer menyebut jumlah baris). Cakupan dan
+penyamaran nama sama dengan halamannya; ekspor itu sendiri tercatat sebagai event
+`audit.exported`. Rincian di [docs/DEPLOY.md](docs/DEPLOY.md) §2d.
+
 ## Retensi otomatis
 
 Worker menjalankan kebijakan tiap jam: dokumen yang kedaluwarsa dan tidak diperbarui dalam

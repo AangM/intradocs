@@ -371,7 +371,98 @@ export async function setUserActive(actor: Actor, target: string, active: boolea
     );
   });
 }
-export async function listAudit(actor: Actor): Promise<
+/**
+ * The audit rows of a date range for export: the same shielding as listAudit (names and
+ * titles only where the exporter may see them), oldest first so the file reads as a
+ * ledger, one row more than the limit so the caller knows it was cut. The export is
+ * recorded as an audit event of its own in the same transaction.
+ */
+export async function exportAudit(
+  actor: Actor,
+  filter: { from: Date; to: Date; action: string | null },
+  limit: number,
+): Promise<{
+  rows: Array<{
+    id: string;
+    createdAt: string;
+    action: string;
+    actorId: string;
+    actorName: string | null;
+    documentId: string | null;
+    documentTitle: string | null;
+    subjectUserId: string | null;
+    subjectName: string | null;
+  }>;
+  truncated: boolean;
+}> {
+  if (!hasCapability(actor, 'audit.view')) throw new AccessDenied();
+  return withActor(actor.id, async ({ client }) => {
+    // The range can hold thousands of rows; resolving names and titles per row through
+    // RLS is what made the page's query unfit here. The events come first (one policy
+    // check per row), then the distinct people and documents they mention are looked up
+    // once each -- the same shielding, a few dozen checks instead of thousands.
+    const { rows } = await client.query<{
+      id: string;
+      action: string;
+      actor_id: string;
+      document_id: string | null;
+      subject_user_id: string | null;
+      created_at: Date;
+    }>(
+      `SELECT a.request_id::text AS id,a.action,a.actor_id,a.created_at,a.document_id,a.subject_user_id
+       FROM app.audit_events a
+       WHERE a.created_at>=$1 AND a.created_at<=$2 AND ($3::text IS NULL OR a.action=$3)
+       ORDER BY a.id ASC LIMIT $4`,
+      [filter.from, filter.to, filter.action, limit + 1],
+    );
+    const truncated = rows.length > limit;
+    const page = rows.slice(0, limit);
+    const people = [...new Set(page.flatMap((r) => [r.actor_id, r.subject_user_id ?? '']))].filter(
+      Boolean,
+    );
+    const documents = [...new Set(page.map((r) => r.document_id ?? ''))].filter(Boolean);
+    const names = new Map<string, string>();
+    const titles = new Map<string, string>();
+    if (people.length)
+      for (const p of (
+        await client.query<{ id: string; name: string }>(
+          'SELECT id,name FROM app.profiles WHERE id=ANY($1)',
+          [people],
+        )
+      ).rows)
+        names.set(p.id, p.name);
+    if (documents.length)
+      for (const d of (
+        await client.query<{ id: string; title: string }>(
+          'SELECT id,title FROM app.documents WHERE id=ANY($1::uuid[])',
+          [documents],
+        )
+      ).rows)
+        titles.set(d.id, d.title);
+    await client.query(
+      `INSERT INTO app.audit_events(actor_id,action,request_id) VALUES(app.actor_id(),'audit.exported',$1)`,
+      [randomUUID()],
+    );
+    return {
+      truncated,
+      rows: page.map((r) => ({
+        id: r.id,
+        createdAt: r.created_at.toISOString(),
+        action: r.action,
+        actorId: r.actor_id,
+        actorName: names.get(r.actor_id) ?? null,
+        documentId: r.document_id,
+        documentTitle: r.document_id ? (titles.get(r.document_id) ?? null) : null,
+        subjectUserId: r.subject_user_id,
+        subjectName: r.subject_user_id ? (names.get(r.subject_user_id) ?? null) : null,
+      })),
+    };
+  });
+}
+export async function listAudit(
+  actor: Actor,
+  filter?: { from: Date; to: Date; action: string | null },
+): Promise<
   Array<{
     id: string;
     action: string;
@@ -404,7 +495,11 @@ export async function listAudit(actor: Actor): Promise<
         (SELECT d.title FROM app.documents d WHERE d.id=a.document_id) AS document_title,
         (SELECT d.slug FROM app.documents d WHERE d.id=a.document_id) AS document_slug,
         (SELECT p.name FROM app.profiles p WHERE p.id=a.subject_user_id) AS subject_name
-       FROM app.audit_events a ORDER BY a.id DESC LIMIT 100`,
+       FROM app.audit_events a
+       WHERE ($1::timestamptz IS NULL OR a.created_at>=$1) AND ($2::timestamptz IS NULL OR a.created_at<=$2)
+         AND ($3::text IS NULL OR a.action=$3)
+       ORDER BY a.id DESC LIMIT 100`,
+      [filter?.from ?? null, filter?.to ?? null, filter?.action ?? null],
     );
     return rows.map((r) => ({
       id: r.id,

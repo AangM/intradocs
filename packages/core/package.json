@@ -27,6 +27,7 @@
     "./answer-export": "./src/answer-export.ts",
     "./dashboard-export": "./src/dashboard-export.ts",
     "./rag-messages": "./src/rag-messages.ts",
-    "./mail": "./src/mail.ts"
+    "./mail": "./src/mail.ts",
+    "./audit-export": "./src/audit-export.ts"
   }
 }
