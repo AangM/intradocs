@@ -47,6 +47,8 @@ services:
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
       OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
       OIDC_LABEL: ${OIDC_LABEL:-}
+      MAIL_MODE: ${MAIL_MODE:-off}
+      MAIL_FROM: ${MAIL_FROM:-}
       AI_PROVIDER: ${AI_PROVIDER:-off}
       STORAGE_DRIVER: filesystem
       APP_URL: ${APP_URL:?set APP_URL to the https origin users type}
@@ -92,6 +94,11 @@ services:
     environment:
       APP_PROFILE: ${APP_PROFILE:?}
       AI_PROVIDER: ${AI_PROVIDER:-off}
+      # The worker is what sends; it needs APP_URL only to write links into the mail.
+      APP_URL: ${APP_URL:?}
+      MAIL_MODE: ${MAIL_MODE:-off}
+      MAIL_FROM: ${MAIL_FROM:-}
+      SMTP_URL: ${SMTP_URL:-}
       WORKER_DATABASE_URL: ${WORKER_DATABASE_URL:?}
       DATABASE_PRIVATE_NETWORK: ${DATABASE_PRIVATE_NETWORK:-true}
       INTRADOCS_ROOT: /app

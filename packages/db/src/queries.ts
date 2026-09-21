@@ -113,6 +113,20 @@ function mapDocument(r: RawDocument): DocumentDetail {
     expired: r.expired,
   };
 }
+/** The person's own email switch (migration 041); read on the settings page. */
+export async function emailNotificationsEnabled(actorId: string): Promise<boolean> {
+  return withActor(actorId, async ({ client }) => {
+    const { rows } = await client.query<{ on: boolean }>(
+      'SELECT email_notifications AS "on" FROM app.profiles WHERE id=app.actor_id()',
+    );
+    return rows[0]?.on ?? true;
+  });
+}
+export async function setEmailNotifications(actorId: string, value: boolean): Promise<void> {
+  await withActor(actorId, async ({ client }) => {
+    await client.query('SELECT app.set_email_notifications($1)', [value]);
+  });
+}
 export async function loadActor(id: string): Promise<Actor | null> {
   return withActor(id, async ({ client }) => {
     // The custom role's denials are read here, on every request, so a change to a

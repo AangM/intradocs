@@ -79,6 +79,26 @@ untuk teks tombol). Di IdP, daftarkan klien _confidential_ dengan redirect URI
   `http://localhost:3099` (hanya `local-dev` yang menerima issuer http), dan
   `tests/http/sso.test.ts` memverifikasi kelima kasus di atas terhadapnya.
 
+### 2b. Email pemberitahuan, bila organisasi punya relay SMTP
+
+`MAIL_MODE=smtp`, `SMTP_URL` (`smtps://user:pass@relay:465` untuk TLS langsung, atau
+`smtp://relay:587` untuk STARTTLS — relay yang tidak bisa upgrade **ditolak**, kredensial
+tidak pernah lewat tanpa TLS), dan `MAIL_FROM`. Yang dikirim persis isi lonceng —
+penugasan review, keputusan, publikasi, review jatuh tempo, masukan pembaca — sebagai
+**satu ringkasan per orang** beberapa menit setelah kejadian terakhir, bukan satu email
+per kejadian. Worker yang mengirim; web hanya menampilkan statusnya.
+
+- Setiap orang bisa mematikannya sendiri di Pengaturan; tautan untuk itu ada di setiap
+  email. Lonceng tetap berjalan.
+- Tautan di email membuka pembaca, yang menerapkan akses penerima saat dibuka — email yang
+  diteruskan tidak membuka apa pun untuk orang lain.
+- Relay yang gagal: percobaan dihitung, dicoba lagi tiap menit, dan diberhentikan setelah
+  lima kali agar alamat yang selalu memantul tidak menyibukkan antrean. Item yang lebih
+  dari 7 hari (1 hari bila `MAIL_MODE=off`) diberhentikan tanpa dikirim, sehingga
+  menyalakan email belakangan tidak melepas tumpukan lama.
+- Di laptop: `MAIL_MODE=file` menulis setiap email sebagai `.eml` ke `var/outbox/`
+  (ditolak pada profil deployment).
+
 ---
 
 ## 3. Setiap rilis

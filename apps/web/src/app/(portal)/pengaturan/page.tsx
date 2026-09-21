@@ -4,11 +4,17 @@ import { PageHeading, Notice } from '@/components/shared';
 import { Icon } from '@/components/icon';
 import { aiStatus } from '@/lib/rag';
 import { readRuntimeConfig } from '@intradocs/core/config';
+import { readMailConfig } from '@intradocs/core/mail';
+import { emailNotificationsEnabled } from '@intradocs/db/queries';
+import { EmailSwitch } from '@/components/email-switch';
 
 export default async function Settings() {
   const actor = await requireActor();
   const ai = aiStatus();
-  const sso = readRuntimeConfig(process.env).sso;
+  const runtime = readRuntimeConfig(process.env);
+  const sso = runtime.sso;
+  const mail = readMailConfig(process.env, runtime.hardened);
+  const emailOn = await emailNotificationsEnabled(actor.id);
   const aiOn = ai.retrieval !== 'off';
   const aiLabel = !aiOn
     ? 'Belum diaktifkan'
@@ -108,6 +114,21 @@ export default async function Settings() {
         <span className="pill p-amber">Lokal · data sintetis</span>
       </div>
       <div className="settings-grid">
+        <section className="card settings-tile" key="email">
+          <span className="nt-ic nt-info" aria-hidden="true">
+            <Icon name="msg" size={16} />
+          </span>
+          <div className="settings-tile-b">
+            <div className="settings-tile-l">Email pemberitahuan</div>
+            <div className="settings-tile-v">
+              {mail.mode === 'off' ? 'Belum dikonfigurasi' : 'Ringkasan ke kotak masuk Anda'}
+            </div>
+            <EmailSwitch initial={emailOn} mailOn={mail.mode !== 'off'} />
+          </div>
+          <span className={`pill ${mail.mode === 'off' ? 'p-amber' : 'p-green'}`}>
+            {mail.mode === 'off' ? 'MAIL_MODE=off' : mail.mode === 'file' ? 'Outbox lokal' : 'SMTP'}
+          </span>
+        </section>
         {tiles.map((t) => (
           <section className="card settings-tile" key={t.label}>
             <span className={`nt-ic ${t.tone}`} aria-hidden="true">

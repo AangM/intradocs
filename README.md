@@ -123,6 +123,13 @@ SSO tidak pernah membuat akun. Untuk mencobanya di laptop: `pnpm idp:mock` (IdP 
 `OIDC_CLIENT_SECRET=mock-idp-secret-not-for-deployments`. Detail deployment di
 [docs/DEPLOY.md](docs/DEPLOY.md) §2a.
 
+## Email pemberitahuan
+
+Isi lonceng juga bisa dikirim ke kotak masuk sebagai ringkasan per orang (`MAIL_MODE=smtp`
+dengan relay organisasi, lihat [docs/DEPLOY.md](docs/DEPLOY.md) §2b). Di laptop,
+`MAIL_MODE=file` plus `MAIL_FROM=IntraDocs <noreply@intradocs.example.test>` di `.env.local`
+menulis setiap email ke `var/outbox/*.eml`. Setiap orang punya sakelar sendiri di Pengaturan.
+
 ## Isi demo yang lebih penuh
 
 `pnpm demo:content` mengisi portal lewat aplikasi sendiri (unggah → scan → konversi →

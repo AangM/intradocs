@@ -26,6 +26,7 @@
     "./diff": "./src/diff.ts",
     "./answer-export": "./src/answer-export.ts",
     "./dashboard-export": "./src/dashboard-export.ts",
-    "./rag-messages": "./src/rag-messages.ts"
+    "./rag-messages": "./src/rag-messages.ts",
+    "./mail": "./src/mail.ts"
   }
 }

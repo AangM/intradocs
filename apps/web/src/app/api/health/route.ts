@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getPool } from '@intradocs/db';
 import { readAiConfig } from '@intradocs/core/ai-config';
 import { readRuntimeConfig } from '@intradocs/core/config';
+import { readMailConfig } from '@intradocs/core/mail';
 export const dynamic = 'force-dynamic';
 export async function GET() {
   try {
@@ -15,6 +16,7 @@ export async function GET() {
         profile: readRuntimeConfig(process.env).profile,
         // Mode only; issuer and client id stay out of an unauthenticated response.
         auth: readRuntimeConfig(process.env).sso ? 'oidc' : 'local',
+        mail: readMailConfig(process.env, readRuntimeConfig(process.env).hardened).mode,
         ai: readAiConfig(process.env).retrieval,
         release: '0.3.0',
       },

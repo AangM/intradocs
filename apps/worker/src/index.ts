@@ -8,7 +8,9 @@ import { processPublication } from '@intradocs/core/workflow';
 import { readAiConfig } from '@intradocs/core/ai-config';
 import { WeknoraClient } from '@intradocs/core/weknora';
 import { processRagExport, sweepRagOrphans } from '@intradocs/core/rag';
+import { processEmailDigests } from '@intradocs/core/mail';
 import { PostgresPublicationRepository } from './publication.ts';
+import { PostgresDigestRepository, createMailTransport } from './mail.ts';
 import { PostgresRagExportRepository, WeknoraIndexTarget } from './rag-export.ts';
 
 const sha256Hex = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
@@ -36,6 +38,12 @@ async function start() {
           index: new WeknoraIndexTarget(new WeknoraClient(ai.weknora)),
         }
       : null;
+  // Email is a second channel for the bell. With MAIL_MODE=off nothing is built and
+  // unsent items are retired after a day, so switching mail on later does not release
+  // a backlog of stale mail.
+  const mail = createMailTransport(process.env, path.resolve(root));
+  const digests = mail ? new PostgresDigestRepository(pool) : null;
+  let digestDue = Date.now();
   boss.on('error', () => console.error('Antrean worker gagal; periksa PostgreSQL.'));
   pool.on('error', () => console.error('Koneksi worker gagal.'));
   await boss.start();
@@ -87,6 +95,25 @@ async function start() {
           }
         } catch {
           console.error('Ekspor RAG tertunda; antrean mempertahankan status dan retry.');
+        }
+      }
+      if (digestDue <= Date.now()) {
+        digestDue = Date.now() + 60000;
+        try {
+          if (digests && mail) {
+            const sent = await processEmailDigests({
+              repository: digests,
+              transport: mail.transport,
+              appUrl: mail.appUrl,
+              log: (m) => console.error(m),
+            });
+            if (sent > 0) console.log(`Mengirim ${sent} email ringkasan.`);
+          }
+          await pool.query('SELECT app.retire_stale_email($1::interval)', [
+            digests ? '7 days' : '1 day',
+          ]);
+        } catch {
+          console.error('Email ringkasan tertunda; item menunggu putaran berikutnya.');
         }
       }
       await pool.query(
