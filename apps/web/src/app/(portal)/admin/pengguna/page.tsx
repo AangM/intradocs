@@ -3,9 +3,13 @@ import { listCategories } from '@intradocs/db/queries';
 import { requireActor } from '@/lib/session';
 import { listUsers } from '@intradocs/db/queries';
 import { ROLES, ROLE_LABELS, hasCapability, initials, type Role } from '@intradocs/core';
-import { PageHeading, Notice } from '@/components/shared';
+import { PageHeading } from '@/components/shared';
 import { Icon } from '@/components/icon';
 import { UserStatus } from '@/components/user-status';
+import { InviteUser } from '@/components/invite-user';
+import { listInvitations } from '@intradocs/db/invitations';
+import { listCustomRoles } from '@intradocs/db/roles';
+import { CustomRoles } from '@/components/custom-roles';
 const detail: Record<Role, { icon: string; color: string; description: string }> = {
   super_admin: {
     icon: 'shield',
@@ -39,22 +43,35 @@ export default async function Users() {
   const categories = await listCategories(actor.id);
   const users = await listUsers(actor);
   const manage = hasCapability(actor, 'users.manage');
+  const invitations = await listInvitations(actor.id);
+  const customRoles = await listCustomRoles(actor.id);
+  const holders: Record<string, number> = {};
+  for (const u of users)
+    if (u.customRoleId) holders[u.customRoleId] = (holders[u.customRoleId] ?? 0) + 1;
   return (
     <div className="pad">
       <PageHeading
         title="Pengguna & Kontrol Akses (RBAC)"
-        subtitle={`${users.filter((u) => u.active).length} pengguna aktif terlihat · 5 role bawaan · identitas lokal`}
+        subtitle={`${users.filter((u) => u.active).length} pengguna aktif terlihat · 5 role bawaan${customRoles.length ? ` + ${customRoles.length} kustom` : ''} · identitas lokal`}
         actions={
-          <>
-            <button className="btn" disabled>
+          <div className="row invite-row">
+            <button
+              className="btn"
+              disabled
+              title="Sinkronisasi direktori (SCIM) tidak ada: identitas masuk lewat undangan, SSO hanya mengautentikasi akun yang sudah diundang."
+            >
               <Icon name="refresh" size={16} />
               Sinkron SSO
             </button>
-            <button className="btn btn-p" disabled>
-              <Icon name="plus" size={16} />
-              Undang Pengguna
-            </button>
-          </>
+            <InviteUser
+              categories={categories.map((c) => ({ id: c.id, name: c.name }))}
+              invitations={invitations}
+              defaultUnit={actor.unit}
+              canPickUnit={actor.role === 'super_admin'}
+              canScopeAll={actor.role === 'super_admin'}
+              customRoles={customRoles}
+            />
+          </div>
         }
       />
       <div className="grid g3 rbac-cards mb">
@@ -74,29 +91,23 @@ export default async function Users() {
             <p className="rd">{detail[role].description}</p>
           </div>
         ))}
-        <div className="role-card role-pending">
-          <div>
-            <Icon name="plus" size={23} style={{ margin: '0 auto 8px' }} />
-            <strong>Role kustom</strong>
-            <span className="sub tiny">Direncanakan untuk V1</span>
-          </div>
-        </div>
+        <CustomRoles roles={customRoles} canManage={manage} userCounts={holders} />
       </div>
-      <Notice>
-        <strong>Scope + klasifikasi tetap berlaku.</strong> Bahkan Super Admin tidak otomatis
-        membaca Terbatas/Rahasia. Matriks berikut menunjukkan akses yang diimplementasikan di M3;
-        bukan janji fitur yang belum tersedia.
-      </Notice>
       <section className="card mb">
         <div className="card-h">
           <Icon name="lock" />
-          <h2 className="h3">Matriks izin M1–M3</h2>
+          <h2 className="h3">Matriks izin</h2>
+          <div className="matrix-legend ml-auto" aria-hidden="true">
+            <span className="permission-yes">Diizinkan</span>
+            <span className="permission-limited">Terbatas scope/grant</span>
+            <span className="permission-no">Tidak</span>
+          </div>
         </div>
         <div
           className="table-scroll"
           tabIndex={0}
           role="region"
-          aria-label="Tabel yang dapat digulir"
+          aria-label="Matriks izin (dapat digulir)"
         >
           <table className="matrix">
             <thead>
@@ -165,11 +176,11 @@ export default async function Users() {
               </tr>
               <tr>
                 <td>Upload / review</td>
-                <td>Dalam scope / ditugaskan</td>
-                <td>Dalam scope / ditugaskan</td>
-                <td>Dalam scope / ditugaskan</td>
-                <td>Milik sendiri / tidak</td>
-                <td>Tidak / tidak</td>
+                <td className="permission-limited">Dalam scope / ditugaskan</td>
+                <td className="permission-limited">Dalam scope / ditugaskan</td>
+                <td className="permission-limited">Dalam scope / ditugaskan</td>
+                <td className="permission-limited">Milik sendiri / tidak review</td>
+                <td className="permission-no">Tidak</td>
               </tr>
             </tbody>
           </table>
@@ -185,7 +196,7 @@ export default async function Users() {
           className="table-scroll"
           tabIndex={0}
           role="region"
-          aria-label="Tabel yang dapat digulir"
+          aria-label="Daftar pengguna (dapat digulir)"
         >
           <table>
             <thead>
@@ -212,7 +223,14 @@ export default async function Users() {
                     </div>
                   </td>
                   <td>
-                    <span className="pill p-blue">{ROLE_LABELS[u.role]}</span>
+                    {u.customRoleName ? (
+                      <span className="role-cell">
+                        <span className="pill p-ai">{u.customRoleName}</span>
+                        <span className="sub tiny">berbasis {ROLE_LABELS[u.role]}</span>
+                      </span>
+                    ) : (
+                      <span className="pill p-blue">{ROLE_LABELS[u.role]}</span>
+                    )}
                   </td>
                   <td className="small-cell">{u.unit}</td>
                   <td>
@@ -236,7 +254,10 @@ export default async function Users() {
                   <td>
                     <UserAssignment
                       id={u.id}
+                      name={u.name}
                       initialRole={u.role}
+                      initialCustomRoleId={u.customRoleId}
+                      customRoles={customRoles}
                       scopeAll={u.scopeAll}
                       categoryIds={u.categoryIds}
                       categories={categories}
@@ -256,9 +277,8 @@ export default async function Users() {
         </div>
       </section>
       <p className="sub tiny mt20">
-        Menonaktifkan akun memblokir pembacaan data di database dan mencabut session. Akun sendiri
-        tidak dapat dinonaktifkan; karena pelaku harus admin aktif, tindakan ini tidak dapat
-        menghapus admin aktif terakhir.
+        Akun yang dinonaktifkan langsung keluar dan tidak bisa membaca apa pun. Akun sendiri dan
+        admin aktif terakhir tidak bisa dinonaktifkan.
       </p>
     </div>
   );

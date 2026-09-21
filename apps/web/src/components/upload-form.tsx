@@ -2,6 +2,8 @@
 import Link from 'next/link';
 import { useRef, useState } from 'react';
 import { Icon } from './icon';
+import { MetadataHelp } from './metadata-help';
+import { RevisionSuggestions } from './revision-suggestions';
 import { CLASSIFICATIONS, CLASSIFICATION_LABELS, type Classification } from '@intradocs/core';
 type Category = { id: string; name: string; allowed: boolean; minimumClassification: string };
 type Result = { documentId: string; versionId: string; slug: string; reused: boolean };
@@ -16,25 +18,43 @@ export type RevisionInput = {
   classification: Classification;
 };
 const steps = ['Pilih sumber', 'Metadata', 'Proses & simpan', 'Tinjau hasil'];
+const FT_BY_EXT: Record<string, [string, string]> = {
+  md: ['md', 'MD'],
+  txt: ['txt', 'TXT'],
+  pdf: ['pdf', 'PDF'],
+  docx: ['doc', 'DOC'],
+  xlsx: ['xls', 'XLS'],
+};
+const ftClass = (name: string) =>
+  FT_BY_EXT[name.split('.').pop()?.toLowerCase() ?? '']?.[0] ?? 'txt';
+const ftLabel = (name: string) =>
+  FT_BY_EXT[name.split('.').pop()?.toLowerCase() ?? '']?.[1] ?? 'FILE';
+
 export function UploadForm({
   categories,
   ownerName,
   maxFileBytes,
+  formats = ['MD', 'TXT', 'PDF', 'DOCX', 'XLSX'],
   initialScanner,
   revision,
+  initialTitle,
 }: {
   categories: Category[];
   ownerName: string;
   maxFileBytes: number;
+  /** Formats this installation accepts (server-decided; PPTX only with WeKnora). */
+  formats?: readonly string[];
   initialScanner: ScannerState;
   revision?: RevisionInput;
+  /** Title seed for a new document, e.g. a knowledge-gap term from the dashboard. */
+  initialTitle?: string;
 }) {
   const [step, setStep] = useState(1),
     [file, setFile] = useState<File | null>(null),
     [attachments, setAttachments] = useState<File[]>([]),
     [source, setSource] = useState(''),
     [preview, setPreview] = useState('');
-  const [title, setTitle] = useState(revision?.title ?? ''),
+  const [title, setTitle] = useState(revision?.title ?? initialTitle ?? ''),
     [summary, setSummary] = useState(revision?.summary ?? ''),
     [categoryId, setCategoryId] = useState(
       revision?.categoryId ?? categories.find((c) => c.allowed)?.id ?? '',
@@ -51,6 +71,7 @@ export function UploadForm({
     [result, setResult] = useState<Result | null>(null),
     [dragging, setDragging] = useState(false);
   const input = useRef<HTMLInputElement>(null),
+    attachmentInput = useRef<HTMLInputElement>(null),
     requestId = useRef<string | null>(null),
     selection = useRef(0),
     controller = useRef<AbortController | null>(null);
@@ -58,9 +79,10 @@ export function UploadForm({
     requestId.current = null;
     setError('');
   };
+  const accept = formats.map((f) => `.${f.toLowerCase()}`).join(',');
   function checkFile(f: File) {
-    if (!/\.(md|txt|pdf|docx|xlsx)$/i.test(f.name))
-      throw new Error('Gunakan MD, TXT, PDF bertesks, DOCX, atau XLSX.');
+    const ext = f.name.split('.').at(-1)?.toUpperCase() ?? '';
+    if (!formats.includes(ext)) throw new Error(`Gunakan ${formats.join(', ')}.`);
     if (!f.size || f.size > maxFileBytes)
       throw new Error('Setiap berkas harus berisi data dan maksimal 50 MiB.');
   }
@@ -243,24 +265,29 @@ export function UploadForm({
           </li>
         ))}
       </ol>
-      <div className={`callout ${scanner.ready ? 'c-info' : 'c-warn'} upload-scanner`}>
-        <Icon name="shield" />
-        <div>
-          <strong>{scanner.ready ? 'Pemindai tersedia' : 'Pemindai belum tersedia'}</strong>
-          <p>{scanner.message}</p>
-          <p className="hint">
-            Kesiapan bukan hasil scan. Setiap original dan lampiran dipindai sebelum dikonversi.
-            Converter terisolasi diperlukan untuk PDF/Office.
-          </p>
+      {/* Ready: one quiet status line. Not ready: a warning, because nothing can be saved. */}
+      {scanner.ready ? (
+        <p className="upload-scanner-ok sub tiny">
+          <Icon name="shield" size={13} /> Pemindai virus siap · setiap berkas dipindai sebelum
+          disimpan
+        </p>
+      ) : (
+        <div className="callout c-warn upload-scanner">
+          <Icon name="shield" />
+          <div>
+            <strong>Pemindai virus belum tersedia</strong>
+            <p>{scanner.message}</p>
+            <p className="hint">Unggahan ditolak sampai pemindai aktif. Hubungi admin.</p>
+          </div>
+          <button
+            className="btn btn-sm"
+            disabled={checking || busy}
+            onClick={() => void checkScanner()}
+          >
+            {checking ? 'Memeriksa…' : 'Periksa ulang'}
+          </button>
         </div>
-        <button
-          className="btn btn-sm"
-          disabled={checking || busy}
-          onClick={() => void checkScanner()}
-        >
-          {checking ? 'Memeriksa…' : 'Periksa ulang'}
-        </button>
-      </div>
+      )}
       {error && (
         <p role="alert" className="upload-error">
           {error}
@@ -288,7 +315,7 @@ export function UploadForm({
               <h2>Tarik sumber utama ke sini</h2>
               <p className="sub">50 MiB per berkas · 100 MiB total · data sintetis saja</p>
               <div className="fmt">
-                {['MD', 'TXT', 'PDF', 'DOCX', 'XLSX'].map((f) => (
+                {formats.map((f) => (
                   <span key={f}>{f}</span>
                 ))}
               </div>
@@ -298,7 +325,7 @@ export function UploadForm({
                 type="file"
                 hidden
                 aria-label="Berkas utama"
-                accept=".md,.txt,.pdf,.docx,.xlsx"
+                accept={accept}
                 onChange={(e) => void choose(e.target.files)}
               />
               <button className="btn btn-p" onClick={() => input.current?.click()}>
@@ -307,29 +334,75 @@ export function UploadForm({
             </div>
             {file && (
               <div className="file-row">
-                <Icon name="file" />
-                <strong>{file.name}</strong>
-                <span className="sub">{(file.size / 1024).toFixed(1)} KiB · belum dipindai</span>
+                <span className={`ft ft-${ftClass(file.name)}`}>{ftLabel(file.name)}</span>
+                <div className="upload-file-info">
+                  <strong>{file.name}</strong>
+                  <div className="sub tiny">
+                    {(file.size / 1024).toFixed(1)} KiB · sumber utama · dipindai saat disimpan
+                  </div>
+                </div>
+                <span className="pill p-blue">Siap</span>
+                <button
+                  type="button"
+                  className="btn-icon"
+                  aria-label="Hapus berkas utama"
+                  onClick={() => {
+                    setFile(null);
+                    if (input.current) input.current.value = '';
+                  }}
+                >
+                  <Icon name="x" size={14} />
+                </button>
               </div>
             )}
-            <label className="attachment-picker">
-              Lampiran (opsional, maksimal 4)
+            {attachments.map((a, i) => (
+              <div className="file-row" key={`${a.name}-${i}`}>
+                <span className={`ft ft-${ftClass(a.name)}`}>{ftLabel(a.name)}</span>
+                <div className="upload-file-info">
+                  <strong>{a.name}</strong>
+                  <div className="sub tiny">
+                    {(a.size / 1024).toFixed(1)} KiB · lampiran {i + 1} · dipindai bersama sumber
+                    utama
+                  </div>
+                </div>
+                <span className="pill p-grey">Lampiran</span>
+                <button
+                  type="button"
+                  className="btn-icon"
+                  aria-label={`Hapus lampiran ${a.name}`}
+                  onClick={() => {
+                    changed();
+                    setAttachments(attachments.filter((_, j) => j !== i));
+                  }}
+                >
+                  <Icon name="x" size={14} />
+                </button>
+              </div>
+            ))}
+            <div className="attachment-picker">
               <input
+                id="attachment-files"
+                ref={attachmentInput}
                 type="file"
+                hidden
                 multiple
-                accept=".md,.txt,.pdf,.docx,.xlsx"
+                accept={accept}
+                aria-label="Lampiran"
                 onChange={(e) => chooseAttachments(e.target.files)}
               />
-            </label>
-            {attachments.map((a, i) => (
-              <p className="sub" key={i}>
-                {i + 1}. {a.name} · {(a.size / 1024).toFixed(1)} KiB
-              </p>
-            ))}
+              <button
+                type="button"
+                className="btn btn-sm"
+                disabled={attachments.length >= 4}
+                onClick={() => attachmentInput.current?.click()}
+              >
+                <Icon name="plus" size={14} /> Tambah lampiran
+              </button>
+              <span className="sub tiny">Opsional, maksimal 4 berkas pendukung</span>
+            </div>
             <p className="hint">
-              Hasil canonical gabungan maksimal 2 MiB. PDF pindai, macro, ZIP, format
-              rusak/encrypted, dan hasil yang kehilangan data penting ditolak; tidak ada OCR atau AI
-              yang mengarang isinya.
+              Berkas dengan teks yang bisa dibaca saja: PDF hasil pindai (gambar), makro, ZIP, dan
+              berkas terenkripsi ditolak. Tidak ada OCR.
             </p>
             <div className="upload-actions">
               <button className="btn btn-p" disabled={!file} onClick={() => setStep(2)}>
@@ -444,6 +517,56 @@ export function UploadForm({
                 Pemilik
                 <input className="inp" value={ownerName} readOnly />
               </label>
+              {/* A revision starts from a published, indexed version, so what the model
+                  generated about it (§17) and the filtered label suggestions can be taken
+                  into the form here -- by a press, never by default. */}
+              {revision && (
+                <RevisionSuggestions
+                  documentId={revision.documentId}
+                  currentSummary={summary}
+                  currentLabels={labels
+                    .split(',')
+                    .map((l) => l.trim())
+                    .filter(Boolean)}
+                  onUseSummary={(text) => {
+                    setSummary(text.slice(0, 1000));
+                    changed();
+                  }}
+                  onAddLabel={(name) => {
+                    const current = labels
+                      .split(',')
+                      .map((l) => l.trim())
+                      .filter(Boolean);
+                    if (current.some((l) => l.toLowerCase() === name.toLowerCase())) return;
+                    setLabels([...current, name].join(', '));
+                    changed();
+                  }}
+                />
+              )}
+              {/* Draft-side help: the file stays here; see MetadataHelp for what travels. */}
+              <MetadataHelp
+                title={title}
+                excerpt={source.slice(0, 20000)}
+                categoryId={categoryId}
+                currentLabels={labels
+                  .split(',')
+                  .map((l) => l.trim())
+                  .filter(Boolean)}
+                onPickCategory={(id) => {
+                  if (revision || !categories.find((c) => c.id === id)?.allowed) return;
+                  setCategoryId(id);
+                  changed();
+                }}
+                onAddLabel={(name) => {
+                  const current = labels
+                    .split(',')
+                    .map((l) => l.trim())
+                    .filter(Boolean);
+                  if (current.some((l) => l.toLowerCase() === name.toLowerCase())) return;
+                  setLabels([...current, name].join(', '));
+                  changed();
+                }}
+              />
             </fieldset>
             <div className="upload-form-footer">
               <button className="btn" type="button" onClick={() => setStep(1)}>

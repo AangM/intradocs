@@ -2,7 +2,12 @@
 // locator resolution. No I/O, no network, no database — so every rule below is
 // unit-testable offline and cannot be softened by a live service being agreeable.
 import { createHash } from 'node:crypto';
-import { headingSlug, InputError } from './validation.ts';
+import { headingSlug, InputError, parseUuid } from './validation.ts';
+import {
+  ABSTAIN_MESSAGE,
+  NO_DIRECT_ANSWER_MESSAGE,
+  MODEL_DECLINE_PATTERN,
+} from './rag-messages.ts';
 
 /**
  * Bumping this forces every version to be re-exported on the next sync. Change it
@@ -181,6 +186,15 @@ export interface RawHit {
   score: number;
   /** Optional: how the engine found the chunk. Absent means unknown. */
   matchType?: 'vector' | 'keyword' | 'context' | 'other';
+  /**
+   * Optional: what the engine says the chunk is. WeKnora indexes the summary it
+   * generated at ingest as a `summary` chunk next to the document's own `text` chunks,
+   * and hybrid search returns both. Absent is treated as `text` for engines that do not
+   * distinguish; anything present and not `text` is model output and is never cited.
+   */
+  chunkType?: string;
+  /** Cosine similarity from the vector-only pass, attached by gateByRelevance when known. */
+  relevance?: number;
 }
 
 export interface GatedRetrieval {
@@ -235,7 +249,7 @@ export function gateByRelevance(
   }
   scored.sort((a, b) => b.relevance - a.relevance);
   return {
-    kept: [...scored.map((s) => s.hit), ...keywordOnly],
+    kept: [...scored.map((s) => ({ ...s.hit, relevance: s.relevance })), ...keywordOnly],
     dropped,
     topRelevance: scored.length ? scored[0]!.relevance : null,
   };
@@ -254,9 +268,12 @@ export interface Citation {
   anchor: string | null;
   href: string;
   score: number;
+  /** Cosine similarity when the relevance gate measured one; null for keyword-only hits. */
+  relevance: number | null;
 }
 
-export type RejectionReason = 'unknown_source' | 'duplicate' | 'empty_content';
+export type RejectionReason =
+  'unknown_source' | 'duplicate' | 'empty_content' | 'generated_content';
 
 export interface ValidatedRetrieval {
   citations: Citation[];
@@ -271,7 +288,16 @@ export function sanitizeSnippet(text: string, maxChars: number): string {
     // was surfacing verbatim inside citation snippets shown to readers.
     .replace(/<!--\s*intradocs:[^>]*-->/g, ' ')
     .replace(/^\s*>\s*Sumber:\s*IntraDocs[^\n]*/gm, ' ')
+    // A snippet is shown as a quote, so Markdown structure is noise: heading markers,
+    // blockquote bars, emphasis, code fences and table rules go; the words stay.
+    .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+    .replace(/^\s{0,3}>\s?/gm, '')
+    .replace(/^\s*\|?(\s*:?-{3,}:?\s*\|)+\s*:?-*:?\s*\|?\s*$/gm, ' ')
+    .replace(/```[a-z]*/g, ' ')
+    .replace(/(\*\*|__)(.*?)\1/g, '$2')
+    .replace(/\|/g, ' · ')
     .replace(/[\u0000-\u001f\u007f]/g, ' ')
+    .replace(/(\s·\s*){2,}/g, ' · ')
     .replace(/[ \t]+/g, ' ')
     .trim();
   return cleaned.length > maxChars ? `${cleaned.slice(0, maxChars).trimEnd()}…` : cleaned;
@@ -333,6 +359,13 @@ export function validateRetrieval(
       rejected.push({ knowledgeId: hit.knowledgeId, reason: 'unknown_source' });
       continue;
     }
+    // Found in the index, about an authorised version, and still not citable: a
+    // summary WeKnora wrote about the document is not the document. It would show up as
+    // a quote with no anchor -- exactly what an invented citation looks like.
+    if (hit.chunkType !== undefined && hit.chunkType !== 'text') {
+      rejected.push({ knowledgeId: hit.knowledgeId, reason: 'generated_content' });
+      continue;
+    }
     const snippet = sanitizeSnippet(hit.content, options.maxSnippetChars);
     if (!snippet) {
       rejected.push({ knowledgeId: hit.knowledgeId, reason: 'empty_content' });
@@ -360,6 +393,7 @@ export function validateRetrieval(
       anchor: located?.anchor ?? null,
       href: `/dokumen/${source.documentId}/${source.documentSlug}${located ? `#${located.anchor}` : ''}`,
       score: hit.score,
+      relevance: hit.relevance ?? null,
     });
   }
   return { citations, rejected };
@@ -377,22 +411,347 @@ export function parseQuestion(value: unknown, maxChars: number): string {
 }
 
 /**
- * Body shape for the chat endpoint. Any extra field is rejected outright, so a client
- * cannot smuggle a system prompt, a knowledge base ID, a model name or a scope.
+ * Words a follow-up can be made of without naming anything: pronouns, connectives,
+ * "more / in detail / why / how / again" and their Indonesian everyday spellings. A
+ * question built only from these ("jelaskan lebih lengkap", "kenapa?", "apa saja
+ * langkahnya?") carries no subject of its own, so retrieval on it alone finds nothing
+ * and the assistant would abstain in the middle of a conversation about something it
+ * had just answered. Anything else ("berapa harga saham?") names a subject and must
+ * stand on its own -- inheriting the previous sources there would turn an honest
+ * abstention into an answer built from the wrong documents.
  */
-export function parseChatBody(value: unknown, maxChars: number): { question: string } {
+const CONTINUATION_WORDS = new Set(
+  (
+    'jelaskan jelasin terangkan uraikan rincikan rinci sebutkan elaborasi lebih lengkap detail ' +
+    'detil jelas panjang singkat ringkas ringkasnya intinya lanjut lanjutkan lanjutannya terus ' +
+    'teruskan kenapa mengapa bagaimana gimana caranya cara langkah langkahnya tahapan tahapannya ' +
+    'contoh contohnya misalnya maksud maksudnya artinya berarti apa apakah kah saja aja yang itu ' +
+    'ini tadi sebelumnya barusan tersebut nya dan lalu kemudian selanjutnya berikutnya lagi ulangi ' +
+    'ulang sekali tolong mohon coba bisa boleh bisakah bolehkah ya iya tidak bukan kok dong sih ' +
+    'deh nih ok oke baik jadi untuk dengan di ke dari pada secara tentang soal mengenai semua ' +
+    'semuanya seluruhnya poin poinnya bagian bagiannya versi versinya sederhana simpel bahasa ' +
+    'awam kalau jika kalo bila gitu begitu gini begini yg dgn tsb ' +
+    'explain elaborate more detail details why how what that this it again continue please ' +
+    'summarize summary shorter longer example examples steps'
+  ).split(' '),
+);
+
+/**
+ * True when a question is only a continuation of the previous turn -- see
+ * CONTINUATION_WORDS. Bounded at eight words: a longer question is saying something.
+ */
+export function isContinuation(question: string): boolean {
+  const words = question
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w.replace(/-?nya$/u, '').replace(/-/g, ''))
+    .filter(Boolean);
+  return words.length > 0 && words.length <= 8 && words.every((w) => CONTINUATION_WORDS.has(w));
+}
+
+/**
+ * Messages that are about the assistant or the catalogue rather than about a document's
+ * content. They never reach retrieval: the answer is composed from the catalogue the
+ * person may read (RLS) or is a fixed sentence, so "apa ada dokumen lain yang menarik?"
+ * gets a list instead of "tidak ada sumber". Content questions return null and go
+ * through the gate as before; a question that names a document AND asks about its
+ * content ("dokumen apa yang mengatur retensi?") is deliberately not matched.
+ */
+export type AssistantIntent = 'greeting' | 'thanks' | 'capabilities' | 'catalog';
+
+export function classifyIntent(question: string): AssistantIntent | null {
+  const q = question
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s?]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const words = q.replace(/\?/g, '').split(' ').filter(Boolean);
+  if (words.length === 0) return null;
+  if (
+    words.length <= 12 &&
+    /\b(bisa apa|apa yang (bisa|dapat) (kamu|anda|kau|lu)( lakukan| bantu)?|kamu siapa|siapa kamu|apa itu intradocs|cara (pakai|memakai|menggunakan) (asisten|kamu|ini)|bagaimana (cara )?bertanya|(fitur|kemampuan) (apa|kamu|anda|asisten)|kamu bisa|bantuan)\b/.test(
+      q,
+    )
+  )
+    return 'capabilities';
+  if (
+    words.length <= 4 &&
+    /^(halo|hai|hi|hello|hey|selamat (pagi|siang|sore|malam)|pagi|siang|sore|malam|assalamualaikum|permisi|tes|test)\b/.test(
+      q,
+    )
+  )
+    return 'greeting';
+  if (
+    words.length <= 6 &&
+    /^(terima kasih|makasih|thanks|thank you|thx|oke|ok|sip|mantap|baik|siap|noted)\b/.test(q)
+  )
+    return 'thanks';
+  // The document must be the thing asked about -- "dokumen apa saja", "ada panduan
+  // lain", "rekomendasi bacaan" -- not merely mentioned ("kebijakan backup ini berlaku
+  // untuk dataset apa saja?" is a content question about one policy).
+  const DOC = '(?:dokumen|doc|docs|panduan|sop|artikel|materi|topik|bacaan|referensi)\\w*';
+  const catalog = [
+    `^(?:apa|ada|adakah|apakah|punya|tolong|coba|bisa|mohon)?\\s*(?:ada\\s+)?${DOC}\\s+(?:lain|lainnya|apa saja|apa aja|menarik|tersedia|terbaru|populer|yang (?:lain|menarik|tersedia|ada|bisa|boleh|perlu|harus|terbaru|populer|paling))`,
+    `\\b(?:rekomendasi|rekomendasikan|sarankan|saran|daftar|list|semua|seluruh)\\s+${DOC}`,
+    `\\b${DOC}\\s+(?:apa saja|apa aja)\\s+yang\\s+(?:ada|tersedia|bisa|boleh)`,
+    `\\b(?:apa|mana)\\s+(?:saja\\s+)?yang\\s+(?:bisa|boleh|dapat|perlu|harus)\\s+(?:saya|aku)\\s+baca`,
+    `\\b(?:ada|berapa)\\s+(?:berapa\\s+)?${DOC}`,
+  ];
+  if (words.length <= 14 && catalog.some((p) => new RegExp(p, 'u').test(q))) return 'catalog';
+  return null;
+}
+
+/**
+ * A 3B model often opens with the decline sentence and then quotes the very passage
+ * that answers ("Dokumen ... tidak membahas hal ini. Namun, dokumen tersebut menyebutkan
+ * ... ping vpn.example.test"). When that continuation shares enough of the question's
+ * own words, it IS the answer and is returned as such (leading "Namun," trimmed);
+ * otherwise -- the continuation merely describes what the passages are about -- null,
+ * and the caller keeps the honest "no direct answer" framing.
+ */
+export function salvageDecline(question: string, remainder: string): string | null {
+  const content = (t: string) =>
+    new Set(
+      t
+        .toLowerCase()
+        .split(/[^\p{L}\p{N}]+/u)
+        .filter((w) => w.length >= 4 && !CONTINUATION_WORDS.has(w)),
+    );
+  const asked = [...content(question)];
+  if (asked.length === 0 || remainder.length < 40) return null;
+  const said = content(remainder);
+  const overlap = asked.filter((w) => said.has(w)).length;
+  if (overlap < 2 && overlap < asked.length) return null;
+  return remainder
+    .replace(/^(?:namun|tetapi|akan tetapi|meskipun demikian|meski begitu)\s*,?\s*/iu, '')
+    .replace(/^\p{Ll}/u, (c) => c.toUpperCase());
+}
+
+/**
+ * PRD §3.4: when sources disagree, show the disagreement instead of letting the model
+ * pick. Deterministic and narrow on purpose: a "quantity" is a number with a unit
+ * (7 hari, 24 jam, 30 menit, 50 MiB, 2 tahap, 90%); two citations from DIFFERENT
+ * documents that state different values for the same unit, each in a sentence that
+ * shares a word with the question, are a conflict. Anything subtler (wording, policy
+ * text without numbers) is not detected -- and is not claimed to be.
+ */
+export interface SourceConflict {
+  unit: string;
+  values: Array<{
+    value: string;
+    documentId: string;
+    documentTitle: string;
+    href: string;
+    excerpt: string;
+  }>;
+}
+
+const UNIT_ALIASES: Record<string, string> = {
+  hari: 'hari',
+  jam: 'jam',
+  menit: 'menit',
+  detik: 'detik',
+  minggu: 'minggu',
+  bulan: 'bulan',
+  tahun: 'tahun',
+  '%': '%',
+  persen: '%',
+  kali: 'kali',
+  tahap: 'tahap',
+  orang: 'orang',
+  karakter: 'karakter',
+  kb: 'KB',
+  kib: 'KB',
+  mb: 'MB',
+  mib: 'MB',
+  gb: 'GB',
+  gib: 'GB',
+};
+
+export function detectConflicts(
+  question: string,
+  citations: ReadonlyArray<Pick<Citation, 'documentId' | 'documentTitle' | 'href' | 'snippet'>>,
+): SourceConflict[] {
+  const words = question
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((w) => w.length >= 4 && !CONTINUATION_WORDS.has(w));
+  if (words.length === 0) return [];
+  const byUnit = new Map<string, SourceConflict['values']>();
+  const quantity =
+    /(\d+(?:[.,]\d+)?)\s*(hari|jam|menit|detik|minggu|bulan|tahun|%|persen|kali|tahap|orang|karakter|kib|kb|mib|mb|gib|gb)\b/giu;
+  for (const c of citations) {
+    for (const sentence of c.snippet.replace(/\s+/g, ' ').split(/(?<=[.;!?])\s+|\s*\|\s*/)) {
+      const lower = sentence.toLowerCase();
+      if (!words.some((w) => lower.includes(w))) continue;
+      for (const m of sentence.matchAll(quantity)) {
+        const unit = UNIT_ALIASES[m[2]!.toLowerCase()];
+        if (!unit) continue;
+        const value = m[1]!.replace(',', '.');
+        const list = byUnit.get(unit) ?? [];
+        if (!list.some((v) => v.documentId === c.documentId && v.value === value))
+          list.push({
+            value,
+            documentId: c.documentId,
+            documentTitle: c.documentTitle,
+            href: c.href,
+            excerpt: sentence.trim().slice(0, 200),
+          });
+        byUnit.set(unit, list);
+      }
+    }
+  }
+  const out: SourceConflict[] = [];
+  for (const [unit, values] of byUnit) {
+    const documents = new Set(values.map((v) => v.documentId));
+    const distinct = new Set(values.map((v) => v.value));
+    if (documents.size < 2 || distinct.size < 2) continue;
+    // Only a real disagreement: some document states a value another does not.
+    const perDoc = new Map<string, Set<string>>();
+    for (const v of values)
+      perDoc.set(v.documentId, (perDoc.get(v.documentId) ?? new Set()).add(v.value));
+    const sets = [...perDoc.values()];
+    const agree = sets.every((a) => sets.every((b) => [...a].every((x) => b.has(x))));
+    if (agree) continue;
+    out.push({ unit, values });
+  }
+  return out;
+}
+
+/**
+ * What a question is asked against. `all` is every active version the actor may read;
+ * the other two NARROW that set -- a category the actor can see, or documents the actor
+ * has opened. A scope never widens anything: the IDs are filtered through the same
+ * row-level policies as the unscoped list, so an ID outside the actor's access simply
+ * contributes nothing and the request abstains.
+ */
+export type RetrievalScope =
+  | { type: 'all' }
+  | { type: 'category'; categoryId: string }
+  | { type: 'documents'; documentIds: string[] };
+
+export const MAX_SCOPE_DOCUMENT_IDS = 20;
+
+export function parseScope(value: unknown): RetrievalScope {
+  if (value === undefined) return { type: 'all' };
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw new InputError('Cakupan tidak valid.');
+  const scope = value as Record<string, unknown>;
+  const keys = Object.keys(scope).sort();
+  if (scope.type === 'all' && keys.join() === 'type') return { type: 'all' };
+  if (scope.type === 'category' && keys.join() === 'categoryId,type')
+    return { type: 'category', categoryId: parseUuid(scope.categoryId) };
+  if (scope.type === 'documents' && keys.join() === 'documentIds,type') {
+    if (!Array.isArray(scope.documentIds) || scope.documentIds.length === 0)
+      throw new InputError('Pilih minimal satu dokumen.');
+    if (scope.documentIds.length > MAX_SCOPE_DOCUMENT_IDS)
+      throw new InputError(`Maksimal ${MAX_SCOPE_DOCUMENT_IDS} dokumen per cakupan.`);
+    return { type: 'documents', documentIds: [...new Set(scope.documentIds.map(parseUuid))] };
+  }
+  throw new InputError('Cakupan tidak valid.');
+}
+
+export interface ChatBody {
+  question: string;
+  scope: RetrievalScope;
+  /** Continue an existing conversation; ownership is checked when the turn is stored. */
+  conversationId: string | null;
+}
+
+/**
+ * Body shape for the chat endpoint. Beyond the question, a client may only narrow the
+ * scope and name a conversation of its own; any other field is rejected outright, so a
+ * client cannot smuggle a system prompt, a knowledge base ID or a model name.
+ */
+export function parseChatBody(value: unknown, maxChars: number): ChatBody {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw new InputError('Payload tidak valid.');
   const body = value as Record<string, unknown>;
-  const keys = Object.keys(body);
-  if (keys.length !== 1 || keys[0] !== 'question')
-    throw new InputError(
-      'Hanya field question yang diizinkan. Prompt sistem, knowledge base dan model ditentukan server.',
-    );
-  return { question: parseQuestion(body.question, maxChars) };
+  const allowed = new Set(['question', 'scope', 'conversationId']);
+  for (const key of Object.keys(body))
+    if (!allowed.has(key))
+      throw new InputError(
+        'Hanya field question, scope dan conversationId yang diizinkan. Prompt sistem, knowledge base dan model ditentukan server.',
+      );
+  return {
+    question: parseQuestion(body.question, maxChars),
+    scope: parseScope(body.scope),
+    conversationId:
+      body.conversationId === undefined || body.conversationId === null
+        ? null
+        : parseUuid(body.conversationId),
+  };
 }
 
-export { ABSTAIN_MESSAGE } from './rag-messages.ts';
+export {
+  ABSTAIN_MESSAGE,
+  NO_DIRECT_ANSWER_MESSAGE,
+  MODEL_DECLINE_SENTENCE,
+  MODEL_DECLINE_PATTERN,
+} from './rag-messages.ts';
+
+/**
+ * The generated answer as it should reach a reader. Two cases become the same reader-facing
+ * sentence, next to the sources IntraDocs' gate did pass:
+ *  - WeKnora's fixed fallback (the abstain sentence), emitted when its own pipeline --
+ *    thresholds, or the reranker when one is on -- kept no chunk. Shown verbatim it would
+ *    contradict the source list under it.
+ *  - The model's own decline, which the pinned prompt asks for when the passages do not
+ *    contain the answer. The small model paraphrases it and then often keeps writing
+ *    about what the passages do say -- frequently the very sentence that answers
+ *    ("...belum dianggap berhasil sebelum hasil restore dapat diverifikasi, namun tidak
+ *    menyebutkan kapan tepatnya"). That continuation comes back as `remainder`, so the
+ *    caller can show it as what the material does say rather than throw it away.
+ * Any other text is passed through untouched.
+ */
+/**
+ * Sentences a small model sometimes copies out of its own instructions and appends to an
+ * otherwise good answer ("Riwayat percakapan hanya untuk memahami maksud pertanyaan, bukan
+ * sumber fakta."). They are instructions, not facts from a document, so they never reach
+ * the reader. Matched loosely (case, spacing) and removed as whole sentences.
+ */
+const PROMPT_ECHOES: RegExp[] = [
+  /riwayat percakapan\s+(?:hanya\s+)?(?:dipakai\s+)?untuk memahami maksud pertanyaan[^.!?\n]*[.!?]?/giu,
+  /(?:faktanya|fakta)\s+(?:tetap\s+)?hanya\s+dari materi(?: referensi)?[^.!?\n]*[.!?]?/giu,
+  /dokumen yang tersedia tidak membahas hal lain[.!?]?/giu,
+  /kata-kata penting \(negasi, angka, nama\) disalin persis[^.!?\n]*[.!?]?/giu,
+  /\[runtime context[^\]]*\]/giu,
+];
+export function stripPromptEchoes(text: string): string {
+  let out = text;
+  for (const pattern of PROMPT_ECHOES) out = out.replace(pattern, '');
+  return out
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/(^|\n)[ \t]*(?=\n|$)/g, '$1')
+    .trim();
+}
+
+export function resolveGeneratedAnswer(text: string): {
+  answer: string;
+  fellBack: boolean;
+  /** What the model wrote after its decline sentence, when anything; never a fixed fallback's. */
+  remainder: string;
+} {
+  const trimmed = stripPromptEchoes(text);
+  // Nothing but echoed instructions is no answer at all: same path as a decline.
+  if (!trimmed || trimmed === ABSTAIN_MESSAGE)
+    return { answer: NO_DIRECT_ANSWER_MESSAGE, fellBack: true, remainder: '' };
+  if (MODEL_DECLINE_PATTERN.test(trimmed)) {
+    // The decline sentence ends at its first period; the rest is the model's account of
+    // the material. A remainder that only restates the decline is dropped.
+    const end = trimmed.search(/[.!]\s|[.!]$/);
+    const remainder = end >= 0 ? trimmed.slice(end + 1).trim() : '';
+    return {
+      answer: NO_DIRECT_ANSWER_MESSAGE,
+      fellBack: true,
+      remainder: remainder.length >= 40 && !MODEL_DECLINE_PATTERN.test(remainder) ? remainder : '',
+    };
+  }
+  return { answer: trimmed, fellBack: false, remainder: '' };
+}
 
 /* ------------------------------------------------------------------ *
  * Export worker

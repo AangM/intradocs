@@ -25,7 +25,10 @@ export function converterOptions(env: Record<string, string | undefined>) {
   return { url: `http://127.0.0.1:${raw}/convert`, token };
 }
 export class LocalDocumentConverter implements DocumentConverter {
-  constructor(private readonly env: Record<string, string | undefined>) {}
+  private readonly env: Record<string, string | undefined>;
+  constructor(env: Record<string, string | undefined>) {
+    this.env = env;
+  }
   async convert(file: UploadFile, signal?: AbortSignal): Promise<ConvertedText> {
     if (file.format === 'MD' || file.format === 'TXT') return convertText(file);
     const { url, token } = converterOptions(this.env);

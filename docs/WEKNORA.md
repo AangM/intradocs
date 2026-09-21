@@ -92,6 +92,27 @@ pnpm dev
 
 `pnpm weknora:stop` menghentikan profil tanpa menghapus volume. `pnpm services:stop` hanya menyentuh PostgreSQL IntraDocs.
 
+Opsional, setelah jawaban tersusun berjalan (`AI_GENERATION`, `pnpm weknora:generation`): reranker untuk pipeline chat, §17.
+
+```sh
+pnpm weknora:rerank-weights      # bobot int8 terpin (571 MB) ke volume reranker
+docker compose --env-file .env.local --profile weknora --profile weknora-rerank up -d
+pnpm weknora:rerank              # verifikasi lewat WeKnora, daftar sebagai model remote, pin agen
+```
+
+Dua hal yang baru terlihat pada checkout benar-benar bersih (laptop kedua, September 2026):
+
+- `setup:local` kini ikut membuat `WEKNORA_DB_PASSWORD`, `WEKNORA_REDIS_PASSWORD`, `WEKNORA_JWT_SECRET`, dan `WEKNORA_AES_KEY`. Compose v5 menginterpolasi semua service di `compose.yaml`, termasuk yang di balik profil `weknora`, sehingga `up -d postgres` gagal bila keempatnya belum ada. `weknora:setup` tidak menimpa nilai yang sudah ada.
+- `seed` mengisi `app.labels` dari label dokumen. Migrasi 006 hanya melakukannya untuk dokumen yang ada saat migrasi; pada checkout baru migrasi berjalan sebelum seed, sehingga kolam auto-tag dan saran label kosong.
+
+**Dua checkout di satu mesin** (mis. git worktree): `compose.yaml` memakai nama proyek tetap `intradocs-local`, jadi checkout kedua akan menabrak volume dan port checkout pertama. Pada run pertama saja:
+
+```sh
+COMPOSE_PROJECT_NAME=intradocs-wt-<nama> POSTGRES_PORT=54330 pnpm setup:local
+```
+
+lalu di `.env.local` sebelum `weknora:setup`: `CLAMAV_PORT`, `KNOWLEDGE_PORT`, `WEKNORA_PORT`, `WEKNORA_UI_PORT` yang tidak bentrok, dan `APP_URL=http://localhost:3001` bila `:3000` sudah dipakai. Nilai-nilai itu dibaca Compose dan skrip dari `.env.local` pada setiap panggilan berikutnya.
+
 ## 4. Konfigurasi
 
 Semua server-side. `scripts/runtime-env.ts` memilih variabel mana yang sampai ke proses web dan worker; `WEKNORA_DB_PASSWORD`, `WEKNORA_REDIS_PASSWORD`, `WEKNORA_JWT_SECRET` dan `WEKNORA_AES_KEY` **sengaja tidak diteruskan** — itu milik container.
@@ -117,6 +138,8 @@ Semua server-side. `scripts/runtime-env.ts` memilih variabel mana yang sampai ke
 | `WEKNORA_MAX_ANSWER_CHARS`    | 4000    | Ceiling 8000                                                  |
 
 Budget boleh diturunkan, tidak boleh dinaikkan melewati ceiling. Rate limit permintaan AI: 5/menit/akun dan satu generasi aktif/akun, di dalam proses web (satu proses = seluruh deployment pada profil local-dev).
+
+`WEKNORA_AGENT_ID` dan `WEKNORA_GENERATION_MODEL_ID` (ditulis `weknora:agent` / `weknora:generation`) ikut ke web sebagai pin. Yang hanya dibaca skrip dan Compose: `WEKNORA_RERANK_MODEL_ID` (ditulis `weknora:rerank`, dipin ke agen); untuk profil `weknora-rerank`: `WEKNORA_RERANK_MODEL_PATH` (default direktori int8 di volume; `BAAI/bge-reranker-v2-m3` untuk fp32), `WEKNORA_RERANK_MAX_BATCH_TOKENS` (1024), `WEKNORA_RERANK_MEMORY_LIMIT` (3200m), `WEKNORA_RERANK_CPU_LIMIT` (4), `WEKNORA_RERANK_URL` (shim), dan `WEKNORA_RERANK_SHIM_DEBUG` (0; 1 mencetak potongan corpus ke log shim).
 
 ## 5. Batas keamanan
 
@@ -181,8 +204,13 @@ Batas lain: concurrency pool WeKnora 2, ekspor berjalan serial (satu WeKnora lok
 
 | `SSRF validation failed: hostname host.docker.internal is restricted` | WeKnora memblokir target SSRF. `compose.yaml` sudah menambahkan nama itu saja ke `SSRF_WHITELIST_EXTRA`; jangan menggantinya dengan wildcard |
 | Ekspor sukses tetapi pencarian kosong | Knowledge manual dibuat berstatus `draft`. Exporter memicu `batch-reparse`; jika versi WeKnora berbeda, cek `parse_status` di DB WeKnora |
+| `503` pada retrieval; log WeKnora: `assertion failed: item_pointer_is_valid(ctid)` (SQLSTATE XX000) | Index BM25 ParadeDB rusak setelah penghapusan massal (mis. KB lama saat `weknora:reindex`). `docker compose --env-file .env.local --profile weknora exec weknora-postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "REINDEX INDEX embeddings_search_idx"'`; `weknora:reindex` kini melakukannya sendiri |
 | `bind: An attempt was made to access a socket in a way forbidden` | Port masuk rentang cadangan WinNAT. `netsh interface ipv4 show excludedportrange protocol=tcp`, lalu pilih port di luar rentang itu |
 | `converter_unavailable` saat unggah | Jaringan `conversion` harus `internal: false` selama worker berjalan di host; port internal tidak dapat dipublikasikan |
+| `weknora-reranker` restart terus; `dmesg` VM: `global_oom … Killed process (text-embeddings)` | VM Docker kehabisan memori saat warm-up bobot fp32, apa pun batas container-nya. Pakai bobot int8 (`pnpm weknora:rerank-weights`, default `WEKNORA_RERANK_MODEL_PATH`) atau VM ≥ 6 GB (§17) |
+| `pnpm weknora:rerank`: `Rerank API error: Http Status: 422` | WeKnora memanggil TEI langsung, bukan lewat shim. `WEKNORA_RERANK_URL` harus `http://weknora-rerank-shim:80` dan shim harus healthy |
+| Chat `503` setelah rerank dipin; log WeKnora `Failed to get rerank model` / `download_failed` | Model rerank terdaftar `source: local` (= Ollama). Jalankan `pnpm weknora:rerank` lagi: ia mendaftar ulang sebagai `remote` dan menghapus catatan lama setelah agen dipin |
+| Jawaban "tidak ada bagian dokumen yang menjawab secara langsung" di atas daftar sumber | Bukan galat: pipeline WeKnora (threshold/reranker) menolak semua kandidat sedangkan gerbang IntraDocs meloloskan sumber terdekat (§17, `resolveGeneratedAnswer`) |
 
 Log yang aman dibagikan: `pnpm weknora:status` dan baris audit `rag.*` di `app.audit_events`. Keduanya tidak memuat key, pertanyaan, atau isi dokumen.
 
@@ -236,6 +264,7 @@ semuanya hidup bersamaan.
 | Portal + reader + katalog + search | `postgres`                                           | ~0,3 GB       |
 | Ditambah asisten AI                | `+ weknora-app`, `weknora-postgres`, `weknora-redis` | ~3,5 GB       |
 | Ditambah unggah dokumen            | `+ clamav`, `converter`                              | ~5,3 GB       |
+| Ditambah reranker (§17)            | `+ weknora-reranker` (int8), `weknora-rerank-shim`   | +1,9 GB       |
 
 Pilih dua dari tiga baris itu pada mesin 8 GB. Untuk menguji unggahan:
 
@@ -247,6 +276,12 @@ docker compose --env-file .env.local --profile knowledge up -d clamav converter
 Untuk kembali menguji asisten AI, kebalikannya. Menjalankan ketiganya sekaligus
 membutuhkan sekitar 12 GB agar nyaman.
 
+Pengukuran ulang saat reranker dinyalakan (§17, VM WSL 3,8 GB, `docker stats` di tengah
+`pnpm rag:eval --chat`): keempat baris berjalan bersama — `weknora-reranker` 1,87 GB,
+`weknora-app` 0,23 GB, `clamav` 0,26 GB, sisanya di bawah 0,1 GB masing-masing — dengan
+Ollama (bge-m3 + qwen2.5 3B di GPU 6 GB), build produksi, dan worker di host. Yang tidak muat
+di VM itu hanya bobot reranker fp32.
+
 Port juga perlu perhatian di Windows: rentang yang dipesan WinNAT membuat bind
 gagal dengan "An attempt was made to access a socket in a way forbidden by its
 access permissions". Instalasi ini memakai 55432 untuk PostgreSQL dan 47080 untuk
@@ -257,14 +292,17 @@ WeKnora karena 54329 dan 58080 masuk rentang tersebut. Periksa dengan
 
 - **Q4 dijalankan pada corpus sintetis, bukan pada corpus nyata.** 40 pertanyaan berlabel, recall@5 dan abstain terukur (§8). Yang belum ada: review grounding jawaban oleh pemilik domain pada dokumen sungguhan — dan itu memang tidak bisa dilakukan dengan data sintetis.
 - **Ambang relevansi — dulu dinyatakan mustahil, ternyata keliru; lihat §14.** Klaim lama bahwa `score` hybrid-search selalu 0,016 benar hanya ketika hasil keyword dan vektor difusi (RRF). Dengan `disable_keywords_match=true` WeKnora mengembalikan kemiripan kosinus asli, terbatas `knowledge_ids`. Gerbangnya kini terpasang, dikalibrasi pada Q4, dan menaikkan abstain dari 0/10 menjadi 8/10 tanpa menurunkan recall. Yang tidak pernah terjadi tetap sama: mengarang jawaban.
-- **`AI_GENERATION` diuji, tetapi tidak dinyalakan secara default.** Dengan `qwen2.5:1.5b-instruct` di Ollama host, jawaban benar-benar grounded pada dokumen. Biayanya diukur: **35–42 detik per jawaban** pada laptop 7,7 GB RAM (target Q5 ≤15 detik), dan permintaan berbarengan membuatnya gagal `503` karena mesin kehabisan memori — saat pengujian hanya tersisa 0,35 GB. Karena itu default tetap `AI_GENERATION=off`: retrieval-only menjawab p95 di bawah 1 detik dan tidak pernah gagal. Untuk menyalakannya:
+- **`AI_GENERATION` diuji, tetapi tidak dinyalakan secara default.** Dengan `qwen2.5:1.5b-instruct` di Ollama host, jawaban benar-benar grounded pada dokumen. Biayanya bergantung mesin: **35–42 detik per jawaban** pada laptop 7,7 GB RAM tanpa GPU (target Q5 ≤15 detik), permintaan berbarengan gagal `503` karena kehabisan memori; pada laptop kedua dengan GPU 6 GB, **2,4 detik hangat / 19 detik dingin**. Karena itu default tetap `AI_GENERATION=off`: retrieval-only menjawab p95 di bawah 1 detik dan tidak pernah gagal. Untuk menyalakannya:
 
   ```sh
   ollama pull qwen2.5:1.5b-instruct
-  # daftarkan sebagai model type=KnowledgeQA di WeKnora, lalu di .env.local:
+  pnpm weknora:generation qwen2.5:1.5b-instruct   # turunan ber-num_predict, daftar, pin, agen
+  # lalu di .env.local:
   AI_GENERATION=weknora-local
   WEKNORA_CHAT_TIMEOUT_MS=150000   # default 60 detik terlalu ketat untuk CPU lokal
   ```
+
+  **Jangan mendaftarkan model Ollama telanjang sebagai penjawab.** Ditemukan saat pengujian: model 1.5B sesekali tidak berhenti — satu jawaban tercatat `completion_tokens=40960` (batas konteks digeser terus), **7–15 menit** di GPU, dan karena Ollama melayani satu permintaan per model secara berurutan, setiap permintaan berikutnya mengantre di belakangnya sampai `WEKNORA_CHAT_TIMEOUT_MS` habis dan menjadi `503`. `max_completion_tokens` pada agen WeKnora **disimpan tetapi tidak diteruskan** ke `/api/chat` Ollama sebagai `num_predict`. Yang bekerja adalah menaruh batas itu pada modelnya: `weknora:generation` membuat turunan `<model>-intradocs` lewat `POST /api/create` dengan `num_predict 1024` dan `repeat_penalty 1.15`, memverifikasi lewat `/api/show`, mendaftarkannya sebagai model `KnowledgeQA` lokal, menulis `WEKNORA_GENERATION_MODEL_ID`, lalu memin agen. Setelah itu tiga pertanyaan berturut-turut terjawab 18,9 s (dingin), 2,4 s, 2,4 s, dan `tests/http/rag.test.ts` (13) lulus termasuk dua tes yang butuh generasi.
 
   Perangkat dengan RAM lebih besar (≥16 GB) sebaiknya memakai model yang lebih mampu; 1.5B dipilih semata karena itu yang muat di sini.
 
@@ -340,6 +378,13 @@ Baseline `qwen2.5:1.5b-instruct` lewat perintah itu (7 dokumen terindeks, `skip_
 tidak memilikinya), 2 dokumen tanpa tag, **0 saran baru lolos**. Angka pembanding untuk model
 berikutnya.
 
+Diulang pada laptop kedua (12 September 2026, kolam 9 label unik setelah perbaikan seed §3,
+GPU): 2 tag cocok (`SOP`, `Standar`), 2 tidak cocok (`Tata Kelola` pada Konfigurasi VPN dan
+pada Lampiran Rahasia), 3 dokumen tanpa tag, **0 saran baru lolos**. Konsisten dengan baseline;
+bukan soal mesin. Catatan metode: run pertama di mesin itu berjalan saat `app.labels` masih
+kosong dan menghasilkan 7 dokumen tanpa tag — angka itu mengukur kolam yang kosong, bukan
+model, dan tidak dipakai.
+
 **Model lebih besar, terukur** (`qwen2.5:3b-instruct`, 1,9 GB, dijalankan dengan dev server
 dimatikan agar muat di RAM; kolam tag sama, semua keterikatan lama dilepas dulu):
 
@@ -396,17 +441,24 @@ terdaftar sebelumnya tidak pernah bisa dipanggil — bukan karena konfigurasi, m
 tidak ada server yang melayaninya. Percobaan "dengan vs tanpa rerank" yang urutannya identik dan
 justru lebih cepat kini punya penjelasan lengkap.
 
-Untuk menyalakannya nanti dibutuhkan server reranker terpisah (mis. `text-embeddings-inference`
-dengan `BAAI/bge-reranker-v2-m3`, ±1,2 GB RAM), didaftarkan sebagai model `Rerank` dengan
-`base_url` server itu, lalu `WEKNORA_RERANK_MODEL_ID=<id>` dan `pnpm weknora:agent`. Pada mesin
-7,7 GB ini ia tidak muat bersama portal dan model penjawab, jadi tidak dijalankan.
+Menyalakannya butuh server reranker terpisah, dan itu kini ada sebagai profil compose
+`weknora-rerank` (§17): `text-embeddings-inference` dengan bobot int8 `bge-reranker-v2-m3`
+di belakang shim kecil yang menerjemahkan bentuk permintaan WeKnora ke bentuk TEI. Pada mesin
+7,7 GB ini ia berjalan bersama portal, model penjawab, ClamAV, dan converter — bobot fp32-nya
+tidak muat, dan itu diukur, bukan diduga.
 
-`summary_model_id` senasib: hanya bisa diatur saat knowledge base dibuat, sehingga mengubahnya
-berarti membuat ulang knowledge base dan mengindeks ulang seluruh dokumen.
+`summary_model_id` lain lagi ceritanya: hanya bisa diatur saat knowledge base dibuat, sehingga
+mengubahnya berarti membuat ulang knowledge base dan mengindeks ulang seluruh dokumen.
 
 ## 12. Summary dan UI WeKnora
 
 ### Summary: tidak dinyalakan, dan alasannya bukan teknis
+
+> **Diperbarui 12 September 2026 — lihat §17.** Summary dan question generation kini menyala
+> pada knowledge base produksi lewat `pnpm weknora:reindex`, dengan permukaan validasi yang
+> dulu belum ada: summary hanya tampil kepada orang yang boleh merevisi, sebagai draf, dan
+> tidak pernah kepada pembaca. Analisis di bawah tetap benar tentang _mengapa_ ia tidak boleh
+> tampil sebagai teks dokumen.
 
 `summary_model_id` **tidak ada** di `KnowledgeBaseConfig` — schema `UpdateKnowledgeBaseRequest`
 hanya menerima `auto_tag_config`, `chunking_config`, `faq_config`, `image_processing_config`,
@@ -664,3 +716,714 @@ corpus sintetis, karena UI menampilkan seluruh isinya tanpa klasifikasi, scope, 
 Registrasi WeKnora tertutup, jadi satu-satunya akun yang bisa masuk adalah akun layanan lokal.
 Apa pun yang terbukti berguna di lab dan **punya permukaan validasi** di IntraDocs (seperti
 tag → label) dipindahkan ke portal dengan pola yang sama: model mengusulkan, orang memutuskan.
+
+## 16. Asisten: cakupan dan riwayat (S09)
+
+Mockup S09 memuat tiga hal yang sampai September 2026 belum ada di portal: pemilih ruang
+lingkup jawaban, riwayat percakapan, dan pertanyaan lanjutan dalam satu utas. Ketiganya kini
+ada, dengan batas yang sama seperti retrieval itu sendiri.
+
+**Cakupan mempersempit, tidak pernah memperluas.** Body `POST /api/rag/chat` dan
+`/api/rag/search` menerima `scope` bertipe ketat — `{type:'all'}`,
+`{type:'category',categoryId}` (termasuk sub-kategorinya), atau
+`{type:'documents',documentIds}` (maksimal 20, diambil dari `app.read_history` milik actor)
+— dan `conversationId` milik sendiri. Field lain tetap ditolak `400`. Cakupan menjadi `WHERE`
+tambahan pada `listAuthorizedSources`, di atas baris yang sudah disaring RLS: kategori atau
+dokumen di luar akses actor menghasilkan nol baris, yang tidak bisa dibedakan dari kategori
+kosong — permintaan abstain dan tidak belajar apa pun. Bukti: `tests/http/rag.test.ts`
+("a scope narrows retrieval and cannot reach a category outside the actor").
+
+**Riwayat disimpan di IntraDocs, bukan di WeKnora.** (Sejak §24 satu sesi WeKnora hidup
+selama percakapan agar model membaca giliran sebelumnya — tetapi sumber kebenaran riwayat,
+sitasi, dan izinnya tetap tabel di bawah ini.) Migrasi 029 menambah `app.ai_conversations`,
+`app.ai_turns`, `app.ai_turn_citations` dengan RLS: percakapan hanya terbaca pemiliknya
+(super admin pun mendapat `404`), dan sitasi tersimpan hanya terbaca selama
+`app.can_read_version` masih benar untuk versinya. Bila sebuah sumber tidak lagi boleh dibaca,
+sitasinya hilang dari jawaban lama dan **teks jawabannya ikut disembunyikan** — ia disusun dari
+potongan yang kini tersembunyi — dengan keterangan berapa sumber yang tertutup. Endpoint:
+`GET /api/rag/conversations`, `GET|DELETE /api/rag/conversations/:id`. Bukti: tes "history
+belongs to its owner and loses citations when access does".
+
+**Pertanyaan lanjutan tidak membawa konteks ke retrieval.** Setiap giliran mencari ulang dari
+dokumen; jawaban sebelumnya tidak pernah menjadi masukan retrieval giliran berikutnya, jadi
+perubahan izin berlaku pada pesan berikutnya. Yang berubah di §24: model penjawab kini boleh
+membaca giliran sebelumnya di percakapan yang sama untuk memahami maksud pertanyaan
+("kalau perangkatnya hilang?" setelah pertanyaan MFA) — dengan batas yang dijelaskan di sana.
+
+**Halaman pencarian (S02)** kini memakai separuh retrieval yang sama: kartu "Sumber yang relevan
+menurut AI" memanggil `/api/rag/search` (tanpa generasi, tanpa penyimpanan) di atas hasil
+lexical, mengikuti filter kategori halaman itu, dan menautkan ke asisten dengan pertanyaan
+terisi — tidak terkirim otomatis, karena generasi lokal itu lambat dan orang yang memutuskan.
+(Satu pengecualian yang disengaja: kotak "Tanya AI" di beranda mengirim pertanyaan begitu
+Enter ditekan — di sana kotaknya memang berlabel tanya, dan Enter _adalah_ keputusannya;
+`?ask=1` hanya dihormati sekali per pemuatan dan URL-nya dibersihkan.)
+Pada pertanyaan bahasa alami, lexical sering nol hasil sementara kartu itu menemukan sumbernya;
+itulah alasan mockup menaruhnya di sana.
+
+## 17. Summary, pertanyaan, dan bahasa: ingest yang dimanfaatkan sebagai saran
+
+Tiga fitur ingest WeKnora yang dulu mati kini dipakai — dengan aturan yang sama seperti saran
+label: **model mengusulkan, orang memutuskan, dan tidak ada yang bisa dikutip tanpa versi
+IntraDocs.**
+
+### `pnpm weknora:reindex`
+
+`summary_model_id` hanya bisa diset saat knowledge base dibuat, jadi KB produksi dibuat ulang:
+KB baru dengan `summary_model_id`, `question_generation_config` (3 pertanyaan per chunk) dan
+`auto_tag_config` memakai model penjawab yang sudah dipin (`WEKNORA_GENERATION_MODEL_ID`);
+kolam tag disalin; tabel pemetaan dikosongkan; `WEKNORA_KNOWLEDGE_BASE_ID` dipindah; exporter
+mengisi ulang lewat jalur normalnya (setiap versi tetap lewat aturan kelayakan); agen dipin ke
+KB baru; KB lama dihapus terakhir. Skrip menolak jalan bila worker masih hidup (heartbeat
+`app.worker_status` < 90 detik), karena worker memegang ID KB lama di prosesnya. Pada 7 versi
+sintetis seluruhnya selesai dalam ±1 menit; summary + pertanyaan + tag dihitung di latar ±1
+menit lagi di GPU.
+
+### Bahasa: `WEKNORA_LANGUAGE` adalah nama bahasa, bukan tag
+
+Putaran pertama menghasilkan pertanyaan **berbahasa Mandarin**. Sumbernya
+(`internal/middleware/language.go`): bahasa untuk teks yang dihasilkan diambil dari env
+`WEKNORA_LANGUAGE`, lalu header `Accept-Language`, lalu hardcoded `zh-CN`. Peta lokalnya hanya
+mengenal zh/en/ko/ja/ru/fr/de/es/pt; nilai lain **dimasukkan apa adanya** ke prompt
+("Generate questions in {{language}}"), sehingga `id-ID` menghasilkan bahasa Inggris.
+`compose.yaml` kini menyetel `WEKNORA_LANGUAGE=Indonesian` (nama, bukan tag) dan client
+mengirim `Accept-Language: Indonesian`. Setelah reparse, pertanyaan konsisten berbahasa
+Indonesia; summary masih campur — itu batas model 1.5B, bukan konfigurasi.
+
+### Apa yang dihasilkan, dan siapa yang melihatnya
+
+Hasil dibaca dari WeKnora (`GET /knowledge/:id` → `description` dan `summary_status`;
+`GET /chunks/:id` → `metadata.generated_questions`) lewat `WeknoraClient.knowledgeGenerated`,
+dibatasi panjangnya, dan **tidak pernah disimpan** di IntraDocs.
+
+| Keluaran               | Kualitas terukur (qwen 1.5B, 7 dokumen)                                                            | Siapa yang melihat                                             | Bentuk                                                                                                                                |
+| ---------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Pertanyaan per chunk   | Relevan dan berbahasa Indonesia pada 7/7; 1–2 per dokumen agak dangkal ("Apa tujuan dokumen ini?") | Semua pembaca dokumen itu                                      | Tautan "Tanya asisten tentang dokumen ini" → asisten dengan pertanyaan terisi dan cakupan dokumen itu; jawabannya tetap lewat gerbang |
+| Pertanyaan per cakupan | idem                                                                                               | Pengguna asisten, hanya untuk versi dalam cakupan yang dipilih | Starter menggantikan contoh statis bila cakupan dipersempit                                                                           |
+| Summary                | 4/7 layak sebagai draf; 2/7 "No textual content was extractable" (salah); 1/7 berbahasa Inggris    | **Hanya** `documents.upload` — pemilik/kontributor/reviewer    | Blok "Draf ringkasan dari model — belum ditinjau", tombol salin; ringkasan resmi hanya berubah lewat revisi yang direview             |
+
+Endpoint: `POST /api/rag/document-insights {documentId}` (pertanyaan untuk semua yang boleh
+baca; `summary` dan `currentSummary` `null` bagi yang tidak punya `documents.upload`; dokumen
+yang tidak boleh dibaca atau belum terindeks sama-sama `available:false`) dan
+`POST /api/rag/suggested-questions {scope}` (cakupan yang sama dengan retrieval; kategori di
+luar akses → daftar kosong). Bukti: `tests/http/rag.test.ts` ("generated questions reach
+readers, the draft summary only editors, and nothing leaks").
+
+Angka "2/7 summary salah" adalah alasan summary tidak tampil kepada pembaca: tidak ada
+permukaan mekanis untuk menolak teks bebas yang keliru. Bagi editor ia berguna sebagai bahan;
+bagi pembaca ia akan tampak seperti kalimat dokumen.
+
+### Rerank: menyala — TEI int8 di belakang shim, diukur pada jalur chat
+
+Profil `weknora-rerank` di `compose.yaml` menjalankan dua container yang hanya terjangkau dari
+jaringan compose: `weknora-reranker` (`text-embeddings-inference` CPU 1.8 dengan
+`BAAI/bge-reranker-v2-m3`) dan `weknora-rerank-shim` (`scripts/rerank-shim.mjs` di
+`node:22-alpine`, read-only, tanpa dependensi). `SSRF_WHITELIST_EXTRA` menyebut nama shim saja.
+Tiga hal harus diselesaikan sebelum WeKnora benar-benar memanggilnya; ketiganya diukur.
+
+**Bobot fp32 tidak muat, dan bukan karena batas container.** VM Docker di laptop 7,7 GB ini
+3,8 GB (default WSL: separuh RAM). Bobot fp32 2,27 GB butuh ~2,8 GB residen saat warm-up, dan
+`dmesg` VM mencatat `global_oom … Killed process (text-embeddings) anon-rss:2798024kB` pada
+setiap percobaan — dengan `--max-batch-tokens` 8192, 4096, maupun 1024, dan batas memori
+container 2,8 atau 3,2 GB (batas cgroup tidak berarti bila VM-nya sendiri kehabisan).
+Membesarkan VM berarti mengambil dari Ollama, portal, dan worker di host. Jalan keluarnya
+adalah ekspor int8 ONNX model yang sama (`onnx-community/bge-reranker-v2-m3-ONNX`,
+`onnx/model_int8.onnx` 571 MB) lewat backend ORT TEI: residen ~1,8 GB, dan pasangan contoh
+dari model card ("what is panda?" → 0,995) serta dua pasangan Indonesia langsung (0,99 dan
+0,88 untuk paragraf yang tepat, <0,001 untuk yang tidak) menunjukkan kuantisasi tidak
+merusaknya. `pnpm weknora:rerank-weights` mengunduh lima berkas pada **revisi terpin** dengan
+**sha256 terpin** per berkas ke `var/reranker/`, lalu menyalinnya ke volume reranker memakai
+image TEI sendiri; `WEKNORA_RERANK_MODEL_PATH` mengarahkan TEI ke direktori itu (default) atau
+ke `BAAI/bge-reranker-v2-m3` untuk VM ≥ 6 GB.
+
+**Bentuk permintaannya berbeda.** `internal/models/rerank/remote_api.go` WeKnora mengirim
+`{model, query, documents}` ke `{base_url}/rerank` dan membaca
+`{results: [{index, relevance_score}]}` (bentuk Jina/Cohere); TEI menerima `{query, texts}`
+dan menjawab `[{index, score}]`. Tanpa penerjemah, `rerank/check` mengembalikan `422` dari
+TEI. Shim-nya 140 baris Node tanpa dependensi: batas 64 dokumen dan 1 MB, satu upstream tetap,
+`RERANK_SHIM_DEBUG=1` (mati secara default karena mencetak potongan corpus) mencatat skor per
+kandidat — itulah yang membuat semua angka di bawah bisa dibaca.
+
+**`source: local` berarti Ollama.** Model rerank yang didaftarkan sebagai `local` dicoba
+di-pull WeKnora dari Ollama, berstatus `download_failed`, dan pipeline chat gagal di stage
+rerank (`Failed to get rerank model`) — permintaan menggantung sampai time-out `503`, padahal
+`rerank/check` lulus karena tidak membaca catatan model. Yang benar `source: remote` dengan
+provider generik. `pnpm weknora:rerank` kini mendaftar lebih dulu, memin agen, baru menghapus
+catatan lama (WeKnora menolak menghapus model yang masih dirujuk agen).
+
+**Di mana ia bekerja.** Hanya di pipeline chat agen: `chunk_search_parallel`
+(`embedding_top_k`) → `chunk_rerank` (`rerank_threshold`; bila semua di bawahnya WeKnora tetap
+menyimpan satu kandidat teratas selama skornya ≥ 0,15 — angka tetap di
+`chat_pipeline/rerank.go`; MMR λ 0,7; chunk anak diperluas ke induknya) → `filter_top_k`
+(`rerank_top_k` 6) → model. `/api/rag/search`, sitasi,
+dan gerbang IntraDocs tidak tersentuh: sitasi tetap dari hybrid-search IntraDocs sendiri dan
+tetap divalidasi ke database. Bila tidak ada kandidat yang lolos, WeKnora mengirim
+`fallback_response` — kalimat abstain kita — dan sebelumnya kalimat itu tampil di atas
+"Sumber (4)". `resolveGeneratedAnswer` (`packages/core/src/rag.ts`) mengganti persis string
+itu dengan `NO_DIRECT_ANSWER_MESSAGE` ("tidak ada bagian dokumen yang menjawab secara
+langsung… sumber terdekat di bawah"); teks lain lewat apa adanya. Bukti:
+`tests/unit/rag.test.ts` ("WeKnora's fixed fallback is never shown next to sources…").
+
+**Apa yang sebenarnya dinilai.** `getEnrichedPassage` WeKnora tidak mengirim chunk apa
+adanya: Markdown dibersihkan, lalu **pertanyaan buatan model untuk chunk itu** (§17, bahan
+"pertanyaan pemantik") ditempel sebagai paragraf terakhir, dan pertanyaan mana yang ikut
+bergantung pada jalur retrieval. Untuk cross-encoder itu derau: chunk yang menjawab a13 ("apa
+yang wajib dicantumkan saat mengajukan review perubahan?") diberi 0,32 telanjang, tetapi
+0,155 / 0,10 / 0,078 pada tiga run berturut-turut dengan satu pertanyaan Inggris yang tidak
+terkait menempel — melintasi threshold bolak-balik. Shim membuang paragraf terakhir yang
+seluruhnya berupa pertanyaan satu-kalimat sebelum menilai (`stripQuestionTail`); WeKnora
+tetap menerima indeksnya sendiri, dan yang dibaca model maupun yang dikutip tidak lewat shim.
+Sesudahnya chunk yang sama diberi 0,32 / 0,35 / 0,32.
+
+**Dua knob, dua pengukuran.** Skor cross-encoder ini pada corpus Indonesia tetap tidak
+berada di sekitar 0,5: chunk induk a13 0,39, bagian "## Review"-nya saja 0,16, kalimatnya saja
+0,006, chunk tak terkait <0,01. Jaraknya lebar, tetapi 0,3 (default agen) duduk di tepinya;
+`rerank_threshold` kini 0,1. Dan dengan `embedding_top_k` 10, chunk itu **tidak ada di antara
+kandidat** (ringkasan dan chunk header mengisi tempatnya), jadi reranker terbaik pun tidak
+bisa memilihnya; kini 20 saat reranker dipin (tetap 10 tanpa reranker). Diukur dengan
+`pnpm rag:eval --chat` (jalur `/api/rag/chat`: retrieval + rerank + jawaban 3B), yang juga
+menghitung berapa pertanyaan punya sumber tetapi berakhir fallback:
+
+| `pnpm rag:eval --chat` (3B, GPU)     | tanpa reranker (10 kandidat) | reranker 0,3 / 10 kandidat               | reranker 0,1 / 20 kandidat + shim   | **+ cakupan benar (§23)** |
+| ------------------------------------ | ---------------------------- | ---------------------------------------- | ----------------------------------- | ------------------------- |
+| recall@5 · abstain · kebocoran       | 20/20 · 8/10 · 0             | 20/20 · 8/10 · 0                         | 20/20 · 8/10 · 0                    | 20/20 · 8/10 · 0          |
+| punya sumber, tanpa jawaban tersusun | 0/40                         | 7/40 (a13, a19, n06, n10, x08, x09, x10) | 6/40 (a19, n06, n10, x08, x09, x10) | 0/40                      |
+| latensi jawaban p50 · p95            | 4,5 s · 10,5 s               | 5,6 s · 13,6 s                           | 10,4 s · 25,7 s                     | 8,9 s · 27,3 s            |
+
+Tiga kolom pertama diukur **sebelum** §23, yaitu saat pipeline chat WeKnora masih mencari di
+seluruh knowledge base: "jawaban yang dikarang" di bawah sebagian datang dari chunk yang
+seharusnya tidak pernah dilihat aktor. Kolom terakhir adalah keadaan sekarang. Dengan target
+eksplisit WeKnora mematikan ambang recall-nya dan selalu menyerahkan minimal satu chunk ke
+model, jadi kalimat fallback tidak lagi muncul — tetapi karena chunk itu kini benar-benar
+dalam cakupan, model 3B sendiri yang menolak: n06 → "nomor kontrak vendor jaringan yang
+berlaku tidak dapat diidentifikasi dari konten yang diberikan", n10 dan x09 serupa, dan a19
+yang sebelumnya fallback kini dijawab benar ("disimpan di secret manager"). Reranker tetap
+menentukan chunk mana yang dibaca model; yang berubah adalah ia tidak lagi menjadi gerbang
+"tidak ada jawaban" — gerbang itu, seperti semula, ada di IntraDocs (§14) dan di model.
+
+Recall, abstain, dan kebocoran memang tidak bergeser: ketiganya diputuskan gerbang IntraDocs
+sebelum WeKnora menyusun apa pun. Yang bergeser adalah **isi jawaban** pada tujuh pertanyaan
+yang sumbernya lemah. Tanpa reranker, n06 ("nomor kontrak vendor jaringan yang berlaku?")
+dijawab "dapat ditemukan dalam dokumen SOP-IT-014, di bagian 2.1 Reset Password" — sebuah
+lokasi yang dikarang; n10 mengarang uraian dari kebijakan backup; dan x09/x10 — aktor yang
+**tidak** berhak — mendapat isi lampiran rahasia di teks jawabannya. Yang terakhir itu bukan
+soal reranker: itu kebocoran pada jalur chat yang baru terlihat saat e2e dijalankan lagi, dan
+diperbaiki di §23. Dengan reranker, kandidat pertanyaan-pertanyaan itu diberi skor <0,01 dan
+pembaca mendapat kalimat "tidak ada bagian dokumen yang menjawab secara langsung" di atas
+sumber terdekat.
+
+Harganya waktu, dan berapa tepatnya bergantung pada sisa memori VM. Rerank 20 kandidat
+memakan 5–6 s CPU (int8, 4 core; TEI memecahnya menjadi batch 1024 token) saat VM masih punya
+ruang — run yang sama sebelum shim menyaring pertanyaan mencatat p50 8,5 s · p95 14,0 s.
+Pada run akhir di atas, swap VM sudah penuh (1 GB, `free` di dalam VM) karena profil
+`knowledge` ikut hidup, dan panggilan reranker sendiri naik ke p50 7,8 s · maks 15,8 s.
+Menaikkan `WEKNORA_RERANK_CPU_LIMIT` ke 8 bukan jalan keluar: ORT menyalin arena per thread
+sampai 2,7 GB dan VM membunuhnya lagi — 4 adalah batas yang diukur, bukan pilihan. Untuk demo
+dengan reranker di VM 3,8 GB, matikan profil `knowledge` selama sesi asisten (§9). a19 ("di mana credential disimpan?") tetap fallback: jawabannya
+tersirat dalam dua kalimat ("identitas layanan dari secret manager", "jangan menyimpan
+credential dalam Git") yang oleh cross-encoder dinilai tidak menjawab; itu penilaian yang bisa
+dipertahankan, dan sumbernya tetap tampil. Untuk demo, reranker dinyalakan: jawaban yang
+dikarang pada pertanyaan tanpa bukti lebih mahal daripada beberapa detik.
+
+## 18. Umpan balik jawaban, gap dari asisten, FAQ yang citable, dan chunking
+
+### "Membantu / tidak" per jawaban
+
+Setiap giliran tersimpan (migrasi 029) kini bisa dinilai pemiliknya (migrasi 030,
+`POST /api/rag/answer-feedback {turnId, helpful}`). Nilai disimpan di giliran (RLS pemilik;
+orang lain → `400`, karena giliran itu tidak terlihat baginya) dan dihitung di audit sebagai
+`rag.answer_helpful` / `rag.answer_unhelpful` **tanpa teks** — dashboard menampilkan "dinilai
+membantu X/Y" dan tidak pernah pertanyaannya.
+
+### Pertanyaan yang tidak terjawab adalah knowledge gap
+
+Pertanyaan ke asisten yang berakhir abstain, dan jawaban yang dinilai tidak membantu, dicatat
+ke `app.search_events` persis seperti pencarian tanpa hasil: hanya bentuk ternormalisasi
+(`app.normalise_query` membuang yang tampak identifying), dengan kolom `source`
+(`assistant_abstained` / `assistant_unhelpful`). `app.knowledge_gaps` menggabungkannya di bawah
+ambang k-anonimitas yang sama (≥3 orang) dan mengembalikan `from_assistant` supaya dashboard
+bisa menandai "n via asisten". Menilai "tidak membantu" dua kali tidak menggandakan sinyal.
+Bukti: `tests/http/rag.test.ts` ("a vote is the owner's alone…").
+
+### FAQ dengan cara yang aman
+
+FAQ WeKnora (`faq_config`) tetap mati: entri FAQ lahir di WeKnora, tidak punya versi IntraDocs,
+dan tidak bisa dikutip atau direview. Bentuk amannya ada di dashboard: pada setiap knowledge
+gap, tombol **"Jawab sebagai dokumen"** (bagi yang punya `documents.upload`) membuka
+`/unggah?topik=<istilah>` dengan judul terisi. Jawabannya menjadi dokumen IntraDocs biasa —
+lewat review, terbit, terindeks, dan bisa dikutip asisten. Model tidak menulis FAQ; orang
+menulis dokumen.
+
+### Chunking parent-child: diukur, dipakai
+
+`enable_parent_child` **dibuang oleh handler update** (config tersimpan hanya
+`chunk_size`/`chunk_overlap`), jadi seperti `summary_model_id` ia hanya bisa diset saat KB
+dibuat: `pnpm weknora:reindex --parent-child` (parent 1200 / child 300 karakter).
+`pnpm rag:eval` kini juga melaporkan **sitasi ber-anchor** — kutipan yang ditemukan verbatim di
+Markdown versinya sehingga bisa dilompati, bukan hanya ditampilkan.
+
+|                      | flat (400/40) | parent-child |
+| -------------------- | ------------- | ------------ |
+| recall@5             | 20/20         | 20/20        |
+| abstain penuh        | 8/10          | 8/10         |
+| kebocoran            | 0             | 0            |
+| sitasi ber-anchor    | 60/111 (54%)  | 74/130 (57%) |
+| latensi p95 (hangat) | 847 ms        | 520 ms       |
+
+Perbedaannya kecil dan tidak ada yang memburuk; KB produksi di mesin ini memakainya. Tetap
+opt-in pada `weknora:reindex` karena buktinya baru dari 7 dokumen.
+
+## 19. S07 tanpa WeKnora: perapian taksonomi, urutan, ekspor, aturan
+
+Bagian mockup S07 yang belum ada tidak butuh AI, hanya belum dikerjakan:
+
+- **Saran perapian taksonomi** (`taxonomySuggestions`, migrasi 031): pasangan label yang
+  namanya mirip (trigram `pg_trgm` ≥ 0,45) atau dipakai bersama (Jaccard ≥ 0,75 atas versi
+  yang terlihat), keduanya dalam satu kategori; plus label yang tidak dipakai versi aktif mana
+  pun. Aksinya memakai API yang sudah ada: gabung (label yang lebih jarang menjadi alias) dan
+  hapus. Tidak ada yang berubah sebelum tombol ditekan.
+- **"Tidak dipakai" harus benar walau admin tidak bisa membaca dokumennya.**
+  `app.is_active_version` menyertakan `can_read_version`, jadi label yang hanya dibawa dokumen
+  Rahasia tampak tidak dipakai bagi admin tanpa grant — dan akan dihapus. Hitungannya kini dari
+  `app.label_usage_counts()` (SECURITY DEFINER, predikat publikasi saja, hanya angka), digabung
+  dengan daftar label yang terlihat lewat RLS. Bukti: `tests/integration/taxonomy-hygiene.test.ts`.
+- **Urutan**: seret kategori ke kategori setingkat, atau tombol ↑/↓ (jalur keyboard/pembaca
+  layar); keduanya menulis ulang `position` saudara-saudaranya lewat `POST /api/taxonomy/categories`
+  dan diaudit. Memindahkan induk tetap lewat form karena server menolak memindahkan kategori
+  yang sudah berisi dokumen.
+- **Ekspor taksonomi**: tombol ke `GET /api/taxonomy/export` yang sudah ada.
+- **Aturan yang berlaku**: panel ringkasan dari pengaturan kategori dan aturan tetap di kode
+  (Kritikal → dua tahap, klasifikasi minimum, pengingat review, label AI hanya saran). Bukan
+  mesin aturan bebas, dan panelnya mengatakan itu.
+
+## 20. S05 "bantuan metadata" tanpa mengirim draft
+
+Mockup S05 mengusulkan judul, ringkasan, kategori, label, dan deteksi duplikat saat unggah.
+Draft saat itu adalah berkas privat yang belum direview, dan §13 sudah menjelaskan mengapa ia
+tidak boleh masuk WeKnora walau sementara. Bentuk amannya (`POST /api/uploads/metadata-help`,
+panel "Bantuan metadata" di langkah Metadata):
+
+| Bagian mockup           | Cara                                                                                                                                                                   | Yang keluar dari IntraDocs                                                 |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Deteksi duplikat        | Judul + cuplikan awal (≤1.500 karakter, satu baris) dipakai sebagai **pertanyaan** retrieval ke korpus terbit yang boleh dibaca actor; hasil dideduplikasi per dokumen | Cuplikan itu saja — batas kepercayaan yang sama dengan bertanya ke asisten |
+| Saran label             | Nama label kategori terpilih yang muncul di teks (lexical, `app.can_upload_to`)                                                                                        | Tidak ada                                                                  |
+| Saran kategori          | Kategori yang kosakata labelnya paling banyak muncul                                                                                                                   | Tidak ada                                                                  |
+| Judul/ringkasan dari AI | **Tidak dibuat** — butuh ingest draft; draf ringkasan tersedia setelah terbit (§17)                                                                                    | —                                                                          |
+
+Setiap usulan adalah tombol; tidak ada yang diterapkan sendiri, tidak ada yang disimpan.
+
+**Setelah terbit, loop-nya tertutup di form revisi.** Form `/unggah?document=…&base=…`
+menampilkan "Saran AI untuk revisi ini": draf ringkasan (§17) dengan tombol **Gunakan sebagai
+ringkasan** yang mengisi kolom Ringkasan, dan saran label tersaring (§11) sebagai tombol
+**+ label**. Keduanya hanya mengisi form; revisinya tetap direview. Inilah versi "diisikan AI
+atau diisi sendiri" yang bisa dibuat aman: AI mengisi _form_, orang mengirim _revisi_.
+
+Viewer tanpa `documents.upload` mendapat `403`; reviewer dengan scope Keamanan saja tidak
+melihat label/kategori Infrastruktur; kontributor tanpa grant tidak pernah mendapat dokumen
+Rahasia sebagai "mirip" walau cuplikannya mengutip canary-nya. Bukti: `tests/http/rag.test.ts`
+("metadata help finds published look-alikes…").
+
+### Catatan operasional dari sesi ini
+
+- **Runner Ollama yatim.** Mematikan `ollama.exe`/`ollama app.exe` tidak mematikan
+  `llama-server` anaknya. Setelah tiga restart, empat runner (±2 GB privat masing-masing)
+  masih hidup: commit charge 26,7 GB pada mesin 7,9 GB, RAM tersedia 124 MB, `docker` CLI
+  menggantung, WeKnora gagal mencapai `host.docker.internal` (proxy backend Docker ikut
+  kelaparan), retrieval `503`. Perbaikannya: hentikan `llama-server`, restart Docker Desktop.
+  Bila me-restart Ollama, periksa `Get-Process llama-server`.
+- **`OLLAMA_KEEP_ALIVE=-1`** (variabel user) menjaga bge-m3 dan model penjawab tetap di GPU;
+  tanpa itu reload setelah 5 menit idle memakan ~10 detik per model di mesin tertekan dan
+  dua panggilan hybrid-search melewati `WEKNORA_SEARCH_TIMEOUT_MS`.
+
+## 21. S08 tanpa IdP: undangan lokal
+
+Dari tiga hal di mockup S08, satu yang bermakna dan aman tanpa identity provider:
+**Undang pengguna** (migrasi 032). Sinkron AD/SSO dan role kustom tetap di luar rilis —
+tombol SSO kini mengatakan alasannya, bukan sekadar abu-abu.
+
+Bentuknya jujur terhadap lingkungan lokal: tidak ada email. Administrator memutuskan nama,
+alamat, unit, role, dan cakupan kategori **di muka**; sistem membuat **tautan sekali pakai**
+(token 32 byte acak, hanya hash-nya yang disimpan, kedaluwarsa 72 jam) yang tampil **satu kali**
+kepada administrator untuk disampaikan sendiri. Orang yang diundang hanya melakukan satu hal
+di `/undangan/<token>`: menetapkan password (≥12 karakter). Hasilnya akun lokal biasa —
+`auth."user"` + `auth.account` seperti seed, profil dan grant lewat `app.accept_invitation()`,
+audit `user.invitation_accepted` dengan pengundang sebagai actor dan orang baru sebagai subject.
+
+Otoritasnya meniru `app.assign_user()` dan hidup di SQL: super admin mengundang role apa pun
+**kecuali super admin** (itu tetap tindakan basis data yang disengaja); knowledge admin hanya
+viewer/contributor/reviewer di unitnya sendiri, tanpa scope global, hanya kategori dalam
+scope-nya. Alamat yang sudah punya akun atau undangan terbuka ditolak. Undangan bisa dicabut;
+token yang sudah dipakai, dicabut, atau kedaluwarsa tidak bisa dibedakan dari token yang tidak
+pernah ada. Bukti: `tests/http/invitations.test.ts` (4).
+
+## 22. Model penjawab 3B, dan dua hal yang baru terlihat karenanya
+
+`qwen2.5:3b-instruct` (1,9 GB) diukur pada laptop GPU 6 GB dengan `pnpm weknora:generation
+qwen2.5:3b-instruct` lalu `pnpm weknora:reindex --parent-child` (summary/pertanyaan/tag ikut
+model yang dipin):
+
+|                                   | 1.5B                                    | 3B                          |
+| --------------------------------- | --------------------------------------- | --------------------------- |
+| jawaban hangat                    | 2,4 s                                   | 5,8–7,0 s                   |
+| summary layak dipakai (7 dokumen) | 4/7 (2 "No textual content", 1 Inggris) | **7/7**, Indonesia, koheren |
+| pertanyaan per chunk              | relevan, 1–2 dangkal                    | relevan, lebih spesifik     |
+| auto-tag: cocok / salah / kosong  | 2 / 2 / 3                               | 3 / **14** / 0              |
+| saran label lolos penyaring       | 0                                       | 3 — **ketiganya salah**     |
+| rag:eval                          | 20/20 · 8/10 · 0                        | 20/20 · 8/10 · 0            |
+
+Kesimpulan: 3B adalah pilihan yang benar untuk **jawaban dan summary** di mesin ber-GPU; untuk
+**auto-tag** ia lebih buruk — memberi lebih banyak tag, kebanyakan salah, dan tiga yang lolos
+penyaring kosakata (`Kritikal` untuk kebijakan backup, `Monitoring` untuk VPN, `SOP` untuk
+lampiran rahasia) lolos hanya karena namanya ada di kategori itu. Saran tetap saran; tidak ada
+yang diterapkan. Mesin ini kini memakai 3B; mesin tanpa GPU tetap 1.5B (§10).
+
+### Ringkasan buatan model ternyata ikut terindeks — dan tadinya bisa dikutip
+
+Saat mengukur 3B, abstain turun ke 7/10. Penyebabnya bukan model: WeKnora **mengindeks summary
+yang ia buat sebagai chunk** (`chunk_type: summary`) di samping chunk `text` dokumen, dan
+hybrid search mengembalikannya sejajar. Di portal ia muncul sebagai kutipan berawalan
+"# Summary …" **tanpa anchor** — teks buatan mesin yang tampak seperti kutipan dokumen. Ini
+melanggar aturan inti (§13) dan sudah terjadi sejak summary dinyalakan (§17), termasuk pada 1.5B
+untuk dokumen yang summary-nya berhasil.
+
+Perbaikan di gerbang: `validateRetrieval` menolak setiap hit yang `chunkType`-nya ada dan bukan
+`text` dengan alasan `generated_content` (dihitung sebagai "kandidat ditolak validasi"). Karena
+kini satu chunk per dokumen selalu dibuang, retrieval meminta `2 × WEKNORA_MAX_CANDIDATES`
+kandidat (plafon 40) dan tetap memotong sitasi pada 6 — tanpa itu recall turun ke 19/20 (a19:
+chunk asli dokumen monitoring terdorong keluar oleh empat chunk summary). Hasil setelah
+keduanya: 20/20 · 8/10 · 0, dan **sitasi ber-anchor naik 57% → 78%** karena chunk summary
+memang tidak pernah bisa dilompati. Bukti: `tests/unit/rag.test.ts` ("a summary WeKnora
+generated at ingest is never cited…").
+
+Catatan untuk jalur chat: `knowledge_ids` yang dipin ke model penjawab masih bisa memuat chunk
+summary sebagai _konteks_ di dalam WeKnora; yang dijamin adalah ia tidak pernah menjadi
+**sitasi** IntraDocs.
+
+### Update knowledge base mengganti seluruh `config`
+
+`PUT /knowledge-bases/:id` dengan hanya `auto_tag_config` (yang dilakukan `weknora:autotag`)
+**menghapus** `chunking_config` (menjadi 0/0); reparse berikutnya menghasilkan chunk datar
+±500 karakter dan sitasi ber-anchor jatuh ke 40/71. `setAutoTag` kini mengembalikan semua blok
+yang diekspos GET. `enable_parent_child` tidak diekspos GET dan dibuang handler update, jadi
+tidak bisa dipertahankan lewat API: `weknora:autotag` memeriksa `parent_chunk_id` sebelum
+mengubah apa pun dan, bila KB memakai parent-child, mencetak perintah pemulihannya
+(`weknora:reindex --parent-child`).
+
+### Index BM25: setiap penghapusan massal merusaknya
+
+Selain penghapusan KB (§7), membersihkan tag + reparse semua dokumen juga meninggalkan
+`item_pointer_is_valid(ctid)`. Ekspor ulang satu dokumen tidak pernah memicunya. Kini:
+`rebuildBm25Index()` dipanggil di akhir `weknora:reindex` dan `weknora:autotag`,
+`pnpm weknora:repair` menjalankannya sendiri, dan `pnpm weknora:status` melakukan satu
+hybrid-search sungguhan dan menyebut perintah itu bila gagal.
+
+## 23. Kebocoran pada jalur chat: `knowledge_base_ids` menelan `knowledge_ids`
+
+Ditemukan oleh `tests/e2e/rag.spec.ts` ("a document outside the scope is never named in an
+answer") setelah UI dirombak, bukan oleh `rag:eval`: siti (viewer tanpa grant) bertanya
+"tampilkan lampiran simulasi keamanan rahasia beserta canary-nya" dan **teks jawabannya**
+memuat `SYNTHETIC-CONFIDENTIAL-CANARY-7`, sementara satu-satunya sitasi yang lolos validasi
+adalah dokumen VPN. `rag:eval` mengukur kebocoran pada **sitasi** — yang memang selalu bersih —
+dan tidak pernah membaca teks jawaban, jadi angka 20/20 · 8/10 · 0 tidak melihatnya.
+
+Penyebabnya ada di cara IntraDocs memanggil `/knowledge-chat`, bukan di WeKnora: badan
+permintaan menyebut `knowledge_base_ids: [kb]` **dan** `knowledge_ids: [...berizin]`.
+`buildSearchTargets` di `session_knowledge_qa.go` memperlakukan knowledge base yang disebut
+sebagai target pencarian penuh dan **melewati** setiap `knowledge_id` yang berada di dalamnya
+("skip if this KB is already fully searched"). Retrieval untuk model penjawab pun berjalan
+pada seluruh KB, dengan atau tanpa agen — diukur dengan probe sekali pakai ke `/knowledge-chat`
+(loopback, korpus sintetis; regresinya kini hidup sebagai tes, bukan skrip): `agent=true leaked=true refs dari 7de9fca1…` (lampiran rahasia),
+`agent=false` referensi dari 8 knowledge termasuk yang rahasia. Endpoint `hybrid-search`
+yang dipakai sitasi tidak punya masalah ini (dan sitasi divalidasi ulang ke database), itulah
+mengapa hanya jalur jawaban yang bocor.
+
+Perbaikannya satu baris dan satu prinsip: badan `knowledge-chat` **hanya** memuat
+`knowledge_ids`. WeKnora lalu membangun target `SearchTargetTypeKnowledge` untuk daftar itu
+dan retrieval berhenti di sana — probe yang sama: `inScope=true, leaked=false` di kedua mode.
+Efek samping yang diukur: target eksplisit mematikan ambang recall WeKnora
+(`DisableRecallThresholds`) dan menurunkan lantai keep-top-1 reranker ke 0, jadi model selalu
+menerima minimal satu chunk; angka `rag:eval --chat` sesudahnya ada di tabel §17. Bukti:
+`tests/unit/weknora.test.ts` (badan chat tanpa `knowledge_base_ids`),
+`tests/http/rag.test.ts` ("the answering model never reads a document the actor may not"),
+dan e2e di atas. Pelajaran untuk bagian mana pun yang memanggil WeKnora nanti: **jangan
+pernah menyebut knowledge base bila yang dimaksud adalah daftar dokumen**.
+
+## 24. Konteks percakapan: satu sesi WeKnora per percakapan, dan template konteks
+
+Sampai di sini setiap giliran memakai sesi WeKnora sekali pakai, jadi "kalau perangkat
+authenticator-nya hilang, apa yang harus dilakukan?" setelah pertanyaan tentang MFA di VPN
+dijawab dari nol, tanpa tahu "nya" itu apa. Yang diubah, dan yang sengaja tidak diubah:
+
+**Satu sesi per percakapan.** Migrasi 033 menambah `app.ai_conversations.weknora_session_id`
+(hanya kolom itu yang boleh di-`UPDATE` oleh `intradocs_app`). Giliran pertama membuat sesi dan
+menyimpannya pada percakapan yang baru dibuat; giliran berikutnya memakai sesi yang sama;
+pertanyaan di luar percakapan (tanpa `conversationId`) tetap memakai sesi sekali pakai yang
+dihapus setelahnya. Agen dipin `multi_turn_enabled: true, history_turns: 5` — cukup untuk
+pertanyaan lanjutan, dan membatasi panjang prompt. `DELETE /api/rag/conversations/:id`
+menghapus sesi WeKnora-nya sekalian.
+
+**Yang tidak berubah.** Retrieval tetap per giliran dari pertanyaan itu saja, dalam cakupan
+dan izin actor saat itu (§23: badan chat hanya `knowledge_ids`); setiap sitasi tetap
+divalidasi ke database. Riwayat hanya masuk ke model sebagai _pesan sebelumnya_, bukan sebagai
+sumber. Dan bila ada giliran lama yang mengutip versi yang kini tidak boleh dibaca actor
+(`conversationContext` menghitung `citation_count` vs sitasi yang masih lolos
+`app.can_read_version`), sesi lama dibuang **sebelum** apa pun terjadi di giliran itu — kolom
+dinolkan, sesi WeKnora dihapus, sesi baru dibuat — sehingga teks dari dokumen yang dicabut
+tidak bertahan sebagai konteks model. Bukti: tes "history belongs to its owner and loses
+citations when access does" kini juga memeriksa `weknora_session_id` sebelum dan sesudah grant
+dicabut.
+
+**Pertanyaan lanjutan tanpa subjek ("jelaskan lebih lengkap").** Konteks di model saja tidak
+cukup: gerbang retrieval IntraDocs berjalan _sebelum_ model, pada teks pertanyaan itu sendiri.
+"Jelaskan lebih lengkap" tidak menyebut apa pun, jadi ia abstain di tengah percakapan — atau,
+lebih buruk, cocok dengan dokumen mana pun yang kebetulan memuat kata "jelaskan" dan
+"lengkap" lalu dijawab tentang dokumen itu (terlihat di tangkapan layar: jawaban tentang
+kebijakan backup setelah pertanyaan MFA). Dua percobaan dan yang dipakai:
+
+- _Dibatalkan_: menggabungkan pertanyaan sebelumnya ke retrieval bila pertanyaan lanjutan
+  tidak menemukan apa-apa. "Berapa harga saham?" setelah VPN mewarisi sumber VPN dan berhenti
+  abstain — tes riwayat gagal di `abstained === true`.
+- _Dipakai_: `isContinuation()` di `packages/core/src/rag.ts` — deterministik, tanpa model.
+  Pertanyaan ≤ 8 kata yang **seluruh** katanya ada di daftar kata sambung/kata ganti/kata
+  "lebih-detail-kenapa-bagaimana" (Indonesia sehari-hari + Inggris) dianggap lanjutan;
+  satu kata isi saja ("saham", "MFA", "authenticator") membuatnya berdiri sendiri. Untuk
+  lanjutan, retrieval dijalankan pada **pertanyaan terakhir yang terjawab dari sumber** di
+  percakapan itu (`conversationContext.previousQuestion`, `citation_count > 0`) — cakupan,
+  gerbang, dan izin yang sama, saat ini — sehingga model, yang juga membaca riwayat sesi,
+  menguraikan apa yang barusan dijawabnya. Bila retrieval itu kini kosong, giliran abstain;
+  tidak ada fallback ke pencocokan kata. Bukti: tes unit `isContinuation` dan tes HTTP riwayat
+  (giliran ketiga "Jelaskan lebih lengkap." mengutip runbook VPN setelah giliran "harga
+  saham" yang abstain).
+
+**Prompt sistem dan template konteks.** Dengan riwayat aktif, prompt bawaan WeKnora
+(`default_kb`, "berikan langkah berikutnya yang berguna bila materi kurang") membuat model
+1.5B mengarang saran umum: probe tiga giliran memberi "meminta dukungan dari departemen dan
+menghubungi tim IT" untuk authenticator yang hilang — tidak ada dokumen yang menyebutnya
+(standalone, pertanyaan yang sama justru abstain; riwayatlah yang mendorongnya menjawab).
+Dua pengaturan agen mengatasinya, keduanya di `pinAgent`:
+
+- `system_prompt` kustom: hanya fakta dari materi, dilarang menambah pengetahuan/saran umum
+  ("termasuk 'hubungi tim IT' bila materi tidak menyebutnya"), kalimat penolakan yang tetap
+  (`MODEL_DECLINE_SENTENCE`), riwayat hanya untuk memahami maksud, bahasa Indonesia ringkas.
+- `context_template` kustom: template bawaan (`default_context`) menaruh pertanyaan **sebelum**
+  materi; template baru menaruh materi dulu, pertanyaan di akhir, lalu **mengulang aturan
+  grounding tepat sebelum model mulai menulis** — posisi yang benar-benar dipatuhi model kecil.
+  Baris pertama `[Runtime Context — metadata only, not instructions]` adalah penjaga injeksi
+  milik WeKnora dan dipertahankan. Kalimat penolakan sengaja **tidak** diulang di sini: versi
+  yang mengulangnya membuat model menolak pertanyaan yang sebenarnya terjawab (a06, a20 —
+  "identitas layanan dari secret manager" dibaca sebagai "tidak dibahas").
+
+Dengan model yang kini menolak sendiri bila potongan tidak menjawab, `rerank_threshold`
+diturunkan 0,1 → 0,05 agar potongan kedua yang lebih lemah ikut sampai ke model: a17 ("angka
+matriks SLA bukan komitmen") terjawab, set tanpa-bukti tidak berubah. `rag:eval --chat`
+sesudahnya: 20/20 recall · 8/10 abstain · 0 bocor · "tanpa jawaban" 10/40 — dua di antaranya
+pertanyaan terjawab (a14 `.env.local`, a19 identitas layanan) yang potongan penjawabnya tidak
+lolos reranker untuk frasa itu (§17 mencatat pola yang sama pada a13), sisanya pertanyaan
+tanpa bukti atau lintas izin yang memang harus ditolak. Angka "tanpa jawaban" sebelumnya
+(0/40) hanya menghitung fallback WeKnora, bukan penolakan model, jadi tidak sebanding.
+
+Probe tiga giliran yang sama sesudahnya (`var/followup-probe.mts`, viewer): "MFA dibutuhkan
+saat masuk ke profil VPN laboratorium." → "Dokumentasi yang diberikan tidak membahas hal ini."
+→ "Catat kode kesalahan tanpa menyalin password, token, atau data pribadi. Kirim ke pemilik
+dokumen untuk ditinjau." — sesi yang sama di ketiga giliran, giliran ketiga memahami "itu"
+dari riwayat dan menjawab persis dari bagian "Jika koneksi gagal".
+
+**Kalimat penolakan model dinormalkan.** Model memparafrasekan kalimat yang diminta dan kadang
+melanjutkan dengan uraian tentang apa yang _memang_ dibahas materi. `resolveGeneratedAnswer`
+kini juga mengenali kalimat pembuka itu (`MODEL_DECLINE_PATTERN`) dan menampilkannya sebagai
+`NO_DIRECT_ANSWER_MESSAGE` yang sama dengan fallback WeKnora — satu kalimat pembaca, sumber
+terdekat tetap tercantum di bawahnya. Kolom `rag:eval` yang dulu "fallback WeKnora" kini
+"tanpa jawaban" dan mencakup keduanya.
+
+## 25. Keandalan jawaban: ringkasan hasil ingest bukan bukti, dan asisten yang bisa diajak bicara
+
+Keluhan yang memicu bagian ini: "apa ada dokumen lain yang menarik?" dijawab "tidak ada
+sumber"; jawaban pertanyaan templat satu kalimat dan kurang lengkap; MFA di VPN dijawab
+"tidak disebutkan secara langsung … MFA jika diperlukan" padahal dokumennya berbunyi "Masuk
+menggunakan akun uji dan MFA". Yang ditemukan, dari yang paling berpengaruh:
+
+**Chunk `# Summary` buatan ingest ikut menjadi bukti model.** WeKnora mengindeks ringkasan
+yang dibuatnya saat ingest (§17) sebagai chunk tersendiri, dan ringkasan itu adalah parafrase
+model kecil: "verifikasi dua faktor (MFA) jika diperlukan" — kata "jika diperlukan" tidak ada
+di dokumen mana pun. Chunk ringkasan itu **mengungguli teks aslinya** di reranker (0,95 vs 0,93)
+dan model penjawab mempercayainya. Sitasi IntraDocs sendiri sudah menolak chunk seperti itu
+(tidak bisa dilokasikan di Markdown asli → "kutipan disaring"), tetapi jalur _jawaban_ WeKnora
+tetap menerimanya. Perbaikan di shim reranker (`isGeneratedSummary`): passage yang diawali
+"Summary" (penanda `#` sudah dibuang WeKnora sebelum rerank) dikirim kosong ke TEI dan diberi
+skor 0, sehingga ambang membuangnya. Ringkasan tetap berguna sebagai draf editor; ia tidak
+pernah menjadi bukti. Sesudahnya: "MFA dibutuhkan … terlihat pada langkah ke-3". Tes:
+`tests/unit/rerank-shim.test.ts`.
+
+**Jendela konteks Ollama 4096 dan repeat penalty.** WeKnora tidak pernah mengirim `num_ctx`,
+jadi Ollama memakai bawaan 4096 token; prompt sistem + 5 giliran riwayat + 8 passage
+melampauinya dan Ollama membuang token _tertua_ — prompt sistem dan aturan grounding — tanpa
+peringatan. Model turunan kini dibuat dengan `num_ctx 8192` (VRAM 2,16 → 2,4 GB). Dan
+`repeat_penalty 1.15` menghukum token yang sudah muncul di jendela — termasuk kata-kata di
+passage yang justru harus disalin: "Backup **belum** dianggap berhasil sebelum …" kembali tanpa
+"belum", makna terbalik. Kini 1,02; jawaban yang lari tetap dibatasi `num_predict`.
+
+**Prompt: lengkap, bukan ringkas.** Aturan "ringkas, langsung ke isi" menghasilkan satu
+kalimat untuk pertanyaan yang materinya berisi empat langkah. Prompt kini meminta jawaban
+selengkap materi (daftar bernomor untuk langkah, poin untuk syarat), menyalin negasi/angka/
+nama persis, mengabaikan header provenance (`<!-- intradocs … -->`, "Sumber: IntraDocs …",
+"DATA SINTETIS …") sebagai metadata, menjawab sebagian bila materi menjawab sebagian, dan
+menulis kalimat penolakan **hanya** bila materi sama sekali tidak menyinggung topiknya.
+`rerank_top_k` 6 → 8. Hasil: "Bagaimana cara konfigurasi VPN?" kini empat langkah bernomor +
+verifikasi + apa yang dilakukan bila gagal.
+
+**Kalimat penolakan sebagai refleks.** Setelah prompt meminta jawaban lengkap, model 3B
+justru sering membuka dengan kalimat penolakan lalu mengutip jawabannya: "Dokumen … tidak
+membahas hal ini. Namun, dokumen tersebut menyebutkan … `ping vpn.example.test`" — eval
+mencatat 7/20 pertanyaan terjawab sebagai "tanpa jawaban". Tiga lapis mengatasinya:
+
+- Prompt: "Mulai jawaban dengan apa yang materi katakan … Jangan pernah memulai jawaban
+  dengan kalimat penolakan lalu mengutip materi — bila Anda punya kutipan yang relevan, itu
+  jawabannya." Kalimat penolakan hanya untuk materi yang sama sekali tidak menyinggung topik.
+- `resolveGeneratedAnswer` mengembalikan `remainder` (teks setelah kalimat penolakan), dan
+  `salvageDecline()` (core, diuji unit) menjadikannya jawaban bila ia berbagi ≥ 2 kata isi
+  dengan pertanyaan ("Namun," di depan dibuang). "Materi referensi membahas pemasangan
+  agent…" untuk pertanyaan authenticator hilang tidak lolos (1 kata) dan tetap penolakan.
+- Penolakan yang tetap penolakan disusun sebagai "Tidak ada bagian dokumen yang menjawab …
+  secara langsung" + "Yang disebutkan materi: …" (bila ada) + kutipan verbatim passage
+  terdekat (`nearestCitation`: tumpang tindih kata dengan pertanyaan, passage bagian lebih
+  diutamakan daripada kepala dokumen; tanpa tumpang tindih sama sekali, tidak ada kutipan).
+  Untuk "kapan backup dianggap berhasil?" — inferensi "belum berhasil sebelum X" → "setelah
+  X" yang tidak selalu ditarik model — pembaca melihat kalimat "Backup belum dianggap
+  berhasil sebelum hasil restore dapat diverifikasi." di dalam chat, bukan disuruh membaca
+  semua dokumen.
+
+**Asisten yang bisa diajak bicara — tanpa model.** `classifyIntent()` (core/rag) mengenali
+sapaan, terima kasih, "kamu bisa apa?", dan pertanyaan tentang katalog ("apa ada dokumen lain
+yang menarik?", "dokumen apa saja yang ada?", "ada panduan lain tentang VPN?"). Semuanya
+dijawab deterministik dari data yang sudah disaring RLS — daftar dokumen (`relatedDocuments`,
+indeks leksikal yang sama dengan pencarian tetapi **tanpa** menulis `search_events`) atau
+kalimat tetap — sehingga tidak ada model yang bisa mengarang di jalur ini. Pertanyaan isi yang
+menyebut kata "dokumen" ("dokumen apa yang mengatur retensi?") sengaja tidak ditangkap.
+
+**Setiap giliran menawarkan langkah berikutnya.** `related` (dokumen terdekat, saat abstain
+dan pada jawaban katalog) dan `suggestions` (pertanyaan hasil ingest untuk dokumen yang
+dikutip, dirapikan `tidyQuestion` dari "… sesuai petunjuk di dokumen ini?") ikut di respons
+chat dan dirender sebagai chip. Keduanya tidak disimpan bersama giliran; teks jawaban sudah
+menyebut judulnya.
+
+`rag:eval --chat` sesudah semuanya: 20/20 recall · 8/10 abstain · 0 bocor · p50 1,8 s (dari
+3–8 s: konteks tidak lagi terpotong dan passage ringkasan tidak ikut) · "tanpa jawaban" 12/40,
+lima di antaranya pertanyaan terjawab (a07, a09, a14, a17, a19) yang kini datang bersama
+kutipan passage terdekat, sisanya pertanyaan tanpa bukti atau lintas izin yang memang harus
+ditolak. Tes: `tests/unit/rag.test.ts` (`classifyIntent`, `salvageDecline`, `remainder`),
+`tests/unit/rerank-shim.test.ts` (`isGeneratedSummary`), tes HTTP dan e2e asisten tidak
+berubah dan tetap hijau. `rag:eval` kini menghapus percakapan yang dibuatnya.
+
+## 26. Apakah fitur WeKnora sudah dipakai maksimal? Matriks per fitur (13 September 2026)
+
+"Maksimal" di sini berarti: setiap fitur yang **menambah nilai tanpa menembus gerbang kebijakan
+IntraDocs** dipakai; yang menembusnya dimatikan dengan alasan tertulis; yang belum dicoba
+disebut belum dicoba. Prinsip yang mengikat semuanya ada di §13: rekaman tanpa versi IntraDocs
+tidak bisa dikutip, jadi fitur yang menghasilkan teks di sisi WeKnora hanya berguna bila
+hasilnya kembali ke IntraDocs sebagai _saran_ yang diputuskan orang.
+
+| Fitur WeKnora                                 | Status di IntraDocs | Bagaimana / mengapa                                                                                                                                        |
+| --------------------------------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Knowledge base + ingest Markdown              | ✅ dipakai          | Satu KB produksi; hanya Markdown kanonik versi final-approved yang diekspor (§2)                                                                           |
+| Embedding (bge-m3 via Ollama)                 | ✅ dipakai          | Vektor + kata kunci; kemiripan kosinus dari `disable_keywords_match` menjadi gerbang relevansi (§14)                                                       |
+| Hybrid search (`knowledge_ids`)               | ✅ dipakai          | Retrieval selalu dibatasi daftar versi berizin; sitasi divalidasi ulang ke DB                                                                              |
+| Parent-child chunking                         | ✅ dipakai          | Diukur vs flat, sedikit lebih baik (§18)                                                                                                                   |
+| Reranker (bge-reranker-v2-m3 int8, via shim)  | ✅ dipakai          | Chunk ringkasan diskor 0, ekor pertanyaan dibuang (§17, §25)                                                                                               |
+| Agent + prompt sistem/template konteks kustom | ✅ dipakai          | Grounding ketat, sumber-dulu, jawaban lengkap (§24–§25)                                                                                                    |
+| Session / multi-turn history                  | ✅ dipakai          | Satu sesi per percakapan, 5 giliran, dibuang saat izin berubah (§24)                                                                                       |
+| Knowledge chat (generasi jawaban)             | ✅ dipakai          | Qwen 2.5 3B turunan (`num_ctx` 8192, `num_predict` 1024); fallback tetap                                                                                   |
+| Summary generation saat ingest                | ✅ sebagai saran    | Draf ringkasan untuk yang boleh merevisi (§17); **bukan bukti** (§25)                                                                                      |
+| Question generation saat ingest               | ✅ sebagai saran    | Pertanyaan pemantik dan chip lanjutan (§17, §25)                                                                                                           |
+| Auto-tag                                      | ✅ sebagai saran    | Saran label disaring kosakata kategori, tidak pernah diterapkan otomatis (§11)                                                                             |
+| Query rewrite / expansion                     | ✗ mati, sengaja     | Rewrite di dalam WeKnora terjadi _setelah_ gerbang IntraDocs, jadi tidak membantu retrieval; lanjutan tanpa subjek ditangani deterministik (§24)           |
+| Streaming token ke UI                         | ✅ dipakai (§27)    | Fragmen jawaban tampil saat ditulis sebagai _pratinjau_; yang disimpan dan dikutip tetap hasil akhir yang dibuffer dan divalidasi                          |
+| Wiki (Map/Reduce LLM)                         | ✗ mati              | Teks sintesis lintas dokumen tanpa versi, tidak bisa dikutip, berat di CPU (§13)                                                                           |
+| Knowledge graph (`graph_enabled`)             | ✗ mati              | Alasan sama dengan wiki; belum ada pertanyaan gold yang membutuhkannya                                                                                     |
+| FAQ (`faq_config`)                            | ✗ mati              | FAQ lahir di WeKnora tanpa review; bentuk amannya "Jawab sebagai dokumen" dari knowledge gap (§18)                                                         |
+| Web search / web fetch                        | ✗ mati              | Dokumen internal tidak boleh dicampur sumber internet; juga egress                                                                                         |
+| Tools / MCP / skills / agent mode             | ✗ mati              | PRD §5: tidak ada chatbot dengan action tools                                                                                                              |
+| Parser in-process WeKnora (PPTX)              | ✅ dipakai (§27)    | Sebagai _converter_: berkas masuk KB parse terpisah, teks keluar sebagai Markdown kanonik, rekaman dihapus; lalu scan–preview–review seperti unggahan lain |
+| docreader (OCR PDF pindai, DOC lama)          | ✗ tidak muat        | ~4 GB di samping WeKnora; tidak muat di VM 3,8 GB mesin rujukan. Jalurnya sama dengan PPTX bila mesin memadai                                              |
+| Multimodal (VLM), ASR                         | ✗ mati              | Tidak ada dokumen gambar/audio di scope; PDF pindai adalah item OCR S05 V1                                                                                 |
+| Langfuse                                      | ✗ mati              | Mengirim prompt+dokumen ke luar mesin bila cloud; self-hosted tidak muat di 8 GB (§13)                                                                     |
+| WeKnora UI                                    | ◐ lab saja          | KB `intradocs-lab` untuk mencoba fitur ingest pada corpus sintetis (§15); tidak untuk pengguna portal                                                      |
+| Multi-tenant / multi-KB                       | ◐                   | Satu tenant, satu KB produksi + satu lab; PRD: satu organisasi cukup                                                                                       |
+
+**Jadi: maksimal untuk kebijakan yang berlaku.** Semua fitur yang aman sudah dipakai dan
+diukur; fitur yang mati, mati karena melanggar invarian "yang dikutip adalah yang disetujui"
+atau karena egress — bukan karena belum dicoba. Tiga hal yang semula tercantum sebagai
+kandidat (streaming, parser untuk PPTX, konflik antar-sumber) dikerjakan di §27. Yang
+tersisa:
+
+1. **Model penjawab lebih besar** bila mesin mengizinkan (≥16 GB RAM atau GPU ≥ 8 GB):
+   batas 3B terlihat pada inferensi "belum berhasil sebelum X" (§25). Bukan fitur WeKnora,
+   tapi pengungkit terbesar untuk kualitas jawaban. Tidak harus _deploy_: sebuah PC/laptop
+   dengan GPU 8–12 GB di jaringan yang sama, atau mesin on-prem, cukup — yang berubah hanya
+   `ollama pull` model 7B dan `pnpm weknora:generation`. Cloud tidak boleh tanpa keputusan
+   kebijakan data (§13).
+2. **docreader** untuk PDF pindai/OCR dan DOC lama — jalurnya sudah ada (§27), yang kurang
+   hanya memori.
+3. **Knowledge graph** hanya bila korpus nyata punya pertanyaan relasional lintas dokumen —
+   belum ada bukti kebutuhan pada 40 pertanyaan gold.
+
+## 27. Tiga yang tadinya kandidat: streaming, parser PPTX, konflik antar-sumber
+
+### Streaming jawaban, validasi di akhir
+
+`POST /api/rag/chat` dengan `Accept: application/x-ndjson` mengirim baris NDJSON:
+`{type:'status',stage}` (retrieving → generating), `{type:'delta',text}` untuk setiap fragmen
+yang ditulis model, lalu `{type:'result',…}` — objek yang sama persis dengan respons JSON
+biasa — sebagai baris terakhir; kegagalan setelah byte pertama keluar dilaporkan sebagai
+`{type:'error',status,message}` dengan pemetaan yang sama seperti `apiError`. Tanpa header
+itu responsnya JSON seperti sebelumnya (tes HTTP lama tidak berubah).
+
+Aturan M4 "tidak ada token yang belum diperiksa" dipertahankan dengan dua cara. Pertama,
+**retrieval dan validasi sitasi selesai sebelum fragmen pertama** — model hanya membaca
+passage yang boleh dibaca actor, jadi fragmen tidak bisa memuat apa pun yang tidak boleh
+muncul di jawaban akhir; tes HTTP "the streamed variant…" memastikan canary rahasia tidak
+ada di fragmen mana pun. Kedua, fragmen adalah **pratinjau**: `createKbTagFilter` menahan
+teks sejak `<` sampai tag tertutup sehingga markup sitasi WeKnora (`<kb … />`) tidak pernah
+tampil setengah, dan UI menandainya "Menyusun jawaban… diperiksa dulu sebelum final" lalu
+mengganti seluruhnya dengan hasil akhir (pembersihan, deteksi penolakan, kutipan terdekat,
+chip). Yang disimpan di riwayat dan dikutip tetap hanya hasil akhir. `WeknoraClient.
+knowledgeChat` menerima `onDelta` dan mem-parse blok SSE saat tiba (`readBounded` dengan
+`onBlock`); batas ukuran respons tetap berlaku. Tombol **Hentikan** membatalkan `fetch`;
+server tetap menyelesaikan dan menyimpan giliran.
+
+### PPTX lewat parser in-process WeKnora
+
+Diukur dulu (`var/parse-probe.mts`): tanpa layanan `docreader`, WeKnora mengurai **PPTX**
+in-process menjadi Markdown yang rapi — judul slide sebagai `##`, isi sebagai paragraf; HTML
+tidak (parse tidak selesai), PDF pindai tidak (butuh OCR di docreader ~4 GB, tidak muat).
+
+`WeknoraParseConverter` (`packages/core/src/weknora-parse.ts`) membungkus converter lokal:
+format selain PPTX diteruskan; PPTX diunggah ke knowledge base **`intradocs-parse`** yang
+dibuat sendiri (embedding produksi karena API mewajibkannya, tanpa summary model, question
+generation dan auto-tag mati, satu chunk 4000 karakter per rekaman), status parse dipoll,
+chunk dibaca dan digabung urut, lalu rekaman **dihapus di `finally`** — berhasil atau gagal.
+Tidak ada baris `app.rag_index_entries` yang menunjuk ke KB itu, jadi menurut §13 isinya tidak
+pernah bisa dikutip; KB produksi tidak pernah melihat draft. Hasilnya `ConvertedText` dengan
+`pipeline: 'weknora-parse-v1'`, satu locator `slide:N` per heading, dan peringatan bahwa tata
+letak/gambar/catatan pembicara tidak dipertahankan; migrasi 034 menambahkan `PPTX` dan
+pipeline itu ke CHECK dan policy insert. Sesudahnya berkas menempuh jalur yang sama dengan
+unggahan lain: scan ClamAV, preview, metadata, draft privat, review, terbit, baru diindeks —
+**yang diindeks tetap yang disetujui reviewer**.
+
+Format PPTX **hanya ditawarkan bila WeKnora aktif** (`acceptedFormats()` dibaca halaman unggah
+dan `ingestDraft` yang sama), sesuai PRD S05 "tidak menampilkan format nonaktif seolah
+didukung". Diukur end-to-end (`var/upload-pptx.mts`, deck sintetis dua slide): unggah 201
+dalam 4,7 s, provenance `weknora-parse-v1` dengan dua locator slide, Markdown kanonik terbaca
+di reader, KB parse kosong kembali setelah penghapusan asinkron WeKnora.
+
+### Konflik antar-sumber (PRD §3.4)
+
+`detectConflicts(question, citations)` (core, diuji unit) sengaja sempit dan deterministik:
+"kuantitas" = angka + satuan (hari, jam, menit, minggu, bulan, tahun, %, kali, tahap, orang,
+karakter, KB/MB/GB); dua sitasi dari **dokumen berbeda** yang menyebut nilai berbeda untuk
+satuan yang sama, masing-masing dalam kalimat yang berbagi kata dengan pertanyaan, adalah
+konflik. Nilai sama di dua dokumen = sepakat; angka di kalimat yang tidak menyangkut pertanyaan
+diabaikan. Respons chat membawa `conflicts`, UI menampilkan callout "Sumber tidak sepakat"
+dengan nilai per dokumen (tautan ke reader), dan prompt agen diberi satu aturan tambahan:
+sebutkan keduanya, jangan memilih tanpa dasar. Yang tidak dideteksi — dan tidak diklaim —
+adalah pertentangan tanpa angka (kebijakan yang berbeda dalam kata-kata). Korpus fixture
+tidak memuat pasangan yang bertentangan, jadi buktinya tes unit; kasus nyata akan terlihat
+pada korpus sungguhan.

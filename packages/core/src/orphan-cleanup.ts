@@ -7,7 +7,7 @@ const id = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 const uuid = new RegExp(`^${id}$`),
   versionPath = new RegExp(`^documents/${id}/versions/${id}$`);
 const knownFile = new RegExp(
-  `^(?:content\\.md|provenance\\.json|(?:original|attachment-[1-4])\\.(?:md|txt|pdf|docx|xlsx)|\\.tmp-${id})$`,
+  `^(?:content\\.md|provenance\\.json|(?:original|attachment-[1-4])\\.(?:md|txt|pdf|docx|xlsx|html|pptx)|\\.tmp-${id})$`,
 );
 export interface StorageReferences {
   keys: readonly string[];
@@ -102,7 +102,9 @@ async function inspect(root: string, key: string): Promise<OrphanCandidate> {
       !s.isFile() ||
       s.isSymbolicLink() ||
       s.size >
-        (/^(?:original|attachment-[1-4])\.(md|txt|pdf|docx|xlsx)$/.test(entry.name) ? 50 : 2) *
+        (/^(?:original|attachment-[1-4])\.(md|txt|pdf|docx|xlsx|html|pptx)$/.test(entry.name)
+          ? 50
+          : 2) *
           1024 *
           1024
     )

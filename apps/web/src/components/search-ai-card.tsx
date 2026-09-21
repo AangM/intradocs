@@ -1,0 +1,126 @@
+'use client';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import type { RetrievalScope } from '@intradocs/core/rag';
+import { Icon } from './icon';
+import type { AssistantCitation } from './assistant-chat';
+
+interface Retrieval {
+  citations: AssistantCitation[];
+  rejected: number;
+  scope: number;
+}
+
+const CLASSIFICATION_LABELS: Record<string, string> = {
+  public: 'Publik',
+  internal: 'Internal',
+  restricted: 'Terbatas',
+  confidential: 'Rahasia',
+};
+
+/**
+ * The retrieval half of the assistant, placed above lexical results (mockup S02).
+ *
+ * It calls the retrieval-only endpoint: validated sources with their snippets, never a
+ * composed answer, and nothing is stored. That keeps the card fast enough to run on
+ * every search (p95 under a second on this stack) and keeps generation -- the slow and
+ * memory-hungry part -- behind an explicit question on the assistant page.
+ */
+// Mounted with a key of query+category by the page, so a new search starts from the
+// pending state by remounting rather than by resetting state inside the effect.
+export function SearchAiCard({ query, categoryId }: { query: string; categoryId: string | null }) {
+  const [state, setState] = useState<
+    { kind: 'pending' } | { kind: 'ok'; data: Retrieval } | { kind: 'error'; message: string }
+  >({ kind: 'pending' });
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const scope: RetrievalScope = categoryId ? { type: 'category', categoryId } : { type: 'all' };
+    fetch('/api/rag/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: query, scope }),
+      signal: controller.signal,
+      cache: 'no-store',
+    })
+      .then(async (response) => {
+        const body: unknown = await response.json();
+        if (!response.ok) {
+          const message =
+            body &&
+            typeof body === 'object' &&
+            typeof (body as { error?: unknown }).error === 'string'
+              ? (body as { error: string }).error
+              : 'Retrieval gagal.';
+          setState({ kind: 'error', message });
+          return;
+        }
+        setState({ kind: 'ok', data: body as Retrieval });
+      })
+      .catch((e: unknown) => {
+        if ((e as Error).name !== 'AbortError')
+          setState({ kind: 'error', message: 'Tidak dapat menghubungi layanan lokal.' });
+      });
+    return () => controller.abort();
+  }, [query, categoryId]);
+
+  return (
+    <section className="search-ai-card" aria-live="polite" aria-busy={state.kind === 'pending'}>
+      <div className="search-ai-head">
+        <Icon name="spark" size={16} />
+        Sumber yang relevan menurut AI
+        <span className="pill p-green">retrieval lokal</span>
+      </div>
+      {state.kind === 'pending' && <p className="sub">Mencari bagian dokumen yang relevan…</p>}
+      {state.kind === 'error' && (
+        <p className="callout c-warn" role="alert">
+          <Icon name="alert" size={16} />
+          <span>{state.message}</span>
+        </p>
+      )}
+      {state.kind === 'ok' && state.data.citations.length === 0 && (
+        <p className="sub">
+          Tidak ada bagian dokumen yang cukup relevan dengan pertanyaan ini. Hasil pencarian kata
+          tetap ditampilkan di bawah.
+        </p>
+      )}
+      {state.kind === 'ok' && state.data.citations.length > 0 && (
+        <>
+          <ol className="rag-sources">
+            {/* One entry per document -- the best-ranked chunk -- since this is a
+                result list, not the evidence list the assistant shows. */}
+            {state.data.citations
+              .filter((c, i, all) => all.findIndex((x) => x.documentId === c.documentId) === i)
+              .map((citation, n) => (
+                <li key={`${citation.versionId}-${n}`}>
+                  <Link href={citation.href} prefetch={false} className="document-title">
+                    {citation.documentTitle}
+                  </Link>
+                  <div className="sub tiny">
+                    {citation.categoryName} · v{citation.versionLabel} ·{' '}
+                    {CLASSIFICATION_LABELS[citation.classification] ?? citation.classification}
+                    {citation.heading ? ` · ${citation.heading}` : ''}
+                  </div>
+                  <p className="rag-snippet">{citation.snippet}</p>
+                </li>
+              ))}
+          </ol>
+          <div className="search-ai-foot">
+            <span className="sub tiny">
+              Dicari di {state.data.scope} versi
+              {state.data.rejected > 0 ? ` · ${state.data.rejected} kutipan disaring` : ''}
+            </span>
+            <Link
+              href={`/ai-assistant?q=${encodeURIComponent(query)}`}
+              prefetch={false}
+              className="btn btn-sm"
+            >
+              <Icon name="spark" size={13} />
+              Minta jawaban tersusun
+            </Link>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}

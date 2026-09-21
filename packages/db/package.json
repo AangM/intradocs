@@ -10,15 +10,21 @@
     "./uploads": "./src/uploads.ts",
     "./workflow": "./src/workflow.ts",
     "./taxonomy": "./src/taxonomy.ts",
+    "./roles": "./src/roles.ts",
     "./discovery": "./src/discovery.ts",
     "./rag": "./src/rag.ts",
     "./versions": "./src/versions.ts",
     "./access-requests": "./src/access-requests.ts",
     "./required-reading": "./src/required-reading.ts",
-    "./label-suggestions": "./src/label-suggestions.ts"
+    "./label-suggestions": "./src/label-suggestions.ts",
+    "./assistant": "./src/assistant.ts",
+    "./insights": "./src/insights.ts",
+    "./metadata-help": "./src/metadata-help.ts",
+    "./invitations": "./src/invitations.ts"
   },
   "dependencies": {
     "@intradocs/core": "workspace:*",
+    "better-auth": "1.7.1",
     "pg": "8.23.0",
     "drizzle-orm": "0.45.2"
   }

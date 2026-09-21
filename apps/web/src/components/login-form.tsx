@@ -4,10 +4,20 @@ import { useRouter } from 'next/navigation';
 import type { FormEvent } from 'react';
 import { safeReturnTo } from '@intradocs/core/validation';
 import { Icon } from './icon';
-export function LoginForm({ returnTo }: { returnTo: string }) {
+export function LoginForm({
+  returnTo,
+  sso,
+  ssoError,
+}: {
+  returnTo: string;
+  /** Label of the organisation's IdP when AUTH_MODE=oidc; null when SSO is not wired. */
+  sso: string | null;
+  /** Message from a failed SSO callback, already translated by the page. */
+  ssoError: string;
+}) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(ssoError);
   // The form has no action/method, so a submit before React attaches onSubmit falls back
   // to a native GET and puts the password in the URL, the history and the server log --
   // observed as `GET /login?email=...&password=...` in a real run. Staying disabled until
@@ -47,6 +57,35 @@ export function LoginForm({ returnTo }: { returnTo: string }) {
     } catch {
       setError('Tidak dapat menghubungi layanan login. Pastikan server lokal aktif.');
     } finally {
+      setBusy(false);
+    }
+  }
+  async function startSso() {
+    if (busy || !sso) return;
+    setBusy(true);
+    setError('');
+    try {
+      // Better Auth answers with the IdP's authorization URL (state and PKCE verifier
+      // already stored server-side); the browser follows it from here.
+      const response = await fetch('/api/auth/sign-in/social', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'sso',
+          callbackURL: safeReturnTo(returnTo),
+          errorCallbackURL: '/login?sso=gagal',
+          disableRedirect: true,
+        }),
+      });
+      const body = (await response.json().catch(() => null)) as { url?: string } | null;
+      if (!response.ok || !body?.url) {
+        setError('SSO tidak dapat dimulai. Coba lagi atau hubungi admin.');
+        setBusy(false);
+        return;
+      }
+      window.location.assign(body.url);
+    } catch {
+      setError('Tidak dapat menghubungi layanan login.');
       setBusy(false);
     }
   }
@@ -90,12 +129,20 @@ export function LoginForm({ returnTo }: { returnTo: string }) {
       <div className="login-separator">
         <span>Identitas perusahaan</span>
       </div>
-      <button className="btn full-width" type="button" disabled aria-describedby="sso-note">
+      <button
+        className="btn full-width"
+        type="button"
+        disabled={!sso || busy || !ready}
+        aria-describedby="sso-note"
+        onClick={startSso}
+      >
         <Icon name="shield" size={16} />
-        Masuk dengan SSO
+        {sso ? `Masuk dengan ${sso}` : 'Masuk dengan SSO'}
       </button>
-      <p id="sso-note" className="sub tiny">
-        SSO direncanakan; belum terhubung pada build lokal.
+      <p id="sso-note" className="sub tiny login-note">
+        {sso
+          ? 'Hanya untuk akun yang sudah diundang admin; SSO tidak membuat akun baru.'
+          : 'Belum terhubung: AUTH_MODE=oidc dan IdP organisasi belum dikonfigurasi.'}
       </p>
     </form>
   );

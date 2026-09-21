@@ -16,7 +16,9 @@ export const UPLOAD_LIMITS = Object.freeze({
 });
 export const UPLOAD_PIPELINE = 'text-v1';
 export type TextFormat = 'MD' | 'TXT';
-export type SourceFormat = TextFormat | 'PDF' | 'DOCX' | 'XLSX';
+export type SourceFormat = TextFormat | 'PDF' | 'DOCX' | 'XLSX' | 'HTML' | 'PPTX';
+/** Formats the local converter handles; PPTX needs WeKnora's parser (weknora-parse.ts). */
+export const LOCAL_FORMATS: readonly SourceFormat[] = ['MD', 'TXT', 'PDF', 'DOCX', 'XLSX', 'HTML'];
 export class UploadError extends InputError {
   readonly code: string;
   readonly status: number;
@@ -273,7 +275,12 @@ export function draftSlug(title: string): string {
   return headingSlug(title).slice(0, 100).replace(/-+$/, '') || 'dokumen';
 }
 
-export function validateDocumentFile(name: string, mime: string, bytes: Uint8Array): UploadFile {
+export function validateDocumentFile(
+  name: string,
+  mime: string,
+  bytes: Uint8Array,
+  accepted: readonly SourceFormat[] = LOCAL_FORMATS,
+): UploadFile {
   if (/\.(md|txt)$/i.test(name)) return validateTextFile(name, mime, bytes);
   if (
     !name ||
@@ -284,10 +291,11 @@ export function validateDocumentFile(name: string, mime: string, bytes: Uint8Arr
   )
     throw new UploadError('invalid_filename', 'Nama berkas tidak valid.');
   const format = name.split('.').at(-1)?.toUpperCase();
-  if (!['PDF', 'DOCX', 'XLSX'].includes(format ?? ''))
+  const binary: readonly string[] = accepted.filter((f) => f !== 'MD' && f !== 'TXT');
+  if (!binary.includes(format ?? ''))
     throw new UploadError(
       'unsupported_format',
-      'Gunakan MD, TXT, PDF bertesks, DOCX atau XLSX.',
+      `Gunakan MD, TXT, PDF bertesks, ${binary.filter((f) => f !== 'PDF').join(', ')}.`,
       415,
     );
   if (!bytes.length) throw new UploadError('empty_file', 'Berkas kosong.');
@@ -298,12 +306,22 @@ export function validateDocumentFile(name: string, mime: string, bytes: Uint8Arr
     PDF: 'application/pdf',
     DOCX: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     XLSX: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    PPTX: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    HTML: 'text/html',
   };
-  const signature = format === 'PDF' ? Buffer.from('%PDF-') : Buffer.from([0x50, 0x4b, 0x03, 0x04]);
-  if (
-    !['', 'application/octet-stream', types[format!]!].includes(contentType) ||
-    !Buffer.from(bytes.subarray(0, signature.length)).equals(signature)
-  )
+  // HTML has no magic bytes: it must start with '<' after an optional BOM and whitespace.
+  const head = Buffer.from(bytes.subarray(0, 64));
+  const looksLike =
+    format === 'HTML'
+      ? /^\s*<|^\xef\xbb\xbf\s*</.test(head.toString('latin1'))
+      : head
+          .subarray(0, 5)
+          .equals(
+            format === 'PDF'
+              ? Buffer.from('%PDF-')
+              : Buffer.from([0x50, 0x4b, 0x03, 0x04, head[4] ?? 0]),
+          );
+  if (!['', 'application/octet-stream', types[format!]!].includes(contentType) || !looksLike)
     throw new UploadError(
       'unsupported_format',
       'Ekstensi, MIME, dan magic bytes tidak cocok.',

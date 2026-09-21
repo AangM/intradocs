@@ -1,6 +1,7 @@
 'use client';
 import { useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { toast } from './toast';
 
 /**
  * Raises an access request (V1 S02). The category list is whatever the server already
@@ -32,6 +33,7 @@ export function AccessRequestForm({ categories }: { categories: { id: string; na
       if (!r.ok) throw new Error(v.error ?? 'Permintaan gagal.');
       setDone(true);
       setReason('');
+      toast('Permintaan akses terkirim', 'ok');
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Koneksi gagal.');
@@ -59,26 +61,28 @@ export function AccessRequestForm({ categories }: { categories: { id: string; na
           </option>
         ))}
       </select>
-      <fieldset disabled={busy}>
+      <fieldset disabled={busy} className="field-lbl">
         <legend>Level akses yang diminta</legend>
-        <label>
-          <input
-            type="radio"
-            name={`${id}-level`}
-            checked={classification === 'restricted'}
-            onChange={() => setClassification('restricted')}
-          />{' '}
-          Terbatas
-        </label>{' '}
-        <label>
-          <input
-            type="radio"
-            name={`${id}-level`}
-            checked={classification === 'confidential'}
-            onChange={() => setClassification('confidential')}
-          />{' '}
-          Rahasia
-        </label>
+        <div className="choice-grid">
+          <label className="choice">
+            <input
+              type="radio"
+              name={`${id}-level`}
+              checked={classification === 'restricted'}
+              onChange={() => setClassification('restricted')}
+            />
+            Terbatas
+          </label>
+          <label className="choice">
+            <input
+              type="radio"
+              name={`${id}-level`}
+              checked={classification === 'confidential'}
+              onChange={() => setClassification('confidential')}
+            />
+            Rahasia
+          </label>
+        </div>
       </fieldset>
       <label htmlFor={`${id}-reason`}>Alasan (20–2000 karakter)</label>
       <textarea
@@ -91,9 +95,8 @@ export function AccessRequestForm({ categories }: { categories: { id: string; na
         onChange={(e) => setReason(e.target.value)}
         placeholder="Tugas atau kebutuhan kerja yang memerlukan akses ini…"
       />
-      <p className="sub tiny">
-        Persetujuan admin adalah keputusan tercatat, bukan pemberian akses otomatis: dokumen
-        Terbatas/Rahasia tetap diberikan per dokumen oleh pemiliknya.
+      <p className="field-help">
+        Keputusan admin tercatat; akses per dokumen tetap diberikan oleh pemiliknya.
       </p>
       <div className="row">
         <button className="btn btn-p" disabled={busy || reason.trim().length < 20}>

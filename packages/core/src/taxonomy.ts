@@ -58,7 +58,7 @@ export function parseLabel(value: unknown) {
   };
 }
 export function parseAssignment(value: unknown) {
-  const v = objectInput(value, ['role', 'scopeAll', 'categoryIds']);
+  const v = objectInput(value, ['role', 'scopeAll', 'categoryIds', 'customRoleId']);
   if (
     !(ROLES as readonly unknown[]).includes(v.role) ||
     typeof v.scopeAll !== 'boolean' ||
@@ -69,5 +69,7 @@ export function parseAssignment(value: unknown) {
   const categoryIds = [...new Set(v.categoryIds.map(parseUuid))];
   if (v.scopeAll && categoryIds.length > 0)
     throw new InputError('Scope global tidak boleh sekaligus memuat kategori khusus.');
-  return { role: v.role as string, scopeAll: v.scopeAll, categoryIds };
+  const customRoleId =
+    v.customRoleId === undefined || v.customRoleId === null ? null : parseUuid(v.customRoleId);
+  return { role: v.role as string, scopeAll: v.scopeAll, categoryIds, customRoleId };
 }

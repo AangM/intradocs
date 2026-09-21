@@ -2,13 +2,15 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { Pool } from 'pg';
 import { PgBoss } from 'pg-boss';
-import { readWorkerConfig } from '@intradocs/core/config';
+import { readRetentionWindows, readWorkerConfig } from '@intradocs/core/config';
 import { LocalBlobStore } from '@intradocs/core/storage';
 import { processPublication } from '@intradocs/core/workflow';
 import { readAiConfig } from '@intradocs/core/ai-config';
 import { WeknoraClient } from '@intradocs/core/weknora';
 import { processRagExport, sweepRagOrphans } from '@intradocs/core/rag';
+import { processEmailDigests } from '@intradocs/core/mail';
 import { PostgresPublicationRepository } from './publication.ts';
+import { PostgresDigestRepository, createMailTransport } from './mail.ts';
 import { PostgresRagExportRepository, WeknoraIndexTarget } from './rag-export.ts';
 
 const sha256Hex = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
@@ -36,12 +38,28 @@ async function start() {
           index: new WeknoraIndexTarget(new WeknoraClient(ai.weknora)),
         }
       : null;
+  // Email is a second channel for the bell. With MAIL_MODE=off nothing is built and
+  // unsent items are retired after a day, so switching mail on later does not release
+  // a backlog of stale mail.
+  const mail = createMailTransport(process.env, path.resolve(root));
+  const digests = mail ? new PostgresDigestRepository(pool) : null;
+  let digestDue = Date.now();
   boss.on('error', () => console.error('Antrean worker gagal; periksa PostgreSQL.'));
   pool.on('error', () => console.error('Koneksi worker gagal.'));
   await boss.start();
   await boss.createQueue('review-reminders');
+  const retention = readRetentionWindows(process.env);
   await boss.work('review-reminders', async () => {
     await pool.query('SELECT app.enqueue_review_reminders()');
+    // The policy pass: archive what expired and was not replaced within the grace
+    // window, escalate reviews overdue past the other. Counts are the only output.
+    const { rows } = await pool.query<{ archived: number; escalated: number }>(
+      'SELECT * FROM app.apply_retention($1,$2)',
+      [retention.graceDays, retention.overdueDays],
+    );
+    const r = rows[0];
+    if (r && (r.archived > 0 || r.escalated > 0))
+      console.log(`Retensi: ${r.archived} diarsipkan, ${r.escalated} eskalasi review.`);
     // Search wording expires after 30 days while the counts stay, so the KPI tiles keep
     // working without the phrasing accumulating indefinitely.
     await pool.query('SELECT app.prune_search_queries()');
@@ -87,6 +105,25 @@ async function start() {
           }
         } catch {
           console.error('Ekspor RAG tertunda; antrean mempertahankan status dan retry.');
+        }
+      }
+      if (digestDue <= Date.now()) {
+        digestDue = Date.now() + 60000;
+        try {
+          if (digests && mail) {
+            const sent = await processEmailDigests({
+              repository: digests,
+              transport: mail.transport,
+              appUrl: mail.appUrl,
+              log: (m) => console.error(m),
+            });
+            if (sent > 0) console.log(`Mengirim ${sent} email ringkasan.`);
+          }
+          await pool.query('SELECT app.retire_stale_email($1::interval)', [
+            digests ? '7 days' : '1 day',
+          ]);
+        } catch {
+          console.error('Email ringkasan tertunda; item menunggu putaran berikutnya.');
         }
       }
       await pool.query(

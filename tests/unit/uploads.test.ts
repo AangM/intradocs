@@ -4,6 +4,8 @@ import { randomUUID } from 'node:crypto';
 import {
   parseDraftMetadata,
   validateTextFile,
+  validateDocumentFile,
+  LOCAL_FORMATS,
   convertText,
   uploadFingerprint,
   UPLOAD_LIMITS,
@@ -220,4 +222,26 @@ test('slow body is cancelled by an overall deadline', async () => {
     (e: unknown) => e instanceof UploadError && e.code === 'upload_timeout',
   );
   assert(cancelled);
+});
+
+test('binary formats are gated by the accepted list, the extension, the MIME and the first bytes', () => {
+  const pdf = Buffer.from('%PDF-1.7 synthetic');
+  const zip = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0, 0, 0, 0]);
+  const html = Buffer.from('﻿  <!doctype html><html><body><p>hi</p></body></html>');
+  assert.equal(validateDocumentFile('a.pdf', 'application/pdf', pdf).format, 'PDF');
+  assert.equal(validateDocumentFile('a.html', 'text/html', html).format, 'HTML');
+  assert.equal(validateDocumentFile('a.html', '', html).format, 'HTML');
+  // HTML must start with '<' (after BOM/whitespace); a PDF body under .html is refused.
+  failure(() => validateDocumentFile('a.html', 'text/html', pdf), 'unsupported_format');
+  // PPTX is a zip, but only when the installation lists it (WeKnora parser present).
+  failure(() => validateDocumentFile('deck.pptx', '', zip), 'unsupported_format');
+  assert.equal(
+    validateDocumentFile('deck.pptx', '', zip, [...LOCAL_FORMATS, 'PPTX']).format,
+    'PPTX',
+  );
+  // The error names what is accepted, so the person is not told PPTX works when it does not.
+  assert.throws(
+    () => validateDocumentFile('deck.pptx', '', zip),
+    (e: unknown) => e instanceof UploadError && !e.message.includes('PPTX'),
+  );
 });

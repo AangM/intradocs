@@ -17,12 +17,17 @@
     "./orphan-cleanup": "./src/orphan-cleanup.ts",
     "./workflow": "./src/workflow.ts",
     "./taxonomy": "./src/taxonomy.ts",
+    "./roles": "./src/roles.ts",
     "./converter": "./src/converter.ts",
+    "./weknora-parse": "./src/weknora-parse.ts",
     "./ai-config": "./src/ai-config.ts",
     "./weknora": "./src/weknora.ts",
     "./rag": "./src/rag.ts",
     "./diff": "./src/diff.ts",
     "./answer-export": "./src/answer-export.ts",
-    "./rag-messages": "./src/rag-messages.ts"
+    "./dashboard-export": "./src/dashboard-export.ts",
+    "./rag-messages": "./src/rag-messages.ts",
+    "./mail": "./src/mail.ts",
+    "./audit-export": "./src/audit-export.ts"
   }
 }

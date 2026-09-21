@@ -21,7 +21,18 @@ export function childEnvironment(
   source: NodeJS.ProcessEnv,
   target: 'web' | 'worker',
 ): NodeJS.ProcessEnv {
-  const shared = ['APP_PROFILE', 'AI_PROVIDER', 'INTRADOCS_ROOT'];
+  // Mail is the worker's job (it sends) and the web's to describe (settings, health).
+  const shared = [
+    'APP_PROFILE',
+    'AI_PROVIDER',
+    'INTRADOCS_ROOT',
+    'MAIL_MODE',
+    'MAIL_FROM',
+    'MAIL_OUTBOX_DIR',
+    'SMTP_URL',
+    'RETENTION_GRACE_DAYS',
+    'RETENTION_OVERDUE_DAYS',
+  ];
   // Both processes talk to WeKnora: web for retrieval, worker for export. The key is a
   // server-side credential and reaches neither the browser bundle nor any response.
   const weknora = [
@@ -52,6 +63,10 @@ export function childEnvironment(
       ? [
           'APP_URL',
           'AUTH_MODE',
+          'OIDC_ISSUER',
+          'OIDC_CLIENT_ID',
+          'OIDC_CLIENT_SECRET',
+          'OIDC_LABEL',
           'STORAGE_DRIVER',
           'STORAGE_ROOT',
           'DATABASE_URL',
@@ -61,7 +76,7 @@ export function childEnvironment(
           'KNOWLEDGE_PORT',
           'KNOWLEDGE_TOKEN',
         ]
-      : ['WORKER_DATABASE_URL', 'STORAGE_ROOT'];
+      : ['WORKER_DATABASE_URL', 'STORAGE_ROOT', 'APP_URL'];
   const result: NodeJS.ProcessEnv = { NEXT_TELEMETRY_DISABLED: '1' };
   for (const key of [...operatingSystemKeys, ...shared, ...weknora, ...keys])
     if (source[key] !== undefined) result[key] = source[key];

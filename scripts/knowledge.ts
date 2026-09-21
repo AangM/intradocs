@@ -61,7 +61,7 @@ async function main() {
     const body = await r.json();
     if (!r.ok || body.pipeline !== 'canonical-v2') throw new Error('Converter belum siap.');
     console.log(
-      'Converter canonical-v2 siap: PDF bertesks, DOCX, XLSX; AI off; isolasi egress bergantung profil Compose.',
+      'Converter canonical-v2 siap: PDF bertesks, DOCX, XLSX, HTML; AI off; isolasi egress bergantung profil Compose.',
     );
   } else
     throw new Error(

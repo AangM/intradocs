@@ -178,6 +178,12 @@ for (const patch of [
   { APP_PROFILE: 'production' },
   { AI_PROVIDER: 'gemini' },
   { AUTH_MODE: 'oidc' },
+  {
+    AUTH_MODE: 'oidc',
+    OIDC_ISSUER: 'http://idp.example.org',
+    OIDC_CLIENT_ID: 'a',
+    OIDC_CLIENT_SECRET: 'x'.repeat(20),
+  },
   { STORAGE_DRIVER: 's3' },
   { BETTER_AUTH_SECRET: 'short' },
   { APP_URL: 'https://example.com' },

@@ -27,8 +27,18 @@ test.beforeEach(async ({ page }) => {
 });
 test('home, metadata search, protected reader and accessible headings', async ({ page }, info) => {
   await expect(page.getByRole('heading', { name: 'Ada yang bisa kami bantu?' })).toBeVisible();
-  await page.getByRole('textbox', { name: 'Apa yang ingin Anda cari?' }).fill('VPN');
-  await page.getByRole('button', { name: 'Cari dokumen', exact: true }).click();
+  if (process.env.AI_PROVIDER === 'weknora-local') {
+    // With AI on, the hero box asks the assistant; keyword search is the link under it.
+    await expect(
+      page.getByRole('textbox', { name: 'Apa yang ingin Anda tanyakan?' }),
+    ).toBeVisible();
+    await page.getByRole('link', { name: 'Buka pencarian dokumen' }).click();
+    await page.getByRole('textbox', { name: 'Kata kunci' }).fill('VPN');
+    await page.getByRole('textbox', { name: 'Kata kunci' }).press('Enter');
+  } else {
+    await page.getByRole('textbox', { name: 'Apa yang ingin Anda cari?' }).fill('VPN');
+    await page.getByRole('button', { name: 'Cari dokumen', exact: true }).click();
+  }
   await page.getByRole('link', { name: 'Konfigurasi VPN untuk Windows, macOS & Mobile' }).click();
   await expect(
     page
@@ -78,4 +88,41 @@ test('direct navigation to an unauthorized document never shows its title or bod
   await expect(
     page.getByRole('heading', { name: 'Lampiran Simulasi Keamanan — Rahasia' }),
   ).toHaveCount(0);
+});
+
+test('a conversation can be deleted from the history rail without a native dialog', async ({
+  page,
+}, info) => {
+  if (process.env.AI_PROVIDER !== 'weknora-local') return;
+  // Seed one conversation through the API (a greeting: no model call), then delete it
+  // from the UI. Any native confirm() would be refused here, proving none is needed.
+  page.on('dialog', (d) => void d.dismiss());
+  const seeded = await page.request.post('/api/rag/chat', {
+    data: { question: 'Halo' },
+    headers: { Origin: new URL(page.url()).origin },
+  });
+  expect(seeded.ok()).toBe(true);
+  const { conversationId } = (await seeded.json()) as { conversationId: string };
+  await page.goto('/ai-assistant');
+  if (info.project.name === 'mobile') await page.locator('label.chat-side-btn').click();
+  // The newest conversation is listed first; older "Halo" threads may exist too.
+  const rows = page.locator('.chat-convs li', { hasText: 'Halo' });
+  const before = await rows.count();
+  expect(before).toBeGreaterThan(0);
+  await rows
+    .first()
+    .getByRole('button', { name: /Hapus percakapan/ })
+    .click();
+  await page.getByRole('button', { name: 'Hapus', exact: true }).click();
+  await expect(rows).toHaveCount(before - 1);
+  // The row leaves the rail as soon as the server confirms; poll the API rather than
+  // racing the request that the click started.
+  await expect
+    .poll(
+      async () => (await page.request.get(`/api/rag/conversations/${conversationId}`)).status(),
+      {
+        timeout: 10_000,
+      },
+    )
+    .toBe(404);
 });

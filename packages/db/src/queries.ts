@@ -1,9 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import { eq } from 'drizzle-orm';
-import { hasCapability, isRole, type Actor, type Classification } from '@intradocs/core';
+import {
+  effectiveCapabilities,
+  hasCapability,
+  isRole,
+  type Actor,
+  type Classification,
+} from '@intradocs/core';
 import type { CatalogQuery } from '@intradocs/core/validation';
 import { withActor } from './index.ts';
-import { profiles } from './schema.ts';
 export class AccessDenied extends Error {}
 export type Category = {
   id: string;
@@ -109,9 +113,43 @@ function mapDocument(r: RawDocument): DocumentDetail {
     expired: r.expired,
   };
 }
+/** The person's own email switch (migration 041); read on the settings page. */
+export async function emailNotificationsEnabled(actorId: string): Promise<boolean> {
+  return withActor(actorId, async ({ client }) => {
+    const { rows } = await client.query<{ on: boolean }>(
+      'SELECT email_notifications AS "on" FROM app.profiles WHERE id=app.actor_id()',
+    );
+    return rows[0]?.on ?? true;
+  });
+}
+export async function setEmailNotifications(actorId: string, value: boolean): Promise<void> {
+  await withActor(actorId, async ({ client }) => {
+    await client.query('SELECT app.set_email_notifications($1)', [value]);
+  });
+}
 export async function loadActor(id: string): Promise<Actor | null> {
-  return withActor(id, async ({ db }) => {
-    const [p] = await db.select().from(profiles).where(eq(profiles.id, id)).limit(1);
+  return withActor(id, async ({ client }) => {
+    // The custom role's denials are read here, on every request, so a change to a
+    // role definition reaches its holders at their next page -- no session to expire.
+    const { rows } = await client.query<{
+      id: string;
+      name: string;
+      email: string;
+      unit: string;
+      role: string;
+      active: boolean;
+      scope_all: boolean;
+      custom_role_id: string | null;
+      custom_role_name: string | null;
+      denied: string[] | null;
+    }>(
+      `SELECT p.id,p.name,p.email,p.unit,p.role,p.active,p.scope_all,
+              r.id AS custom_role_id,r.name AS custom_role_name,r.denied_capabilities AS denied
+       FROM app.profiles p LEFT JOIN app.custom_roles r ON r.id=p.custom_role_id AND r.archived_at IS NULL AND r.base_role=p.role
+       WHERE p.id=$1`,
+      [id],
+    );
+    const p = rows[0];
     if (!p || !p.active || !isRole(p.role)) return null;
     return {
       id: p.id,
@@ -120,7 +158,9 @@ export async function loadActor(id: string): Promise<Actor | null> {
       unit: p.unit,
       role: p.role,
       active: p.active,
-      scopeAll: p.scopeAll,
+      scopeAll: p.scope_all,
+      customRole: p.custom_role_id ? { id: p.custom_role_id, name: p.custom_role_name! } : null,
+      capabilities: effectiveCapabilities(p.role, p.denied ?? []),
     };
   });
 }
@@ -268,7 +308,12 @@ export async function readVersionFile(
     };
   });
 }
-export type UserItem = Actor & { categories: string[]; categoryIds: string[] };
+export type UserItem = Actor & {
+  categories: string[];
+  categoryIds: string[];
+  customRoleId: string | null;
+  customRoleName: string | null;
+};
 export async function listUsers(actor: Actor): Promise<UserItem[]> {
   if (!hasCapability(actor, 'users.view')) throw new AccessDenied();
   return withActor(actor.id, async ({ client }) => {
@@ -282,9 +327,13 @@ export async function listUsers(actor: Actor): Promise<UserItem[]> {
       scope_all: boolean;
       categories: string[];
       category_ids: string[];
+      custom_role_id: string | null;
+      custom_role_name: string | null;
     }>(`
-   SELECT p.*, ARRAY(SELECT category_id::text FROM app.category_grants WHERE user_id=p.id) AS category_ids, coalesce(ARRAY(SELECT c.name FROM app.category_grants g JOIN app.categories c ON c.id=g.category_id WHERE g.user_id=p.id ORDER BY c.name),'{}') AS categories
-   FROM app.profiles p ORDER BY p.name`);
+   SELECT p.*, ARRAY(SELECT category_id::text FROM app.category_grants WHERE user_id=p.id) AS category_ids, coalesce(ARRAY(SELECT c.name FROM app.category_grants g JOIN app.categories c ON c.id=g.category_id WHERE g.user_id=p.id ORDER BY c.name),'{}') AS categories,
+          r.name AS custom_role_name
+   FROM app.profiles p LEFT JOIN app.custom_roles r ON r.id=p.custom_role_id AND r.archived_at IS NULL
+   ORDER BY p.name`);
     return rows.map((p) => ({
       id: p.id,
       name: p.name,
@@ -295,6 +344,8 @@ export async function listUsers(actor: Actor): Promise<UserItem[]> {
       scopeAll: p.scope_all,
       categories: p.categories,
       categoryIds: p.category_ids,
+      customRoleId: p.custom_role_id,
+      customRoleName: p.custom_role_name,
     }));
   });
 }
@@ -320,23 +371,145 @@ export async function setUserActive(actor: Actor, target: string, active: boolea
     );
   });
 }
+/**
+ * The audit rows of a date range for export: the same shielding as listAudit (names and
+ * titles only where the exporter may see them), oldest first so the file reads as a
+ * ledger, one row more than the limit so the caller knows it was cut. The export is
+ * recorded as an audit event of its own in the same transaction.
+ */
+export async function exportAudit(
+  actor: Actor,
+  filter: { from: Date; to: Date; action: string | null },
+  limit: number,
+): Promise<{
+  rows: Array<{
+    id: string;
+    createdAt: string;
+    action: string;
+    actorId: string;
+    actorName: string | null;
+    documentId: string | null;
+    documentTitle: string | null;
+    subjectUserId: string | null;
+    subjectName: string | null;
+  }>;
+  truncated: boolean;
+}> {
+  if (!hasCapability(actor, 'audit.view')) throw new AccessDenied();
+  return withActor(actor.id, async ({ client }) => {
+    // The range can hold thousands of rows; resolving names and titles per row through
+    // RLS is what made the page's query unfit here. The events come first (one policy
+    // check per row), then the distinct people and documents they mention are looked up
+    // once each -- the same shielding, a few dozen checks instead of thousands.
+    const { rows } = await client.query<{
+      id: string;
+      action: string;
+      actor_id: string;
+      document_id: string | null;
+      subject_user_id: string | null;
+      created_at: Date;
+    }>(
+      `SELECT a.request_id::text AS id,a.action,a.actor_id,a.created_at,a.document_id,a.subject_user_id
+       FROM app.audit_events a
+       WHERE a.created_at>=$1 AND a.created_at<=$2 AND ($3::text IS NULL OR a.action=$3)
+       ORDER BY a.id ASC LIMIT $4`,
+      [filter.from, filter.to, filter.action, limit + 1],
+    );
+    const truncated = rows.length > limit;
+    const page = rows.slice(0, limit);
+    const people = [...new Set(page.flatMap((r) => [r.actor_id, r.subject_user_id ?? '']))].filter(
+      Boolean,
+    );
+    const documents = [...new Set(page.map((r) => r.document_id ?? ''))].filter(Boolean);
+    const names = new Map<string, string>();
+    const titles = new Map<string, string>();
+    if (people.length)
+      for (const p of (
+        await client.query<{ id: string; name: string }>(
+          'SELECT id,name FROM app.profiles WHERE id=ANY($1)',
+          [people],
+        )
+      ).rows)
+        names.set(p.id, p.name);
+    if (documents.length)
+      for (const d of (
+        await client.query<{ id: string; title: string }>(
+          'SELECT id,title FROM app.documents WHERE id=ANY($1::uuid[])',
+          [documents],
+        )
+      ).rows)
+        titles.set(d.id, d.title);
+    await client.query(
+      `INSERT INTO app.audit_events(actor_id,action,request_id) VALUES(app.actor_id(),'audit.exported',$1)`,
+      [randomUUID()],
+    );
+    return {
+      truncated,
+      rows: page.map((r) => ({
+        id: r.id,
+        createdAt: r.created_at.toISOString(),
+        action: r.action,
+        actorId: r.actor_id,
+        actorName: names.get(r.actor_id) ?? null,
+        documentId: r.document_id,
+        documentTitle: r.document_id ? (titles.get(r.document_id) ?? null) : null,
+        subjectUserId: r.subject_user_id,
+        subjectName: r.subject_user_id ? (names.get(r.subject_user_id) ?? null) : null,
+      })),
+    };
+  });
+}
 export async function listAudit(
   actor: Actor,
-): Promise<Array<{ id: string; action: string; actorId: string; createdAt: string }>> {
+  filter?: { from: Date; to: Date; action: string | null },
+): Promise<
+  Array<{
+    id: string;
+    action: string;
+    actorId: string;
+    /** Name when the actor may see that profile; otherwise null and the UI shows a placeholder. */
+    actorName: string | null;
+    /** Document title when the actor may read it; RLS on documents decides. */
+    documentTitle: string | null;
+    documentHref: string | null;
+    subjectName: string | null;
+    createdAt: string;
+  }>
+> {
   if (!hasCapability(actor, 'audit.view')) throw new AccessDenied();
   return withActor(actor.id, async ({ client }) => {
     const { rows } = await client.query<{
       id: string;
       action: string;
       actor_id: string;
+      actor_name: string | null;
+      document_id: string | null;
+      document_title: string | null;
+      document_slug: string | null;
+      subject_name: string | null;
       created_at: Date;
     }>(
-      'SELECT request_id::text AS id,action,actor_id,created_at FROM app.audit_events ORDER BY app.audit_events.id DESC LIMIT 50',
+      `SELECT a.request_id::text AS id,a.action,a.actor_id,a.created_at,
+        (SELECT p.name FROM app.profiles p WHERE p.id=a.actor_id) AS actor_name,
+        a.document_id,
+        (SELECT d.title FROM app.documents d WHERE d.id=a.document_id) AS document_title,
+        (SELECT d.slug FROM app.documents d WHERE d.id=a.document_id) AS document_slug,
+        (SELECT p.name FROM app.profiles p WHERE p.id=a.subject_user_id) AS subject_name
+       FROM app.audit_events a
+       WHERE ($1::timestamptz IS NULL OR a.created_at>=$1) AND ($2::timestamptz IS NULL OR a.created_at<=$2)
+         AND ($3::text IS NULL OR a.action=$3)
+       ORDER BY a.id DESC LIMIT 100`,
+      [filter?.from ?? null, filter?.to ?? null, filter?.action ?? null],
     );
     return rows.map((r) => ({
       id: r.id,
       action: r.action,
       actorId: r.actor_id,
+      actorName: r.actor_name,
+      documentTitle: r.document_title,
+      documentHref:
+        r.document_id && r.document_slug ? `/dokumen/${r.document_id}/${r.document_slug}` : null,
+      subjectName: r.subject_name,
       createdAt: r.created_at.toISOString(),
     }));
   });

@@ -56,11 +56,72 @@ export async function searchDocuments(
         updatedAt: r.created_at.toISOString(),
         status: 'published' as const,
         expiresAt: r.expires_at?.toISOString() ?? null,
-        snippet: r.snippet,
+        // Lexical chunks are raw Markdown; a result line should read as prose.
+        snippet: r.snippet
+          .replace(/<!--[\s\S]*?-->/g, ' ')
+          .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+          .replace(/^\s{0,3}>\s?/gm, '')
+          .replace(/[*_`]{1,3}/g, '')
+          .replace(/\s+/g, ' ')
+          .trim(),
       })),
       total,
       pageSize: 8,
       durationMs,
+    };
+  });
+}
+export type SearchFacets = {
+  categories: { id: string; name: string; color: string; n: number }[];
+  labels: { name: string; n: number }[];
+  formats: { format: string; n: number }[];
+  recency: { days7: number; days90: number; all: number };
+  /** ISO dates for the "after" parameter behind the two recency facets (DB clock). */
+  since: { days7: string; days90: string };
+};
+/**
+ * Counts behind the search filters (mockup S02), for the keyword alone: each facet says
+ * how many readable published documents would remain if only that filter were applied,
+ * so a user sees what a click will do. Same visibility rule as the results -- documents
+ * outside the actor's access are not counted, so no count leaks a title or a total.
+ */
+export async function searchFacets(actorId: string, keyword: string): Promise<SearchFacets> {
+  return withActor(actorId, async ({ client }) => {
+    const source = `FROM app.documents d JOIN app.document_versions v ON v.id=d.current_version_id JOIN app.categories c ON c.id=v.category_id
+    LEFT JOIN LATERAL(SELECT 1 AS hit FROM app.lexical_chunks ch WHERE ch.version_id=v.id AND ch.search_vector@@websearch_to_tsquery('simple',$1) LIMIT 1) hit ON true
+    WHERE app.is_active_version(v.id) AND ($1='' OR position(lower($1) in lower(v.title||' '||v.summary))>0 OR hit.hit IS NOT NULL)`;
+    const [categories, labels, formats, recency] = await Promise.all([
+      client.query<{ id: string; name: string; color: string; n: number }>(
+        `SELECT c.id,c.name,c.color,count(*)::int AS n ${source} GROUP BY c.id,c.name,c.color,c.position ORDER BY c.position,c.name`,
+        [keyword],
+      ),
+      client.query<{ name: string; n: number }>(
+        `SELECT l.name,count(*)::int AS n FROM (SELECT unnest(v.labels) AS name ${source}) l GROUP BY l.name ORDER BY n DESC,l.name LIMIT 12`,
+        [keyword],
+      ),
+      client.query<{ format: string; n: number }>(
+        `SELECT v.source_format AS format,count(*)::int AS n ${source} GROUP BY v.source_format ORDER BY n DESC,format`,
+        [keyword],
+      ),
+      client.query<{
+        days7: number;
+        days90: number;
+        all: number;
+        since7: string;
+        since90: string;
+      }>(
+        `SELECT count(*) FILTER(WHERE v.created_at>=now()-interval '7 days')::int AS days7,count(*) FILTER(WHERE v.created_at>=now()-interval '90 days')::int AS days90,count(*)::int AS all,
+                to_char(now()-interval '7 days','YYYY-MM-DD') AS since7,to_char(now()-interval '90 days','YYYY-MM-DD') AS since90 ${source}`,
+        [keyword],
+      ),
+    ]);
+    const r = recency.rows[0];
+    return {
+      categories: categories.rows,
+      labels: labels.rows,
+      formats: formats.rows,
+      recency: { days7: r?.days7 ?? 0, days90: r?.days90 ?? 0, all: r?.all ?? 0 },
+      since: { days7: r?.since7 ?? '', days90: r?.since90 ?? '' },
     };
   });
 }
@@ -87,9 +148,17 @@ export async function dashboardData(actorId: string, days = 30, unit: string | n
         [unit],
       )
     ).rows[0];
+    // Two series per day, both from the audit trail: document reads and questions to the
+    // assistant (retrieval, answer or abstention -- one event per question).
     const activity = (
-      await client.query<{ day: string; reads: number }>(
-        `SELECT to_char(a.created_at AT TIME ZONE 'Asia/Jakarta','YYYY-MM-DD') AS day,count(*)::int AS reads FROM app.audit_events a WHERE a.action='document.read' AND a.created_at>=now()-make_interval(days=>$1) AND ($2::text IS NULL OR EXISTS(SELECT 1 FROM app.documents d JOIN app.profiles p ON p.id=d.owner_id WHERE d.id=a.document_id AND p.unit=$2)) GROUP BY 1 ORDER BY 1`,
+      await client.query<{ day: string; reads: number; asks: number }>(
+        `SELECT to_char(a.created_at AT TIME ZONE 'Asia/Jakarta','YYYY-MM-DD') AS day,
+                count(*) FILTER(WHERE a.action='document.read')::int AS reads,
+                count(*) FILTER(WHERE a.action IN ('rag.retrieval','rag.chat','rag.abstained'))::int AS asks
+           FROM app.audit_events a
+          WHERE a.action IN ('document.read','rag.retrieval','rag.chat','rag.abstained') AND a.created_at>=now()-make_interval(days=>$1)
+            AND ($2::text IS NULL OR (a.action='document.read' AND EXISTS(SELECT 1 FROM app.documents d JOIN app.profiles p ON p.id=d.owner_id WHERE d.id=a.document_id AND p.unit=$2)) OR (a.action<>'document.read' AND EXISTS(SELECT 1 FROM app.profiles p WHERE p.id=a.actor_id AND p.unit=$2)))
+          GROUP BY 1 ORDER BY 1`,
         [days, unit],
       )
     ).rows;
@@ -122,6 +191,19 @@ export async function dashboardData(actorId: string, days = 30, unit: string | n
         [days, unit],
       )
     ).rows;
+    // Most-searched terms under the same k-anonymity rule as knowledge gaps: a term is
+    // listed only once three different people have searched it, in normalised form.
+    const popular = (
+      await client.query<{ term: string; searches: number; people: number }>(
+        `SELECT query_norm AS term,count(*)::int AS searches,count(DISTINCT actor_id)::int AS people
+           FROM app.search_events s
+          WHERE created_at>=now()-make_interval(days=>$1) AND query_norm<>''
+            AND ($2::text IS NULL OR EXISTS(SELECT 1 FROM app.profiles p WHERE p.id=s.actor_id AND p.unit=$2))
+          GROUP BY query_norm HAVING count(DISTINCT actor_id)>=3
+          ORDER BY searches DESC,term LIMIT 5`,
+        [days, unit],
+      )
+    ).rows;
     // AI assistant activity from the audit trail: counts only, never a question. An
     // abstention is a knowledge signal of its own -- someone asked and the corpus had
     // nothing they were allowed to see -- so it is reported next to retrievals.
@@ -132,11 +214,15 @@ export async function dashboardData(actorId: string, days = 30, unit: string | n
         abstained: number;
         rejected: number;
         people: number;
+        helpful: number;
+        unhelpful: number;
       }>(
         `SELECT count(*) FILTER(WHERE action='rag.retrieval')::int AS retrievals,
                 count(*) FILTER(WHERE action='rag.chat')::int AS answers,
                 count(*) FILTER(WHERE action='rag.abstained')::int AS abstained,
                 count(*) FILTER(WHERE action='rag.citation_rejected')::int AS rejected,
+                count(*) FILTER(WHERE action='rag.answer_helpful')::int AS helpful,
+                count(*) FILTER(WHERE action='rag.answer_unhelpful')::int AS unhelpful,
                 count(DISTINCT actor_id) FILTER(WHERE action IN ('rag.retrieval','rag.chat','rag.abstained'))::int AS people
          FROM app.audit_events a WHERE a.created_at>=now()-make_interval(days=>$1)
            AND ($2::text IS NULL OR EXISTS(SELECT 1 FROM app.profiles p WHERE p.id=a.actor_id AND p.unit=$2))`,
@@ -146,15 +232,22 @@ export async function dashboardData(actorId: string, days = 30, unit: string | n
     // Terms people searched for and did not find. The threshold lives in SQL, so no
     // caller can lower it: a term one person searched never reaches this array.
     const gaps = (
-      await client.query<{ term: string; searches: string; people: string; last_seen: Date }>(
-        'SELECT term,searches,people,last_seen FROM app.knowledge_gaps($1,$2)',
-        [days, unit],
-      )
+      await client.query<{
+        term: string;
+        searches: string;
+        people: string;
+        last_seen: Date;
+        from_assistant: string;
+      }>('SELECT term,searches,people,last_seen,from_assistant FROM app.knowledge_gaps($1,$2)', [
+        days,
+        unit,
+      ])
     ).rows.map((r) => ({
       term: r.term,
       searches: Number(r.searches),
       people: Number(r.people),
       lastSeen: r.last_seen.toISOString(),
+      fromAssistant: Number(r.from_assistant),
     }));
     return {
       summary: {
@@ -164,6 +257,7 @@ export async function dashboardData(actorId: string, days = 30, unit: string | n
         expired: Number(summary.expired),
       },
       activity,
+      popular,
       search,
       approvalHours: approval.hours,
       contributors,

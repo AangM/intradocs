@@ -4,6 +4,7 @@ import type { BlobStore, StoredFile } from './ports.ts';
 import type { MalwareScanner, ScanEvidence } from './clamav.ts';
 import { parseUuid } from './validation.ts';
 import {
+  type SourceFormat,
   UPLOAD_PIPELINE,
   UPLOAD_LIMITS,
   UploadError,
@@ -63,6 +64,8 @@ export type IngestDependencies = {
   scanner: MalwareScanner;
   storage: BlobStore;
   converter?: import('./converter.ts').DocumentConverter;
+  /** Formats this installation accepts; defaults to what the local converter handles. */
+  formats?: readonly SourceFormat[];
 };
 function cancelled(signal?: AbortSignal) {
   if (signal?.aborted) throw new UploadError('cancelled', 'Unggahan dibatalkan.');
@@ -102,9 +105,9 @@ export async function ingestDraft(
     throw new UploadError('forbidden', 'Akun tidak diizinkan mengunggah.', 403);
   const requestId = parseUuid(input.requestId),
     metadata = parseDraftMetadata(input.metadata);
-  const file = validateDocumentFile(input.name, input.mime, input.bytes);
+  const file = validateDocumentFile(input.name, input.mime, input.bytes, deps.formats);
   const attachments = (input.attachments ?? []).map((a) =>
-    validateDocumentFile(a.name, a.mime, a.bytes),
+    validateDocumentFile(a.name, a.mime, a.bytes, deps.formats),
   );
   if (
     attachments.length > UPLOAD_LIMITS.attachments ||

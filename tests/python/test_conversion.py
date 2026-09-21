@@ -51,5 +51,18 @@ class ConversionTests(unittest.TestCase):
    self.assertEqual(result['markdownHash'],hashlib.sha256(result['markdown'].encode()).hexdigest())
    lines=result['markdown'].split('\n')
    for m in result['mappings']:self.assertTrue(1<=m['markdownStart']<=m['markdownEnd']<=len(lines))
-
+ def test_html_keeps_structure_and_drops_everything_active(self):
+  src=(b'<!doctype html><html><head><title>x</title><style>p{}</style></head><body>'
+       b'<h1>Panduan (SINTETIS)</h1><script>alert(1)</script><p>Paragraf <b>satu</b> <a href="javascript:x">tautan</a>.</p>'
+       b'<ul><li>satu</li><li>dua<ol><li>dua-a</li></ol></li></ul>'
+       b'<table><tr><th>Layanan</th><th>SLA</th></tr><tr><td>Reset</td><td>30 menit</td></tr></table>'
+       b'<pre>x = 1\ny = 2</pre><img src=x onerror=alert(2)></body></html>')
+  result=converter.convert(src,'HTML');text=result['markdown']
+  self.assertIn('# Panduan',text);self.assertIn('Paragraf satu tautan',text);self.assertIn('- satu',text);self.assertIn('  1. dua-a',text)
+  self.assertIn('| Reset | 30 menit |',text);self.assertIn('```text\nx = 1\ny = 2\n```',text)
+  for banned in ('alert','javascript','onerror','<script','href','p{}','title'):self.assertNotIn(banned,text)
+  self.assertEqual([m['kind'] for m in result['mappings']],['paragraph','paragraph','paragraph','paragraph','paragraph','table','paragraph'])
+  self.assertEqual(converter.convert(src,'HTML'),converter.convert(src,'HTML'))
+  with self.assertRaises(converter.ConversionError):converter.convert(b'not html at all','HTML')
+  with self.assertRaises(converter.ConversionError):converter.convert(b'<html><body><script>x</script></body></html>','HTML')
 if __name__=='__main__':unittest.main()

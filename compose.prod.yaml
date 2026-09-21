@@ -1,0 +1,121 @@
+# A deployment of IntraDocs: the application image, its worker, and the services it owns.
+#
+#   cp .env.production.example .env.production   # then fill it in; nothing has a default
+#   docker compose -f compose.prod.yaml --env-file .env.production up -d
+#
+# What this file deliberately does NOT do:
+#   * terminate TLS. APP_URL must be https, and something in front (nginx, Traefik, a
+#     load balancer) holds the certificate and forwards to the app over the internal
+#     network. Putting a certificate here would hide where it is renewed.
+#   * publish Postgres, WeKnora or Ollama. Only the app's port is mapped, and only to
+#     the loopback interface; the reverse proxy is what reaches it.
+#   * seed anything. A deployment starts with no documents and the one administrator
+#     created by `pnpm ops:bootstrap-admin`, not with the synthetic corpus.
+name: intradocs
+
+x-logging: &logging
+  driver: json-file
+  options: { max-size: '10m', max-file: '5' }
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: intradocs
+      POSTGRES_INITDB_ARGS: '--data-checksums'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d intradocs']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    logging: *logging
+    # No ports: the database is reachable only on the compose network.
+
+  web:
+    image: ${INTRADOCS_IMAGE:-intradocs:0.3.0}
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      APP_PROFILE: ${APP_PROFILE:?set APP_PROFILE to staging or production}
+      AUTH_MODE: ${AUTH_MODE:-local}
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_LABEL: ${OIDC_LABEL:-}
+      MAIL_MODE: ${MAIL_MODE:-off}
+      MAIL_FROM: ${MAIL_FROM:-}
+      RETENTION_GRACE_DAYS: ${RETENTION_GRACE_DAYS:-30}
+      RETENTION_OVERDUE_DAYS: ${RETENTION_OVERDUE_DAYS:-30}
+      AI_PROVIDER: ${AI_PROVIDER:-off}
+      STORAGE_DRIVER: filesystem
+      APP_URL: ${APP_URL:?set APP_URL to the https origin users type}
+      DATABASE_URL: ${DATABASE_URL:?}
+      AUTH_DATABASE_URL: ${AUTH_DATABASE_URL:?}
+      # The bundled postgres below shares this file's private network with the app, so
+      # the link never leaves the host; this is the operator saying so, in writing. Point
+      # DATABASE_URL at a database on another machine and you must drop this line and
+      # add sslmode=verify-full instead -- the app refuses to start otherwise.
+      DATABASE_PRIVATE_NETWORK: ${DATABASE_PRIVATE_NETWORK:-true}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?generate 48+ random characters}
+      INTRADOCS_ROOT: /app
+      STORAGE_ROOT: /data/storage
+      WEKNORA_BASE_URL: ${WEKNORA_BASE_URL:-}
+      WEKNORA_API_KEY: ${WEKNORA_API_KEY:-}
+      WEKNORA_KNOWLEDGE_BASE_ID: ${WEKNORA_KNOWLEDGE_BASE_ID:-}
+      WEKNORA_TENANT_ID: ${WEKNORA_TENANT_ID:-}
+    volumes:
+      - storage:/data/storage
+    ports:
+      # Loopback only: the reverse proxy in front of this host is the public surface.
+      - '127.0.0.1:${WEB_PORT:-3000}:3000'
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -fsS http://127.0.0.1:3000/api/health || exit 1']
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    # A deployment that cannot read its configuration exits 78 and is restarted into the
+    # same failure: the crash loop is the signal, and the previous release keeps serving
+    # until the new one is fixed.
+    logging: *logging
+    security_opt: ['no-new-privileges:true']
+    read_only: true
+    tmpfs: ['/tmp']
+
+  worker:
+    image: ${INTRADOCS_IMAGE:-intradocs:0.3.0}
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+    command: ['node', 'apps/worker/dist/index.js']
+    environment:
+      APP_PROFILE: ${APP_PROFILE:?}
+      AI_PROVIDER: ${AI_PROVIDER:-off}
+      # The worker is what sends; it needs APP_URL only to write links into the mail.
+      APP_URL: ${APP_URL:?}
+      MAIL_MODE: ${MAIL_MODE:-off}
+      MAIL_FROM: ${MAIL_FROM:-}
+      SMTP_URL: ${SMTP_URL:-}
+      RETENTION_GRACE_DAYS: ${RETENTION_GRACE_DAYS:-30}
+      RETENTION_OVERDUE_DAYS: ${RETENTION_OVERDUE_DAYS:-30}
+      WORKER_DATABASE_URL: ${WORKER_DATABASE_URL:?}
+      DATABASE_PRIVATE_NETWORK: ${DATABASE_PRIVATE_NETWORK:-true}
+      INTRADOCS_ROOT: /app
+      STORAGE_ROOT: /data/storage
+      WEKNORA_BASE_URL: ${WEKNORA_BASE_URL:-}
+      WEKNORA_API_KEY: ${WEKNORA_API_KEY:-}
+      WEKNORA_KNOWLEDGE_BASE_ID: ${WEKNORA_KNOWLEDGE_BASE_ID:-}
+      WEKNORA_TENANT_ID: ${WEKNORA_TENANT_ID:-}
+    volumes:
+      - storage:/data/storage
+    logging: *logging
+    security_opt: ['no-new-privileges:true']
+
+volumes:
+  pgdata:
+  storage:

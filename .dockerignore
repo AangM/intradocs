@@ -1,0 +1,16 @@
+node_modules
+**/node_modules
+.next
+**/.next
+var
+.git
+.github
+test-results
+playwright-report
+.env
+.env.local
+.env.*.local
+docs
+reference
+curl
+*.log

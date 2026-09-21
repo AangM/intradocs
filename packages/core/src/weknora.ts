@@ -37,6 +37,12 @@ export interface WeknoraSearchHit {
   score: number;
   /** How WeKnora found this chunk; context chunks are neighbours, not matches. */
   matchType: WeknoraMatchType;
+  /**
+   * What the chunk IS. `text` is document content; anything else (`summary`, and
+   * whatever later versions add) was written by a model at ingest and is indexed by
+   * WeKnora as if it were part of the document. Only `text` may ever be cited.
+   */
+  chunkType: string;
   seq: number;
   chunkIndex: number;
   startAt: number;
@@ -115,6 +121,7 @@ function toHit(value: unknown): WeknoraSearchHit | null {
     content,
     score: num(r.score),
     matchType: matchType(r.match_type),
+    chunkType: str(r.chunk_type, 'text'),
     seq: num(r.seq),
     chunkIndex: num(r.chunk_index),
     startAt: num(r.start_at),
@@ -136,6 +143,10 @@ export class WeknoraClient {
     const headers: Record<string, string> = {
       'X-API-Key': this.config.apiKey,
       Accept: 'application/json',
+      // WeKnora resolves the language of generated text from this header when the
+      // deployment sets no WEKNORA_LANGUAGE. Its locale map has no Indonesian entry and
+      // passes unknown values into the prompt verbatim, so the name is sent, not a tag.
+      'Accept-Language': 'Indonesian',
       ...extra,
     };
     if (this.config.tenantId) headers['X-Tenant-ID'] = this.config.tenantId;
@@ -198,13 +209,21 @@ export class WeknoraClient {
     }
   }
 
-  /** Reads at most maxResponseBytes so a runaway response cannot exhaust memory. */
-  private async readBounded(response: Response): Promise<string> {
+  /**
+   * Reads at most maxResponseBytes so a runaway response cannot exhaust memory. With
+   * `onBlock`, every complete SSE block (blank-line separated) is handed over as it
+   * arrives; the full text is still returned at the end.
+   */
+  private async readBounded(
+    response: Response,
+    onBlock?: (block: string) => void,
+  ): Promise<string> {
     const reader = response.body?.getReader();
     if (!reader) return '';
     const decoder = new TextDecoder();
     let out = '';
     let size = 0;
+    let scanned = 0;
     try {
       for (;;) {
         const { done, value } = await reader.read();
@@ -215,11 +234,20 @@ export class WeknoraClient {
           throw new WeknoraError('Respons WeKnora melewati batas ukuran.', 502, false);
         }
         out += decoder.decode(value, { stream: true });
+        if (onBlock)
+          for (;;) {
+            const m = /\r?\n\r?\n/.exec(out.slice(scanned));
+            if (!m) break;
+            onBlock(out.slice(scanned, scanned + m.index));
+            scanned += m.index + m[0].length;
+          }
       }
     } finally {
       reader.releaseLock?.();
     }
-    return out + decoder.decode();
+    out += decoder.decode();
+    if (onBlock && scanned < out.length) onBlock(out.slice(scanned));
+    return out;
   }
 
   private async json(
@@ -274,6 +302,8 @@ export class WeknoraClient {
     wiki: boolean;
     questionGeneration: { enabled: boolean; questionCount: number; modelId: string };
     autoTag: { enabled: boolean; modelId: string };
+    /** Parent/child chunking; creation-time only, the update handler drops it. */
+    parentChild?: boolean;
   }): Promise<string> {
     const data = asRecord(
       await this.json('POST', '/api/v1/knowledge-bases', {
@@ -289,7 +319,12 @@ export class WeknoraClient {
             graph_enabled: false,
             wiki_enabled: input.wiki,
           },
-          chunking_config: { chunk_size: 400, chunk_overlap: 40, enable_parent_child: false },
+          chunking_config: {
+            chunk_size: 400,
+            chunk_overlap: 40,
+            enable_parent_child: input.parentChild === true,
+            ...(input.parentChild ? { parent_chunk_size: 1200, child_chunk_size: 300 } : {}),
+          },
           question_generation_config: {
             enabled: input.questionGeneration.enabled,
             question_count: input.questionGeneration.questionCount,
@@ -437,6 +472,50 @@ export class WeknoraClient {
     return (await this.knowledgeState(knowledgeId)).tags;
   }
 
+  /**
+   * What WeKnora generated for one record at ingest: the summary (stored in
+   * `description`) and the questions attached to each chunk. Both are model output about
+   * a version that already exists in IntraDocs; callers show them only as suggestions,
+   * bounded here so a runaway generation cannot become a runaway page.
+   */
+  async knowledgeGenerated(
+    knowledgeId: string,
+    limits: { maxSummaryChars: number; maxQuestions: number },
+  ): Promise<{ summary: string | null; summaryStatus: string; questions: string[] }> {
+    const record = asRecord(
+      await this.json('GET', `/api/v1/knowledge/${encodeURIComponent(knowledgeId)}`),
+    );
+    const summaryStatus = str(record.summary_status, 'none');
+    const description = str(record.description).trim();
+    const summary =
+      summaryStatus === 'completed' && description
+        ? description.slice(0, limits.maxSummaryChars)
+        : null;
+    const questions: string[] = [];
+    const query = new URLSearchParams({ page: '1', page_size: '50' });
+    const chunks = await this.json(
+      'GET',
+      `/api/v1/chunks/${encodeURIComponent(knowledgeId)}?${query}`,
+    );
+    const rows = Array.isArray(chunks)
+      ? chunks
+      : Array.isArray(asRecord(chunks).data)
+        ? (asRecord(chunks).data as unknown[])
+        : [];
+    const obj = (v: unknown): Json => (v && typeof v === 'object' ? (v as Json) : {});
+    for (const row of rows) {
+      const generated = obj(obj(row).metadata).generated_questions;
+      if (!Array.isArray(generated)) continue;
+      for (const item of generated) {
+        const question = str(obj(item).question).replace(/\s+/g, ' ').trim();
+        if (!question || question.length > 300 || questions.includes(question)) continue;
+        questions.push(question);
+        if (questions.length >= limits.maxQuestions) return { summary, summaryStatus, questions };
+      }
+    }
+    return { summary, summaryStatus, questions };
+  }
+
   /** Parse state and tags of one record; what an operator polls after a reparse. */
   async knowledgeState(
     knowledgeId: string,
@@ -461,17 +540,36 @@ export class WeknoraClient {
   }
 
   /** Registered models, without their parameters: a provider key lives there. */
-  async listModels(): Promise<Array<{ id: string; name: string; type: string; source: string }>> {
+  async listModels(): Promise<
+    Array<{ id: string; name: string; type: string; source: string; status: string }>
+  > {
     const data = await this.json('GET', '/api/v1/models');
     const items = Array.isArray(data) ? data : [];
-    const out: Array<{ id: string; name: string; type: string; source: string }> = [];
+    const out: Array<{ id: string; name: string; type: string; source: string; status: string }> =
+      [];
     for (const item of items) {
       if (!item || typeof item !== 'object') continue;
       const r = item as Json;
       const id = str(r.id);
-      if (id) out.push({ id, name: str(r.name), type: str(r.type), source: str(r.source) });
+      if (id)
+        out.push({
+          id,
+          name: str(r.name),
+          type: str(r.type),
+          source: str(r.source),
+          status: str(r.status),
+        });
     }
     return out;
+  }
+
+  /** Removes a model record; absent is success, the same as deleteKnowledge. */
+  async deleteModel(modelId: string): Promise<void> {
+    try {
+      await this.json('DELETE', `/api/v1/models/${encodeURIComponent(modelId)}`);
+    } catch (error) {
+      if (!(error instanceof WeknoraError && error.status === 404)) throw error;
+    }
   }
 
   /** Tag vocabulary of the knowledge base; the pool the auto-tagger may choose from. */
@@ -529,11 +627,22 @@ export class WeknoraClient {
   }): Promise<void> {
     const kbRoute = `/api/v1/knowledge-bases/${encodeURIComponent(this.config.knowledgeBaseId)}`;
     const current = asRecord(await this.json('GET', kbRoute));
+    // The update REPLACES the whole config block: sending only auto_tag_config once reset
+    // chunking to 0/0 and the next reparse produced flat 500-character chunks. Every block
+    // the GET exposes is echoed back. What the GET does not expose (enable_parent_child)
+    // cannot be preserved here -- see weknora:autotag for the warning.
+    const keep = (key: string) => (current[key] === undefined ? {} : { [key]: current[key] });
     await this.json('PUT', kbRoute, {
       body: {
         name: str(current.name),
         description: str(current.description),
         config: {
+          ...keep('chunking_config'),
+          ...keep('indexing_strategy'),
+          ...keep('question_generation_config'),
+          ...keep('image_processing_config'),
+          ...keep('faq_config'),
+          ...keep('wiki_config'),
           auto_tag_config: {
             enabled: config.enabled,
             model_id: config.modelId,
@@ -543,6 +652,22 @@ export class WeknoraClient {
         },
       },
     });
+  }
+
+  /** Whether the base's chunks carry parent links -- the only way to see parent-child from outside. */
+  async usesParentChildChunks(): Promise<boolean> {
+    const first = (await this.listKnowledge(1))[0];
+    if (!first) return false;
+    const chunks = await this.json(
+      'GET',
+      `/api/v1/chunks/${encodeURIComponent(first.id)}?page=1&page_size=5`,
+    );
+    const rows = Array.isArray(chunks)
+      ? chunks
+      : Array.isArray(asRecord(chunks).data)
+        ? (asRecord(chunks).data as unknown[])
+        : [];
+    return rows.some((row) => Boolean(str((row as Json).parent_chunk_id)));
   }
 
   /**
@@ -580,6 +705,162 @@ export class WeknoraClient {
     const config = data.config && typeof data.config === 'object' ? (data.config as Json) : {};
     const out: Json = {};
     for (const [k, v] of Object.entries(config)) if (!/prompt|template/.test(k)) out[k] = v;
+    return out;
+  }
+
+  /**
+   * Asks WeKnora to call a reranker once, through its own client code, so "registered"
+   * and "actually callable" are not confused again (an Ollama-backed reranker was the
+   * former and never the latter).
+   */
+  async checkRerank(input: {
+    modelName: string;
+    baseUrl: string;
+  }): Promise<{ available: boolean; message: string }> {
+    const data = asRecord(
+      await this.json('POST', '/api/v1/initialization/rerank/check', {
+        body: { source: 'local', modelName: input.modelName, baseUrl: input.baseUrl },
+      }),
+    );
+    return { available: data.available === true, message: str(data.message) };
+  }
+
+  /** Removes a whole base; used only by weknora:reindex after the replacement is live. */
+  async deleteKnowledgeBase(id: string): Promise<void> {
+    try {
+      await this.json('DELETE', `/api/v1/knowledge-bases/${encodeURIComponent(id)}`);
+    } catch (error) {
+      if (error instanceof WeknoraError && error.status === 404) return;
+      throw error;
+    }
+  }
+
+  /**
+   * The knowledge base the parse converter (weknora-parse.ts) works in, found by name or
+   * created: same embedding model as production (the API insists on one), no summary
+   * model, question generation and auto-tag off, one 4000-character chunk per record so
+   * a parsed document comes back whole. Nothing in it is ever cited: no row of
+   * app.rag_index_entries points at it.
+   */
+  async ensureParseKnowledgeBase(name: string): Promise<string> {
+    const listed = await this.json('GET', '/api/v1/knowledge-bases');
+    const rows = Array.isArray(listed) ? listed : [];
+    for (const row of rows) {
+      const r = asRecord(row);
+      if (str(r.name) === name && str(r.id)) return str(r.id);
+    }
+    const production = asRecord(
+      await this.json(
+        'GET',
+        `/api/v1/knowledge-bases/${encodeURIComponent(this.config.knowledgeBaseId)}`,
+      ),
+    );
+    const embeddingModelId = str(production.embedding_model_id);
+    if (!embeddingModelId)
+      throw new WeknoraError(
+        'Knowledge base produksi tidak memuat embedding_model_id.',
+        502,
+        false,
+      );
+    const created = asRecord(
+      await this.json('POST', '/api/v1/knowledge-bases', {
+        body: {
+          name,
+          description:
+            'Ruang parse sementara IntraDocs: berkas masuk, teks keluar, rekaman dihapus.',
+          type: 'document',
+          embedding_model_id: embeddingModelId,
+          indexing_strategy: {
+            vector_enabled: true,
+            keyword_enabled: true,
+            graph_enabled: false,
+            wiki_enabled: false,
+          },
+          chunking_config: { chunk_size: 4000, chunk_overlap: 0, enable_parent_child: false },
+          question_generation_config: { enabled: false, question_count: 0, model_id: '' },
+          auto_tag_config: { enabled: false, model_id: '', max_tags: 0, skip_if_tagged: true },
+        },
+      }),
+    );
+    const id = str(created.id);
+    if (!id)
+      throw new WeknoraError('WeKnora tidak mengembalikan id knowledge base parse.', 502, false);
+    return id;
+  }
+
+  /** Multipart upload of one file into a knowledge base; returns the record id. */
+  async uploadFileForParse(
+    knowledgeBaseId: string,
+    name: string,
+    bytes: Uint8Array,
+  ): Promise<string> {
+    const form = new FormData();
+    form.append('file', new Blob([Buffer.from(bytes)]), name);
+    let response: Response;
+    try {
+      response = await this.fetchImpl(
+        `${this.config.baseUrl}/api/v1/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/knowledge/file`,
+        {
+          method: 'POST',
+          redirect: 'error',
+          cache: 'no-store',
+          signal: AbortSignal.timeout(this.config.requestTimeoutMs),
+          headers: this.headers(),
+          body: form,
+        },
+      );
+    } catch {
+      throw new WeknoraError('WeKnora tidak dapat dihubungi.', 504, true);
+    }
+    if (!response.ok)
+      throw new WeknoraError(
+        `WeKnora membalas status ${response.status}.`,
+        response.status,
+        response.status >= 500,
+      );
+    const data = asRecord(unwrap(await this.readJson(response)));
+    const id = str(data.id);
+    if (!id) throw new WeknoraError('WeKnora tidak mengembalikan id rekaman.', 502, false);
+    return id;
+  }
+
+  /**
+   * Polls a record until WeKnora is done parsing it, then returns its chunks in order.
+   * A record that ends in a failed state, or with no text, is reported as such.
+   */
+  async waitForParsedChunks(
+    knowledgeId: string,
+    timeoutMs: number,
+    signal?: AbortSignal,
+  ): Promise<Array<{ chunkIndex: number; content: string }>> {
+    const started = Date.now();
+    for (;;) {
+      if (signal?.aborted) throw new WeknoraError('Dibatalkan.', 499, false);
+      const record = asRecord(
+        await this.json('GET', `/api/v1/knowledge/${encodeURIComponent(knowledgeId)}`),
+      );
+      const status = str(record.parse_status);
+      if (status === 'failed') throw new WeknoraError('WeKnora gagal mengurai berkas.', 422, false);
+      if (status && status !== 'pending' && status !== 'processing') break;
+      if (Date.now() - started > timeoutMs)
+        throw new WeknoraError('WeKnora tidak selesai mengurai sebelum batas waktu.', 504, true);
+      await new Promise((r) => setTimeout(r, 750));
+    }
+    const out: Array<{ chunkIndex: number; content: string }> = [];
+    for (let page = 1; page <= 20; page++) {
+      const query = new URLSearchParams({ page: String(page), page_size: '50' });
+      const data = await this.json(
+        'GET',
+        `/api/v1/chunks/${encodeURIComponent(knowledgeId)}?${query}`,
+      );
+      const rows = Array.isArray(data) ? data : [];
+      for (const row of rows) {
+        const r = asRecord(row);
+        if (str(r.chunk_type, 'text') !== 'text') continue;
+        out.push({ chunkIndex: Number(r.chunk_index ?? out.length), content: str(r.content) });
+      }
+      if (rows.length < 50) break;
+    }
     return out;
   }
 
@@ -645,9 +926,17 @@ export class WeknoraClient {
    * pinned off here rather than left to WeKnora defaults, and the knowledge scope is
    * the caller's authorised set — the client never chooses either.
    */
+  /**
+   * `onDelta`, when given, receives each answer fragment as WeKnora streams it -- for a
+   * screen that shows the answer forming. It is a preview only: the returned value is
+   * still the whole stream, buffered, cleaned and bounded exactly as before, and it is
+   * the only thing the caller may store or cite. Fragments are raw model output; pass
+   * them through createKbTagFilter before showing them.
+   */
   async knowledgeChat(
     sessionId: string,
     request: { query: string; knowledgeIds: readonly string[] },
+    onDelta?: (text: string) => void,
   ): Promise<WeknoraAnswer> {
     const response = await this.send(
       'POST',
@@ -657,7 +946,12 @@ export class WeknoraClient {
         accept: 'text/event-stream',
         body: {
           query: request.query,
-          knowledge_base_ids: [this.config.knowledgeBaseId],
+          // ONLY knowledge_ids, never knowledge_base_ids: WeKnora builds its search
+          // targets so that a knowledge base named in full swallows every knowledge_id
+          // inside it ("skip if this KB is already fully searched"), and the answering
+          // model would then read chunks the actor may not see. Measured: with both
+          // fields the confidential canary reached a viewer's answer; with the ids alone
+          // the search target is the explicit file list (WEKNORA.md §23).
           knowledge_ids: [...request.knowledgeIds],
           agent_enabled: false,
           web_search_enabled: false,
@@ -674,8 +968,81 @@ export class WeknoraClient {
         },
       },
     );
-    return parseChatStream(await this.readBounded(response), this.config.maxAnswerChars);
+    const raw = onDelta
+      ? await this.readBounded(response, (block) => {
+          const delta = answerDelta(block);
+          if (delta) onDelta(delta);
+        })
+      : await this.readBounded(response);
+    return parseChatStream(raw, this.config.maxAnswerChars);
   }
+}
+
+/** The `answer` content of one SSE block, or '' for any other frame. */
+export function answerDelta(block: string): string {
+  const payload = block
+    .split(/\r?\n/)
+    .filter((line) => line.startsWith('data:'))
+    .map((line) => line.slice(5).trim())
+    .join('');
+  if (!payload || payload === '[DONE]') return '';
+  try {
+    const frame = asRecord(JSON.parse(payload));
+    return str(frame.response_type) === 'answer' ? str(frame.content) : '';
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Filters a stream of answer fragments so WeKnora's citation markup (`<kb ... />`,
+ * `</kb>`) never reaches a screen half-written. Text is released up to the last '<';
+ * what follows is held until the tag closes (then dropped if it is a kb tag, released
+ * otherwise) or until it is clearly not a tag. `flush()` releases whatever is left.
+ */
+export function createKbTagFilter(): { push(text: string): string; flush(): string } {
+  let held = '';
+  const settle = (): string => {
+    let out = '';
+    for (;;) {
+      const lt = held.indexOf('<');
+      if (lt < 0) {
+        out += held;
+        held = '';
+        return out;
+      }
+      out += held.slice(0, lt);
+      held = held.slice(lt);
+      const gt = held.indexOf('>');
+      if (gt < 0) {
+        // An unfinished tag; a '<' followed by whitespace or a digit is plain text.
+        if (held.length > 1 && !/^<\/?[a-z]/i.test(held)) {
+          out += held[0];
+          held = held.slice(1);
+          continue;
+        }
+        if (held.length > 200) {
+          out += held;
+          held = '';
+        }
+        return out;
+      }
+      const tag = held.slice(0, gt + 1);
+      held = held.slice(gt + 1);
+      if (!/^<\/?kb\b/i.test(tag)) out += tag;
+    }
+  };
+  return {
+    push(text) {
+      held += text;
+      return settle();
+    },
+    flush() {
+      const rest = held.replace(/<\/?kb\b[^>]*>?/gi, '');
+      held = '';
+      return rest;
+    },
+  };
 }
 
 /**
@@ -713,5 +1080,27 @@ export function parseChatStream(raw: string, maxAnswerChars: number): WeknoraAns
         }
       }
   }
-  return { answer: answer.slice(0, maxAnswerChars), references };
+  return { answer: cleanAnswer(answer).slice(0, maxAnswerChars), references };
+}
+
+/**
+ * WeKnora's answering pipeline emits its own citation markup inside the text -- observed
+ * as `<kb doc="[IntraDocs:...] Title" chunk_id="..." kb_id="..." />` at the end of an
+ * answer. IntraDocs builds citations from its own validated retrieval, so the markup is
+ * noise to a reader and a leak of index ids. Any such tag is removed; nothing else in the
+ * answer is interpreted here.
+ */
+export function cleanAnswer(text: string): string {
+  return (
+    text
+      .replace(/<kb\b[^>]*\/?>/gi, '')
+      .replace(/<\/?kb>/gi, '')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+      // The model introduces that markup with a heading ("Referensi:"); with the markup
+      // gone the heading would dangle above IntraDocs' own "Sumber" list.
+      .replace(/\n+\s*[*_#]*\s*(referensi|sumber|references?|sources?)\s*:?\s*[*_]*\s*$/i, '')
+      .trim()
+  );
 }

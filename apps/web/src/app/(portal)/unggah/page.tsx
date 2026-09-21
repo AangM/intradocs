@@ -8,10 +8,11 @@ import { parseUuid } from '@intradocs/core/validation';
 import { UPLOAD_LIMITS } from '@intradocs/core/uploads';
 import { PageHeading } from '@/components/shared';
 import { UploadForm, type RevisionInput } from '@/components/upload-form';
+import { acceptedFormats } from '@/lib/converter';
 export default async function Upload({
   searchParams,
 }: {
-  searchParams: Promise<{ document?: string; base?: string }>;
+  searchParams: Promise<{ document?: string; base?: string; topik?: string }>;
 }) {
   const actor = await requireActor('documents.upload');
   const params = await searchParams;
@@ -38,19 +39,23 @@ export default async function Upload({
       classification: doc.classification,
     };
   }
+  // A knowledge gap handed over from the dashboard: only a title seed, nothing else.
+  const topic = typeof params.topik === 'string' ? params.topik.trim().slice(0, 80) : '';
   const [categories, scanner] = await Promise.all([uploadCategories(actor.id), scannerStatus()]);
   return (
     <div className="pad upload-page">
       <PageHeading
         title={revision ? 'Revisi Dokumen' : 'Unggah Knowledge'}
-        subtitle="Scan → canonical & provenance → draft privat → review → publikasi. AI tetap off."
+        subtitle="Pilih berkas, lengkapi metadata, simpan sebagai draft, lalu ajukan review."
       />
       <UploadForm
         categories={categories}
         ownerName={actor.name}
         maxFileBytes={UPLOAD_LIMITS.binaryBytes}
+        formats={acceptedFormats()}
         initialScanner={scanner}
         revision={revision}
+        initialTitle={topic}
       />
     </div>
   );

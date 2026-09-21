@@ -3,8 +3,9 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { ReviewInfo, VersionSummary } from '@intradocs/db/workflow';
-import { formatDate } from '@intradocs/core';
+import { formatDate, ROLE_LABELS, type Role } from '@intradocs/core';
 import { Icon } from './icon';
+import { toast } from './toast';
 
 type Finding = { rule: string; severity: string; line: number };
 export function WorkflowPanel({
@@ -54,6 +55,7 @@ export function WorkflowPanel({
       const v = await r.json();
       if (!r.ok) throw new Error(v.error ?? 'Perubahan gagal.');
       setMessage(success);
+      toast(success);
       router.refresh();
     } catch (e) {
       setError(
@@ -86,7 +88,18 @@ export function WorkflowPanel({
                   v{v.label} · {v.title}
                 </Link>{' '}
                 <span className="sub">
-                  {v.active ? 'Aktif' : v.reviewState} · {formatDate(v.createdAt)}
+                  {v.active
+                    ? 'Aktif'
+                    : ((
+                        {
+                          approved: 'versi lama',
+                          draft: 'draft',
+                          in_review: 'menunggu review',
+                          changes_requested: 'perlu revisi',
+                          rejected: 'ditolak',
+                        } as Record<string, string>
+                      )[v.reviewState] ?? v.reviewState)}{' '}
+                  · {formatDate(v.createdAt)}
                 </span>
               </li>
             ))}
@@ -95,16 +108,24 @@ export function WorkflowPanel({
         {info.steps.length > 0 && (
           <ol className="review-timeline">
             {info.steps.map((s) => (
-              <li key={s.stage}>
+              <li
+                key={s.stage}
+                className={`tl-step ${s.decision === 'approve' ? 'ok' : s.decision ? 'block' : 'wait'}`}
+              >
                 <strong>
-                  Tahap {s.stage} —{' '}
-                  {s.decision === 'approve'
-                    ? 'Disetujui'
-                    : s.decision === 'reject'
-                      ? 'Ditolak'
-                      : s.decision === 'changes_requested'
-                        ? 'Minta revisi'
-                        : 'Menunggu'}
+                  <span
+                    className={`pill ${s.decision === 'approve' ? 'p-green' : s.decision ? 'p-red' : 'p-amber'}`}
+                  >
+                    {s.decision === 'approve'
+                      ? 'Disetujui'
+                      : s.decision === 'reject'
+                        ? 'Ditolak'
+                        : s.decision === 'changes_requested'
+                          ? 'Minta revisi'
+                          : 'Menunggu'}
+                  </span>
+                  Tahap {s.stage} dari {info.requiredSteps}
+                  {s.reviewerName && <span className="sub">· {s.reviewerName}</span>}
                 </strong>
                 {s.reason && <p>{s.reason}</p>}
                 {s.decidedAt && <span className="sub">{formatDate(s.decidedAt)}</span>}
@@ -112,8 +133,8 @@ export function WorkflowPanel({
             ))}
           </ol>
         )}
-        {info.outbox && (
-          <p className="callout c-info">
+        {info.outbox && info.outbox.state !== 'done' && (
+          <p className={`callout ${info.outbox.state === 'dead' ? 'c-warn' : 'c-info'}`}>
             <span>
               Publikasi:{' '}
               <strong>
@@ -122,18 +143,18 @@ export function WorkflowPanel({
                     {
                       pending: 'Menunggu worker',
                       running: 'Membangun indeks',
-                      done: 'Indeks siap',
                       dead: 'Gagal setelah batas retry',
                       cancelled: 'Dibatalkan; review/versi perlu diperbarui',
                     } as Record<string, string>
                   )[info.outbox.state]
                 }
               </strong>
-              . Percobaan {info.outbox.attempts}/5. Versi lama yang masih sah tetap aktif sampai
-              publikasi baru selesai.
+              {info.outbox.state === 'dead' ? ` (percobaan ${info.outbox.attempts}/5). ` : '. '}
+              Versi lama yang masih sah tetap aktif sampai publikasi baru selesai.
             </span>
           </p>
         )}
+        {/* A finished publication needs no notice: "Published" in the header says it. */}
         {status === 'draft' && owner && latest && (
           <form
             onSubmit={(e) => {
@@ -191,7 +212,7 @@ export function WorkflowPanel({
                         value={c.id}
                         disabled={reviewers.some((id, j) => j !== i && id === c.id)}
                       >
-                        {c.name} · {c.role}
+                        {c.name} · {ROLE_LABELS[c.role as Role] ?? c.role}
                       </option>
                     ))}
                   </select>
@@ -251,8 +272,10 @@ export function WorkflowPanel({
         {info.findings.length > 0 && (
           <div>
             <h3>Temuan keamanan</h3>
-            {info.findings.map((f) => (
-              <div className="finding" key={f.fingerprint}>
+            {info.findings.map((f, i) => (
+              // Two matches of one rule on one line share a fingerprint; the index keeps
+              // the key unique without changing what the fingerprint means.
+              <div className="finding" key={`${f.fingerprint}-${i}`}>
                 <strong>
                   {f.rule} · baris {f.line}
                 </strong>
@@ -349,8 +372,9 @@ export function WorkflowPanel({
           <p className="sub">Menunggu persetujuan tahap sebelumnya.</p>
         )}
         {owner && latest && status !== 'withdrawn' && (
-          <div className="row wrap mt20">
+          <div className="row wrap mt20 owner-actions">
             <Link className="btn" href={`/unggah?document=${documentId}&base=${versionId}`}>
+              <Icon name="edit" size={15} />
               Buat revisi baru
             </Link>
             {info.outbox?.state === 'dead' && (

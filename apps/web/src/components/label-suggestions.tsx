@@ -59,9 +59,8 @@ export function LabelSuggestions({ documentId }: { documentId: string }) {
       </div>
       <div className="card-b">
         <p className="sub tiny">
-          Diusulkan oleh model lokal yang membaca isi dokumen, lalu disaring: hanya label yang sudah
-          ada pada kategori dokumen ini yang ditampilkan. Saran tidak pernah diterapkan otomatis —
-          label versi terbit dibekukan, jadi perubahannya lewat revisi baru.
+          Diusulkan model lokal dari isi dokumen, disaring ke label yang ada di kategori ini. Tidak
+          pernah diterapkan otomatis — perubahan lewat revisi baru.
         </p>
         {!state && (
           <button

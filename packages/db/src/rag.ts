@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { AllowedSource } from '@intradocs/core/rag';
+import type { AllowedSource, RetrievalScope } from '@intradocs/core/rag';
 import { withActor } from './index.ts';
 
 /**
@@ -20,9 +20,15 @@ import { withActor } from './index.ts';
 export async function listAuthorizedSources(
   actorId: string,
   limit: number,
+  scope: RetrievalScope = { type: 'all' },
 ): Promise<AllowedSource[]> {
   if (!Number.isInteger(limit) || limit < 1 || limit > 5000)
     throw new Error('Batas scope tidak valid.');
+  // A narrower scope is an extra WHERE on the same RLS-filtered rows. A category or
+  // document the actor cannot see matches nothing, which is indistinguishable from an
+  // empty category -- the request abstains and learns nothing.
+  const categoryId = scope.type === 'category' ? scope.categoryId : null;
+  const documentIds = scope.type === 'documents' ? scope.documentIds : null;
   return withActor(actorId, async ({ client }) => {
     const { rows } = await client.query<{
       knowledge_id: string;
@@ -40,9 +46,14 @@ export async function listAuthorizedSources(
        JOIN app.document_versions v ON v.id=e.version_id
        JOIN app.documents d ON d.id=e.document_id
        LEFT JOIN app.categories c ON c.id=v.category_id
+       WHERE ($2::uuid IS NULL OR v.category_id IN (
+           WITH RECURSIVE sub AS (SELECT id FROM app.categories WHERE id=$2
+             UNION ALL SELECT c2.id FROM app.categories c2 JOIN sub ON c2.parent_id=sub.id)
+           SELECT id FROM sub))
+         AND ($3::uuid[] IS NULL OR e.document_id=ANY($3))
        ORDER BY e.exported_at DESC,e.version_id
        LIMIT $1`,
-      [limit],
+      [limit, categoryId, documentIds],
     );
     return rows.map((r) => ({
       knowledgeId: r.knowledge_id,
@@ -135,7 +146,12 @@ export async function readAuthorizedMarkdownKeys(
 }
 
 export type RagAuditAction =
-  'rag.retrieval' | 'rag.chat' | 'rag.citation_rejected' | 'rag.abstained';
+  | 'rag.retrieval'
+  | 'rag.chat'
+  | 'rag.citation_rejected'
+  | 'rag.abstained'
+  | 'rag.answer_helpful'
+  | 'rag.answer_unhelpful';
 
 /**
  * Records one RAG action. The question, the answer and any snippet stay out of the audit

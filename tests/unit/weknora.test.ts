@@ -4,7 +4,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readAiConfig } from '../../packages/core/src/ai-config.ts';
-import { WeknoraClient, WeknoraError, parseChatStream } from '../../packages/core/src/weknora.ts';
+import {
+  WeknoraClient,
+  WeknoraError,
+  parseChatStream,
+  cleanAnswer,
+  createKbTagFilter,
+  answerDelta,
+} from '../../packages/core/src/weknora.ts';
 
 const config = readAiConfig({
   AI_PROVIDER: 'weknora-local',
@@ -83,8 +90,12 @@ test('chat pins agent mode, web search and the knowledge scope off the client', 
   const body = JSON.parse(String(calls[0]!.init.body)) as Record<string, unknown>;
   assert.equal(body.agent_enabled, false);
   assert.equal(body.web_search_enabled, false);
-  assert.deepEqual(body.knowledge_base_ids, [config.knowledgeBaseId]);
   assert.deepEqual(body.knowledge_ids, ['k-1']);
+  // Naming the knowledge base as well would turn it into a full-KB search target and
+  // WeKnora would drop the knowledge_ids ("skip if this KB is already fully searched"):
+  // the model would then read chunks the actor may not see. Measured: a confidential
+  // canary reached a viewer's answer that way. Retrieval scope is the id list alone.
+  assert.equal(body.knowledge_base_ids, undefined);
   assert.equal(body.mcp_service_ids, undefined);
   assert.equal(body.skill_names, undefined);
 });
@@ -252,4 +263,56 @@ test('garbage frames are skipped without failing the whole stream', () => {
     '',
   ].join('\n');
   assert.equal(parseChatStream(stream, 4000).answer, 'tetap terbaca');
+});
+
+test("WeKnora's own citation markup never reaches a reader", () => {
+  const raw = [
+    'SLA reset password adalah **30 menit**.  ',
+    '',
+    '<kb doc="[IntraDocs:3000-0001] Panduan" chunk_id="266c" kb_id="ce60" />',
+    '',
+    '',
+    '<kb doc="x"></kb>',
+  ].join('\n');
+  const clean = cleanAnswer(raw);
+  assert.equal(clean, 'SLA reset password adalah **30 menit**.');
+  assert(!/<kb/i.test(clean) && !/chunk_id|kb_id/.test(clean));
+  // The heading the model puts above its markup goes with it; a heading that still
+  // introduces real text stays.
+  assert.equal(
+    cleanAnswer('Cantumkan requirement dan risiko.\n\nReferensi:\n<kb doc="x" />'),
+    'Cantumkan requirement dan risiko.',
+  );
+  assert.equal(
+    cleanAnswer('Lihat bagian Review.\n\n**Sumber:** standar penamaan repository.'),
+    'Lihat bagian Review.\n\n**Sumber:** standar penamaan repository.',
+  );
+});
+
+test('streamed fragments never show a half-written <kb> tag, and keep everything else', () => {
+  const f = createKbTagFilter();
+  // Text before a '<' is released at once; the tag is held until it closes, then dropped.
+  assert.equal(
+    f.push('MFA dibutuhkan. <kb doc="[IntraDocs:x] Konfigurasi VPN"'),
+    'MFA dibutuhkan. ',
+  );
+  assert.equal(f.push(' chunk_id="c1" />'), '');
+  assert.equal(f.push(' Lihat langkah 3.'), ' Lihat langkah 3.');
+  // A closing tag split across fragments is dropped too.
+  assert.equal(f.push('a</k'), 'a');
+  assert.equal(f.push('b>c'), 'c');
+  // A '<' that is not a tag (a comparison, a space after it) is plain text.
+  assert.equal(f.push('x < 5 dan y <'), 'x < 5 dan y ');
+  assert.equal(f.push(' 3'), '< 3');
+  // Other markup passes through; flush releases what is left minus any kb remnant.
+  assert.equal(f.push('<b>tebal</b> <kb'), '<b>tebal</b> ');
+  assert.equal(f.flush(), '');
+});
+
+test('answerDelta reads only answer frames from an SSE block', () => {
+  assert.equal(answerDelta('data: {"response_type":"answer","content":"Hal"}'), 'Hal');
+  assert.equal(answerDelta('data: {"response_type":"references","content":"x"}'), '');
+  assert.equal(answerDelta('data: [DONE]'), '');
+  assert.equal(answerDelta('data: not json'), '');
+  assert.equal(answerDelta('event: ping'), '');
 });

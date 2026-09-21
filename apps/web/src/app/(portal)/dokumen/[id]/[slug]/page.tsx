@@ -16,11 +16,25 @@ import { DocumentAccess } from '@/components/document-access';
 import { documentAccessCandidates } from '@intradocs/db/workflow';
 import { AttachmentsList } from '@/components/attachments-list';
 import { WorkflowPanel } from '@/components/workflow-panel';
-import { ReaderFeedback } from '@/components/reader-feedback';
+import { ReaderFeedback, FavoriteButton } from '@/components/reader-feedback';
 import { LabelSuggestions } from '@/components/label-suggestions';
+import { DocumentInsights } from '@/components/document-insights';
 import { RequiredReadingMark } from '@/components/required-reading-mark';
+import { ReaffirmButton } from '@/components/reaffirm-button';
 import { reviewInfo, versionSummaries, readerPreferences } from '@intradocs/db/workflow';
 import { findSensitiveContent } from '@intradocs/core/workflow';
+/** Older versions in the side panel, in a reader's words rather than the state enum. */
+const VERSION_STATE: Record<string, string> = {
+  approved: 'versi lama',
+  draft: 'draft',
+  in_review: 'menunggu review',
+  changes_requested: 'perlu revisi',
+  rejected: 'ditolak',
+};
+/** The request's clock, taken once so the render itself stays pure. */
+async function currentTime(): Promise<number> {
+  return Date.now();
+}
 export default async function Reader({
   params,
   searchParams,
@@ -72,6 +86,28 @@ export default async function Reader({
       : null;
   const toc = getOutline(markdown);
   const expired = doc.expired;
+  // ~200 words a minute; shown as an estimate, never as a fact about the reader.
+  const readingMinutes = Math.max(
+    1,
+    Math.round(markdown.split(/\s+/).filter(Boolean).length / 200),
+  );
+  const reviewerStep = info?.steps.find((s) => s.reviewerId === actor.id && !s.decision);
+  const ownerDraft =
+    actor.id === doc.ownerId && doc.status === 'draft' && versions[0]?.id === doc.versionId;
+  // The owner's reaffirmation applies to the current published version whose review is
+  // within 30 days or past (the database enforces the same window); an expired version
+  // is past reaffirming and gets the expiry notice instead.
+  // "Now" is read once per request, outside render, like the data it is compared to.
+  const now = await currentTime();
+  const reviewDue =
+    actor.id === doc.ownerId &&
+    doc.status === 'published' &&
+    !expired &&
+    doc.reviewAt !== null &&
+    Date.parse(doc.reviewAt) <= now + 30 * 86_400_000;
+  // The workflow panel is open when this actor has something to do on this version;
+  // otherwise it lives under the collapsed owner/reviewer tools below the article.
+  const workflowOpen = Boolean(reviewerStep || ownerDraft);
   if (
     !(await withActor(
       actor.id,
@@ -107,9 +143,9 @@ export default async function Reader({
           </a>
         ))}
         <div className="local-note">
-          Sumber: {source ? source.name : 'Markdown seed'}
+          Berkas asli: {source ? source.name : 'contoh bawaan'}
           <br />
-          <span>File dan checksum versi disimpan immutable.</span>
+          <span>Setiap versi tersimpan apa adanya dan tidak bisa diubah.</span>
         </div>
       </aside>
       <div className="doc-main">
@@ -137,25 +173,40 @@ export default async function Reader({
               {doc.approvedBy && (
                 <span className="pill p-green">
                   <Icon name="check-c" size={13} />
-                  {source ? 'Disetujui' : 'Approval fixture'}: {doc.approvedBy}
+                  Disetujui: {doc.approvedBy}
                 </span>
               )}
+              <span className="sub tiny doc-meta-right">
+                <Icon name="clock" size={13} /> ±{readingMinutes} menit baca
+              </span>
             </div>
             <div className="reader-actions">
               <a className="btn btn-sm" href={`/api/files/${doc.versionId}/markdown`}>
                 <Icon name="download" size={15} />
                 Unduh Markdown
               </a>
-              <Link className="btn btn-sm" href="/ai-assistant">
+              <Link className="btn btn-sm" href={`/ai-assistant?doc=${id}`}>
                 <Icon name="spark" size={15} />
-                Status AI Assistant
+                Tanya AI tentang dokumen ini
               </Link>
-              {doc.labels.map((t) => (
-                <span className="tag" key={t}>
-                  {t}
-                </span>
-              ))}
+              {doc.status === 'published' && !expired && (
+                <FavoriteButton documentId={id} initialFavorite={preferences.favorite} />
+              )}
+              <span className="reader-labels">
+                {doc.labels.map((t) => (
+                  <Link className="tag" key={t} href={`/katalog?label=${encodeURIComponent(t)}`}>
+                    {t}
+                  </Link>
+                ))}
+              </span>
             </div>
+            {reviewDue && doc.reviewAt && (
+              <ReaffirmButton
+                versionId={doc.versionId}
+                reviewAt={formatDate(doc.reviewAt)}
+                overdue={Date.parse(doc.reviewAt) <= now}
+              />
+            )}
             {doc.status === 'withdrawn' ? (
               <Notice kind="warn">
                 <strong>Publikasi dicabut.</strong> Akses histori ini hanya untuk pemilik atau
@@ -171,17 +222,7 @@ export default async function Reader({
                 <strong>Belum dipublikasikan.</strong> Hanya pemilik atau reviewer yang ditugaskan
                 dan memiliki scope yang dapat membukanya.
               </Notice>
-            ) : (
-              <Notice>
-                Dokumen sintetis untuk menguji reader dan hak akses.{' '}
-                {doc.reviewAt && (
-                  <>
-                    Tanggal review contoh: <strong>{formatDate(doc.reviewAt)}</strong>. Pengingat
-                    dalam aplikasi dimulai H−14.
-                  </>
-                )}
-              </Notice>
-            )}
+            ) : null}
             <details className="reader-outline-mobile">
               <summary>Di halaman ini</summary>
               {toc.map((t) => (
@@ -219,7 +260,7 @@ export default async function Reader({
 
             <section className="related-documents">
               <h2 className="h3">Dokumen terkait</h2>
-              <p className="hint">Publikasi aktif dalam kategori yang sama, sesuai akses Anda.</p>
+              <p className="hint">Dokumen lain di kategori ini yang boleh Anda baca.</p>
               {related.length ? (
                 <ul>
                   {related.map((d) => (
@@ -233,27 +274,15 @@ export default async function Reader({
                 <p className="sub">Belum ada dokumen terkait yang dapat ditampilkan.</p>
               )}
             </section>
+            {/* Generated questions for every reader; the draft summary only for those who
+                could revise. The route enforces the same split server-side. */}
             {doc.status === 'published' && !expired && (
-              <ReaderFeedback
-                documentId={id}
-                versionId={doc.versionId}
-                initialFavorite={preferences.favorite}
-                initialFeedback={preferences.feedback}
-              />
+              <DocumentInsights documentId={id} editor={hasCapability(actor, 'documents.upload')} />
             )}
-            {/* Only people who could act on a suggestion are offered one: taking it up
-                means creating a revision, which needs documents.upload. */}
-            {hasCapability(actor, 'documents.upload') && <LabelSuggestions documentId={id} />}
-            {/* Only a taxonomy admin may require reading, and only of a published version:
-                the insert policy checks role, scope and readability again in SQL. */}
-            {hasCapability(actor, 'taxonomy.view') && doc.status === 'published' && (
-              <RequiredReadingMark
-                documentId={id}
-                categoryId={doc.categoryId}
-                categoryName={doc.categoryName}
-              />
+            {doc.status === 'published' && !expired && (
+              <ReaderFeedback versionId={doc.versionId} initialFeedback={preferences.feedback} />
             )}
-            {info && (
+            {info && workflowOpen && (
               <WorkflowPanel
                 key={doc.versionId + info.state}
                 documentId={id}
@@ -268,6 +297,46 @@ export default async function Reader({
                 slug={doc.slug}
               />
             )}
+            {/* Owner, reviewer and taxonomy tools, folded away for readers who only came
+                to read: label suggestions need documents.upload (taking one up is a
+                revision), required reading needs taxonomy.view, and the version panel is
+                the same one shown open above when there is something to decide. */}
+            {(hasCapability(actor, 'documents.upload') ||
+              hasCapability(actor, 'taxonomy.view') ||
+              (info && !workflowOpen)) && (
+              <details className="editor-tools">
+                <summary>
+                  <Icon name="settings" size={15} />
+                  Alat pemilik, reviewer & taksonomi
+                  <span className="sub tiny">versi, persetujuan, saran label, bacaan wajib</span>
+                </summary>
+                <div className="editor-tools-body">
+                  {hasCapability(actor, 'documents.upload') && <LabelSuggestions documentId={id} />}
+                  {hasCapability(actor, 'taxonomy.view') && doc.status === 'published' && (
+                    <RequiredReadingMark
+                      documentId={id}
+                      categoryId={doc.categoryId}
+                      categoryName={doc.categoryName}
+                    />
+                  )}
+                  {info && !workflowOpen && (
+                    <WorkflowPanel
+                      key={doc.versionId + info.state}
+                      documentId={id}
+                      versionId={doc.versionId}
+                      actorId={actor.id}
+                      owner={actor.id === doc.ownerId}
+                      latest={versions[0]?.id === doc.versionId}
+                      status={doc.status}
+                      info={info}
+                      versions={versions}
+                      preflight={source ? findSensitiveContent(markdown) : []}
+                      slug={doc.slug}
+                    />
+                  )}
+                </div>
+              </details>
+            )}
           </article>
           <aside className="toc" aria-label="Daftar isi">
             <div className="toc-t">Di halaman ini</div>
@@ -277,28 +346,41 @@ export default async function Reader({
               </a>
             ))}
             <div className="versions-box">
-              <div className="toc-t">Versi saat ini</div>
-              <span className="pill p-blue">v{doc.versionLabel}</span>
-              <p className="sub tiny mt20">
-                {doc.approvedAt
-                  ? `Disetujui ${formatDate(doc.approvedAt)}`
-                  : 'Draft belum disetujui'}
+              <div className="toc-t">Riwayat versi</div>
+              <ul className="version-list">
+                {versions.slice(0, 4).map((v) => (
+                  <li key={v.id}>
+                    <Link
+                      prefetch={false}
+                      href={`/dokumen/${doc.id}/${doc.slug}?version=${v.id}`}
+                      className={`pill ${v.id === doc.versionId ? 'p-blue' : 'p-grey'}`}
+                      aria-current={v.id === doc.versionId ? 'true' : undefined}
+                    >
+                      v{v.label}
+                    </Link>
+                    <span className="sub tiny">
+                      {v.active
+                        ? formatDate(v.createdAt)
+                        : (VERSION_STATE[v.reviewState] ?? v.reviewState)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              {versions.length > 4 && (
+                <p className="sub tiny">+{versions.length - 4} versi lebih lama di panel versi.</p>
+              )}
+              <p className="sub tiny">
+                {doc.approvedAt ? `Disetujui ${formatDate(doc.approvedAt)}.` : 'Belum disetujui.'}
+                {doc.reviewAt ? ` Ditinjau ulang ${formatDate(doc.reviewAt)}.` : ''}
               </p>
-              <a className="btn btn-sm full-width mt20" href="#main-content">
-                Kembali ke awal
-              </a>
               {versions.length > 1 && (
                 <Link
-                  className="btn btn-sm full-width mt20"
+                  className="btn btn-sm full-width"
                   href={`/dokumen/${doc.id}/${doc.slug}/versi`}
                 >
                   Bandingkan versi
                 </Link>
               )}
-              <p className="sub tiny">
-                Pilih versi immutable pada panel Versi & Persetujuan di bawah dokumen.
-                Diff/rollback: V1.
-              </p>
             </div>
           </aside>
         </div>

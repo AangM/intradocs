@@ -8,6 +8,8 @@ export default defineConfig([
   globalIgnores([
     '**/.next/**',
     '**/node_modules/**',
+    // Generated bundles: apps/worker/dist is esbuild output shipped into the image.
+    '**/dist/**',
     'reference/**',
     'var/**',
     'artifacts/**',

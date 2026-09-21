@@ -58,7 +58,7 @@ class Handler(BaseHTTPRequestHandler):
         kind = self.headers.get('X-Source-Format', '')
         checksum = self.headers.get('X-Source-Sha256', '')
         if (len(raw_length) != 1 or not re.fullmatch(r'[0-9]{1,10}', raw_length[0]) or self.headers.get('Transfer-Encoding')
-            or not 0 < int(raw_length[0]) <= LIMIT or kind not in ('PDF', 'DOCX', 'XLSX')
+            or not 0 < int(raw_length[0]) <= LIMIT or kind not in ('PDF', 'DOCX', 'XLSX', 'HTML')
             or not re.fullmatch(r'[a-f0-9]{64}', checksum)
             or self.headers.get('Content-Type') != 'application/octet-stream'):
             self.send_json(400, {'code': 'invalid_file'})
