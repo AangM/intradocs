@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { Pool } from 'pg';
 import { PgBoss } from 'pg-boss';
 import { readRetentionWindows, readWorkerConfig } from '@intradocs/core/config';
-import { LocalBlobStore } from '@intradocs/core/storage';
+import { createBlobStore } from '@intradocs/core/storage';
 import { processPublication } from '@intradocs/core/workflow';
 import { readAiConfig } from '@intradocs/core/ai-config';
 import { WeknoraClient } from '@intradocs/core/weknora';
@@ -16,14 +16,12 @@ import { PostgresRagExportRepository, WeknoraIndexTarget } from './rag-export.ts
 const sha256Hex = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
 
 async function start() {
-  const { databaseUrl: connectionString } = readWorkerConfig(process.env);
+  const { databaseUrl: connectionString, storage: storageConfig } = readWorkerConfig(process.env);
   const root = process.env.INTRADOCS_ROOT;
-  const relative = process.env.STORAGE_ROOT ?? 'var/storage';
-  if (!root || !/^var\/[A-Za-z0-9_/-]+$/.test(relative) || relative.includes('..'))
-    throw new Error('Worker requires a private local storage directory.');
+  if (!root) throw new Error('Worker requires INTRADOCS_ROOT.');
   const pool = new Pool({ connectionString, max: 3, connectionTimeoutMillis: 5000 });
   const boss = new PgBoss({ connectionString, schema: 'jobs', createSchema: false });
-  const storage = new LocalBlobStore(path.resolve(root, relative));
+  const storage = createBlobStore(storageConfig, root);
   const repository = new PostgresPublicationRepository(pool);
   // AI stays off unless explicitly configured; with it off no exporter, client or
   // outbound request exists at all, and publication keeps working unchanged.

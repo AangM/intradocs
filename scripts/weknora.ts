@@ -15,7 +15,7 @@ import { ROOT, loadLocalEnv, localAdminUrl, command, reportFailure } from './sha
 import { readAiConfig, assertLoopbackHttpOrigin } from '../packages/core/src/ai-config.ts';
 import { readWorkerConfig } from '../packages/core/src/config.ts';
 import { WeknoraClient } from '../packages/core/src/weknora.ts';
-import { LocalBlobStore } from '../packages/core/src/storage.ts';
+import { createBlobStore } from '../packages/core/src/storage.ts';
 import { processRagExport, sweepRagOrphans, buildExportPayload } from '../packages/core/src/rag.ts';
 import { ABSTAIN_MESSAGE, MODEL_DECLINE_SENTENCE } from '../packages/core/src/rag-messages.ts';
 import { PostgresRagExportRepository, WeknoraIndexTarget } from '../apps/worker/src/rag-export.ts';
@@ -467,9 +467,7 @@ async function sync(): Promise<void> {
     if (!ai.weknora)
       throw new Error('AI_PROVIDER masih off. Aktifkan weknora-local sebelum mengindeks.');
     const root = process.env.INTRADOCS_ROOT ?? ROOT;
-    const storage = new LocalBlobStore(
-      path.resolve(root, process.env.STORAGE_ROOT ?? 'var/storage'),
-    );
+    const storage = createBlobStore(readWorkerConfig(process.env).storage, root);
     const repository = new PostgresRagExportRepository(pool);
     const index = new WeknoraIndexTarget(new WeknoraClient(ai.weknora));
     // The same two steps the worker runs on its timer, so a manual sync and the
@@ -1307,8 +1305,9 @@ async function lab(): Promise<void> {
   for (const name of labelNames)
     if (!have.some((t) => t.name === name)) await labClient.createTag(name);
 
-  const storage = new LocalBlobStore(
-    path.resolve(process.env.INTRADOCS_ROOT ?? ROOT, process.env.STORAGE_ROOT ?? 'var/storage'),
+  const storage = createBlobStore(
+    readWorkerConfig(process.env).storage,
+    process.env.INTRADOCS_ROOT ?? ROOT,
   );
   const present = new Set((await labClient.listKnowledge()).map((k) => k.title));
   const created: string[] = [];

@@ -5,7 +5,8 @@ import path from 'node:path';
 import { Pool } from 'pg';
 import { hashPassword } from 'better-auth/crypto';
 import { ROOT, localAdminUrl, isMain, reportFailure } from './shared.ts';
-import { LocalBlobStore } from '../packages/core/src/storage.ts';
+import { createBlobStore } from '../packages/core/src/storage.ts';
+import { readRuntimeConfig } from '../packages/core/src/config.ts';
 import { users, categories, documents, IDS, docId, versionId } from '../fixtures/data.ts';
 export type DemoAccount = {
   id: string;
@@ -53,7 +54,7 @@ export async function seed(): Promise<void> {
       )
     )
       throw new Error('File akun lokal tidak lengkap.');
-    const store = new LocalBlobStore(path.resolve(ROOT, process.env.STORAGE_ROOT ?? 'var/storage'));
+    const store = createBlobStore(readRuntimeConfig(process.env).storage, ROOT);
     await c.query('BEGIN');
     try {
       for (const u of users) {

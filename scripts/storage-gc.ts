@@ -39,7 +39,11 @@ async function main() {
     connectionTimeoutMillis: 5000,
   });
   const config = readRuntimeConfig(process.env);
-  const storage = await privateDirectory(config.storageRoot);
+  if (config.storage.driver !== 'filesystem')
+    throw new Error(
+      'storage:gc hanya untuk STORAGE_DRIVER=filesystem; pada S3 gunakan lifecycle rule bucket untuk objek yang tidak dirujuk.',
+    );
+  const storage = await privateDirectory(config.storage.root);
   const client = await pool.connect();
   const locks: Array<[number, number]> = [];
   let journal: Awaited<ReturnType<typeof open>> | undefined;
