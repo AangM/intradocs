@@ -66,3 +66,33 @@ class ConversionTests(unittest.TestCase):
   with self.assertRaises(converter.ConversionError):converter.convert(b'not html at all','HTML')
   with self.assertRaises(converter.ConversionError):converter.convert(b'<html><body><script>x</script></body></html>','HTML')
 if __name__=='__main__':unittest.main()
+
+
+@unittest.skipUnless(converter.ocr_available(), 'tesseract/pdftoppm not installed (runs inside the converter image)')
+class OcrTests(unittest.TestCase):
+ def read(self,name):return (ROOT/'fixtures/uploads'/name).read_bytes()
+ def test_scanned_pdf_is_read_page_by_page_and_marked(self):
+  r=converter.convert(self.read('scanned-ocr-demo.pdf'),'PDF')
+  md=r['markdown']
+  self.assertIn('## Halaman 1 (OCR)',md);self.assertIn('## Halaman 2 (OCR)',md)
+  for word in ['Serah Terima','nomor aset','formulir','Pengembalian','5 hari kerja']:self.assertIn(word,md)
+  self.assertEqual([m['kind'] for m in r['mappings']],['page-ocr','page-ocr'])
+  self.assertTrue(any('OCR' in w and '1, 2' in w for w in r['warnings']))
+ def test_mixed_pdf_keeps_the_text_page_and_ocrs_only_the_scan(self):
+  r=converter.convert(self.read('mixed-scan-demo.pdf'),'PDF')
+  self.assertEqual([m['kind'] for m in r['mappings']],['page','page-ocr'])
+  self.assertIn('## Halaman 1\n',r['markdown']);self.assertIn('## Halaman 2 (OCR)',r['markdown'])
+  self.assertTrue(any('Halaman 2 dibaca dengan OCR' in w for w in r['warnings']))
+ def test_ocr_is_deterministic(self):
+  self.assertEqual(converter.convert(self.read('scanned-ocr-demo.pdf'),'PDF'),converter.convert(self.read('scanned-ocr-demo.pdf'),'PDF'))
+ def test_a_page_with_nothing_on_it_is_still_refused(self):
+  with self.assertRaises(converter.ConversionError) as e:converter.convert(self.read('scanned-empty-demo.pdf'),'PDF')
+  self.assertEqual(e.exception.code,'empty_text')
+ def test_more_scanned_pages_than_the_limit_is_refused(self):
+  from pypdf import PdfReader,PdfWriter
+  src=PdfReader(io.BytesIO(self.read('scanned-ocr-demo.pdf')));w=PdfWriter()
+  for _ in range(converter.MAX_OCR_PAGES//2+1):
+   for p in src.pages:w.add_page(p)
+  buf=io.BytesIO();w.write(buf)
+  with self.assertRaises(converter.ConversionError) as e:converter.convert(buf.getvalue(),'PDF')
+  self.assertEqual(e.exception.code,'ocr_limit')

@@ -10,7 +10,9 @@ import {
 export interface DocumentConverter {
   convert(file: UploadFile, signal?: AbortSignal): Promise<ConvertedText>;
 }
-export const LOCAL_CONVERTER = { maxResponseBytes: 5 * 1024 * 1024, timeoutMs: 35000 } as const;
+// A scanned PDF is OCR'd page by page (at most 10) inside the converter's own 150 s parse
+// budget; the client waits a little longer so the converter, not the client, decides.
+export const LOCAL_CONVERTER = { maxResponseBytes: 5 * 1024 * 1024, timeoutMs: 160000 } as const;
 export function converterOptions(env: Record<string, string | undefined>) {
   const raw = env.KNOWLEDGE_PORT ?? '8091';
   if (!/^\d{1,5}$/.test(raw) || Number(raw) < 1024 || Number(raw) > 65535)
@@ -85,7 +87,10 @@ export class LocalDocumentConverter implements DocumentConverter {
       const messages: Record<string, string> = {
         encrypted: 'Berkas terenkripsi tidak didukung.',
         unsafe_archive: 'Office berisi arsip/relasi yang tidak aman.',
-        empty_text: 'Tidak ditemukan teks. PDF pindai/OCR belum didukung.',
+        empty_text:
+          'Tidak ditemukan teks yang dapat dibaca (juga lewat OCR). Unggah versi berteks atau pindaian yang lebih jelas.',
+        ocr_limit:
+          'PDF pindai lebih dari 10 halaman tanpa teks. Pecah berkas atau unggah versi berteks.',
         complexity: 'Berkas melewati batas kompleksitas konversi.',
         invalid_file: 'Berkas rusak atau tidak sesuai format.',
         active_content: 'Berkas memiliki konten aktif/macro/lampiran yang tidak didukung.',
@@ -133,7 +138,7 @@ export function validateConversionResponse(value: unknown, file: UploadFile): Co
     if (!entry || typeof entry !== 'object') throw bad();
     const m = entry as Record<string, unknown>;
     if (
-      !['page', 'paragraph', 'table', 'sheet'].includes(String(m.kind)) ||
+      !['page', 'page-ocr', 'paragraph', 'table', 'sheet'].includes(String(m.kind)) ||
       typeof m.locator !== 'string' ||
       m.locator.length > 200 ||
       !Number.isInteger(m.markdownStart) ||
