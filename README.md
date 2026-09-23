@@ -87,7 +87,7 @@ pnpm ops:bootstrap-admin --email anda@org.example --name "Nama" --unit "Divisi I
 ```
 
 Runbook lengkap — persiapan, tiap rilis, alarm, rollback, kapasitas terukur, dan daftar
-hal yang masih menjadi keputusan organisasi (SSO, TLS, kebijakan data, OCR) — ada di
+hal yang masih menjadi keputusan organisasi (SSO, TLS, kebijakan data) — ada di
 [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ## Operasi lokal (Q6, sebagian)
@@ -122,6 +122,14 @@ SSO tidak pernah membuat akun. Untuk mencobanya di laptop: `pnpm idp:mock` (IdP 
 `OIDC_ISSUER=http://localhost:3099`, `OIDC_CLIENT_ID=intradocs-local`,
 `OIDC_CLIENT_SECRET=mock-idp-secret-not-for-deployments`. Detail deployment di
 [docs/DEPLOY.md](docs/DEPLOY.md) §2a.
+
+## OCR untuk PDF pindai
+
+Halaman PDF tanpa teks yang berisi gambar dibaca oleh Tesseract (ind+eng) di dalam container
+converter — lokal, tanpa layanan eksternal, maks. 10 halaman per berkas. Halaman OCR ditandai
+`(OCR)` dan konversi memberi peringatan agar dicocokkan dengan original sebelum diajukan.
+Setelah menarik perubahan ini: `docker compose --env-file .env.local --profile knowledge up -d --build converter`.
+Rincian di [docs/DEPLOY.md](docs/DEPLOY.md) §2f.
 
 ## Storage objek (S3)
 

@@ -8,6 +8,7 @@ import hmac
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -28,6 +29,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def setup(self):
         super().setup()
+        # Reading the body is bounded by this; a PDF that needs OCR may take longer to
+        # answer, which the parse timeout below bounds instead.
         self.connection.settimeout(20)
 
     def send_json(self, status, value):
@@ -48,7 +51,10 @@ class Handler(BaseHTTPRequestHandler):
         if self.path != '/health' or not self.authorized():
             self.send_json(404, {'code': 'unavailable'})
             return
-        self.send_json(200, {'status': 'ok', 'pipeline': 'canonical-v2', 'formats': ['PDF', 'DOCX', 'XLSX']})
+        # Same test convert.py applies (python -I keeps this script's folder off sys.path).
+        ocr = bool(shutil.which('tesseract') and shutil.which('pdftoppm'))
+        self.send_json(200, {'status': 'ok', 'pipeline': 'canonical-v2', 'formats': ['PDF', 'DOCX', 'XLSX', 'HTML'],
+                             'ocr': ocr})
 
     def do_POST(self):
         if self.path != '/convert' or not self.authorized():
@@ -87,7 +93,7 @@ class Handler(BaseHTTPRequestHandler):
                     result = subprocess.run([sys.executable, '-I', str(ROOT / 'convert.py'), kind, str(source)],
                         cwd=directory, env={'LANG': 'C.UTF-8', 'PATH': os.defpath,
                             'OPENBLAS_NUM_THREADS': '1', 'OMP_NUM_THREADS': '1'}, stdout=stream,
-                        stderr=subprocess.DEVNULL, timeout=25, check=False)
+                        stderr=subprocess.DEVNULL, timeout=150 if kind == 'PDF' else 25, check=False)
                 if output.stat().st_size > 5 * 1024 * 1024:
                     status, response = 422, {'code': 'complexity'}
                 else:

@@ -157,6 +157,23 @@ volume; itulah prasyarat menjalankan lebih dari satu replika. Variabel: `S3_ENDP
   `STORAGE_ROOT` ke `s3://bucket/prefix/` dengan struktur yang sama (`aws s3 sync` /
   `mc mirror`), lalu ganti driver. Kunci di database tidak berubah.
 
+### 2f. OCR untuk PDF pindai
+
+Converter (`apps/knowledge-runtime`) kini memuat **Tesseract 5 (ind+eng) dan pdftoppm** —
+biner lokal di container yang sudah tanpa egress, +146 MB image, bukan docreader WeKnora
+±4 GB. Aturannya:
+
+- Hanya halaman PDF **tanpa lapisan teks yang memuat gambar** yang di-OCR; halaman berteks
+  tetap memakai teksnya. Halaman kosong/tanpa gambar tetap ditolak (`empty_text`).
+- Setiap halaman OCR ditandai `## Halaman N (OCR)` di Markdown dan `page-ocr` di mapping,
+  dan konversi membawa peringatan yang menyebut halaman mana yang harus dicocokkan dengan
+  original — reviewer melihatnya sebelum menyetujui.
+- Batas: 10 halaman OCR per berkas (lebih → `ocr_limit`), 30 dtk per halaman, 150 dtk per
+  konversi, teks < 20 karakter dianggap tidak terbaca. ClamAV tetap berjalan lebih dulu.
+- Terukur di laptop rujukan: 2 halaman A4 pindai ≈ 14 dtk end-to-end, converter < 250 MB.
+- Image tanpa Tesseract = perilaku lama (pindaian ditolak); `/health` converter melaporkan
+  `ocr: true|false`.
+
 ---
 
 ## 3. Setiap rilis
@@ -240,15 +257,15 @@ terpisah (satu generasi pada satu waktu di mesin rujukan).
 
 Tidak satu pun bisa diselesaikan dari repositori ini, dan tidak satu pun disembunyikan:
 
-| Hal                            | Kenapa bukan pekerjaan kode                                                                                                                                                                                                                 |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Pendaftaran klien OIDC**     | Kodenya ada (§2a): `AUTH_MODE=oidc` menambahkan tombol SSO yang mengautentikasi akun yang sudah diundang. Yang harus diberikan organisasi: issuer, client id/secret, dan persetujuan security. Sinkronisasi direktori (SCIM) **tidak** ada. |
-| **Sertifikat TLS & DNS**       | Dimiliki tim infrastruktur; aplikasi mensyaratkan https tetapi tidak memegang sertifikat.                                                                                                                                                   |
-| **Kebijakan data**             | Klasifikasi, kadens review per kategori, dua jendela retensi (§2c), dan siapa yang boleh menyetujui apa adalah keputusan pemilik dokumen; default 30 hari hanya titik awal. Penghapusan fisik arsip tidak diotomatiskan.                    |
-| **Review security & ops**      | Tinjauan pihak ketiga atas RLS, header, dan runbook ini.                                                                                                                                                                                    |
-| **UAT pemilik domain**         | Q4: mutu jawaban AI pada korpus **nyata**, bukan sintetis.                                                                                                                                                                                  |
-| **OCR (PDF pindai, DOC lama)** | Butuh layanan `docreader` WeKnora ±4 GB; jalurnya sama dengan PPTX (WEKNORA.md §27), yang kurang hanya memori di host. Sampai itu ada, unggahan PDF pindai ditolak dengan pesan jelas — bukan diterima diam-diam lalu kosong.               |
-| **Backup off-site**            | `ops:backup` menulis ke disk lokal. Menyalinnya ke luar mesin adalah kebijakan penyimpanan organisasi.                                                                                                                                      |
+| Hal                        | Kenapa bukan pekerjaan kode                                                                                                                                                                                                                 |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Pendaftaran klien OIDC** | Kodenya ada (§2a): `AUTH_MODE=oidc` menambahkan tombol SSO yang mengautentikasi akun yang sudah diundang. Yang harus diberikan organisasi: issuer, client id/secret, dan persetujuan security. Sinkronisasi direktori (SCIM) **tidak** ada. |
+| **Sertifikat TLS & DNS**   | Dimiliki tim infrastruktur; aplikasi mensyaratkan https tetapi tidak memegang sertifikat.                                                                                                                                                   |
+| **Kebijakan data**         | Klasifikasi, kadens review per kategori, dua jendela retensi (§2c), dan siapa yang boleh menyetujui apa adalah keputusan pemilik dokumen; default 30 hari hanya titik awal. Penghapusan fisik arsip tidak diotomatiskan.                    |
+| **Review security & ops**  | Tinjauan pihak ketiga atas RLS, header, dan runbook ini.                                                                                                                                                                                    |
+| **UAT pemilik domain**     | Q4: mutu jawaban AI pada korpus **nyata**, bukan sintetis.                                                                                                                                                                                  |
+| **DOC lama, ZIP**          | Belum didukung. PDF pindai **sudah** (OCR Tesseract lokal di converter, §2f); DOC biner lama dan arsip ZIP butuh parser tambahan dan tetap ditolak dengan pesan jelas.                                                                      |
+| **Backup off-site**        | `ops:backup` menulis ke disk lokal. Menyalinnya ke luar mesin adalah kebijakan penyimpanan organisasi.                                                                                                                                      |
 
-Pilot boleh dimulai tanpa SSO dan tanpa OCR; keduanya tercatat sebagai batasan yang
-diketahui, bukan kejutan.
+Pilot boleh dimulai tanpa SSO; DOC lama dan ZIP tercatat sebagai batasan yang diketahui,
+bukan kejutan.

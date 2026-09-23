@@ -401,8 +401,8 @@ export function UploadForm({
               <span className="sub tiny">Opsional, maksimal 4 berkas pendukung</span>
             </div>
             <p className="hint">
-              Berkas dengan teks yang bisa dibaca saja: PDF hasil pindai (gambar), makro, ZIP, dan
-              berkas terenkripsi ditolak. Tidak ada OCR.
+              PDF hasil pindai dibaca dengan OCR lokal (maks. 10 halaman) dan ditandai untuk dicek
+              ulang; makro, ZIP, dan berkas terenkripsi ditolak.
             </p>
             <div className="upload-actions">
               <button className="btn btn-p" disabled={!file} onClick={() => setStep(2)}>

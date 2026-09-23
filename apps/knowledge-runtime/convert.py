@@ -1,9 +1,20 @@
-"""Deterministic text-first conversion. No URL fetches, OCR, macros or formula evaluation."""
+"""Deterministic text-first conversion. No URL fetches, macros or formula evaluation.
+
+OCR is the one exception to "text first", and only for PDF pages that have an image but
+no text layer: the page is rasterised by pdftoppm and read by Tesseract (ind+eng), both
+local binaries in this container, never a service. A page that has text keeps its text;
+an OCR'd page is marked as such in the Markdown and in the mapping, and the conversion
+carries a warning that says which pages to proof-read against the original. Tesseract
+absent from the image means the old behaviour: a scanned page is refused, not emptied.
+"""
 from __future__ import annotations
 import hashlib
 import io
 import json
 import re
+import shutil
+import subprocess
+import tempfile
 from html.parser import HTMLParser
 import sys
 import zipfile
@@ -12,6 +23,44 @@ from defusedxml import ElementTree as ET
 
 MAX_SOURCE = 50 * 1024 * 1024
 MAX_MARKDOWN = 2 * 1024 * 1024
+# OCR is slow and heavy on one CPU: a bound on pages, a bound per page, and text that is
+# too thin to be a page (a stamp, a logo) is still refused rather than published.
+MAX_OCR_PAGES = 10
+OCR_PAGE_SECONDS = 30
+OCR_MIN_CHARS = 20
+OCR_LANGS = 'ind+eng'
+
+def ocr_available():
+    return bool(shutil.which('tesseract') and shutil.which('pdftoppm'))
+
+def ocr_page(source, number):
+    """One page -> text, or None when there is nothing readable on it."""
+    with tempfile.TemporaryDirectory(prefix='ocr-') as work:
+        pdf_path = work + '/in.pdf'
+        with open(pdf_path, 'wb') as stream:
+            stream.write(source)
+        # 200 dpi greyscale: enough for body text, a few MB per A4 page.
+        subprocess.run(['pdftoppm', '-f', str(number), '-l', str(number), '-r', '200', '-gray',
+                        '-png', '-singlefile', pdf_path, work + '/page'],
+                       check=True, timeout=OCR_PAGE_SECONDS, stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL, env={'PATH': '/usr/bin:/bin', 'LANG': 'C.UTF-8'})
+        done = subprocess.run(['tesseract', work + '/page.png', 'stdout', '-l', OCR_LANGS, '--psm', '3'],
+                              check=True, timeout=OCR_PAGE_SECONDS, capture_output=True,
+                              env={'PATH': '/usr/bin:/bin', 'LANG': 'C.UTF-8', 'OMP_THREAD_LIMIT': '1'})
+    text = done.stdout.decode('utf-8', 'replace').replace('\x0c', '').strip()
+    return text if len(re.sub(r'\s+', '', text)) >= OCR_MIN_CHARS else None
+
+def page_has_image(page):
+    resources = page.get('/Resources', {})
+    if hasattr(resources, 'get_object'):
+        resources = resources.get_object()
+    xobjects = resources.get('/XObject', {}) if resources else {}
+    if hasattr(xobjects, 'get_object'):
+        xobjects = xobjects.get_object()
+    for ref in (xobjects or {}).values():
+        if ref.get_object().get('/Subtype') == '/Image':
+            return True
+    return False
 W = '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}'
 
 class ConversionError(Exception):
@@ -284,6 +333,7 @@ def pdf(source, out):
         if len(reader.pages) > 200:
             raise ConversionError('complexity')
         found = False
+        ocr_pages = []
         for i, page in enumerate(reader.pages, 1):
             for ref in page.get('/Annots', []):
                 annotation = ref.get_object()
@@ -295,13 +345,32 @@ def pdf(source, out):
                 raise ConversionError('empty_text')
             text = page.extract_text(extraction_mode='layout')
             if not text or not text.strip():
-                # Mixed scanned/text PDFs must not silently lose a page.
-                raise ConversionError('empty_text')
+                # A page with no text layer: OCR when it carries an image and OCR is
+                # installed; otherwise refuse -- mixed scanned/text PDFs must not
+                # silently lose a page.
+                if not (page_has_image(page) and ocr_available()):
+                    raise ConversionError('empty_text')
+                if len(ocr_pages) >= MAX_OCR_PAGES:
+                    raise ConversionError('ocr_limit')
+                try:
+                    text = ocr_page(source, i)
+                except subprocess.TimeoutExpired as exc:
+                    raise ConversionError('complexity') from exc
+                if not text:
+                    raise ConversionError('empty_text')
+                ocr_pages.append(i)
+                found = True
+                out.add(f'## Halaman {i} (OCR)\n\n' + literal(text), 'page-ocr', f'Halaman {i}')
+                continue
             found = True
             out.add(f'## Halaman {i}\n\n' + literal(text), 'page', f'Halaman {i}')
         if not found:
             raise ConversionError('empty_text')
-        out.warning('Ekstraksi teks berlayout, bukan OCR. Tinjau urutan kolom dan tabel pada setiap halaman; tidak ada bounding box buatan.')
+        if ocr_pages:
+            pages = ', '.join(str(p) for p in ocr_pages)
+            out.warning(f'Halaman {pages} dibaca dengan OCR (Tesseract, ind+eng) dari gambar pindaian. Cocokkan angka, nama, dan tanda baca dengan original sebelum mengajukan; OCR bisa salah membaca.')
+        if len(ocr_pages) < len(reader.pages):
+            out.warning('Ekstraksi teks berlayout untuk halaman berteks. Tinjau urutan kolom dan tabel pada setiap halaman; tidak ada bounding box buatan.')
     except ConversionError:
         raise
     except Exception as exc:
@@ -462,7 +531,9 @@ def convert(source, kind):
 
 if __name__ == '__main__':
     import resource
-    resource.setrlimit(resource.RLIMIT_CPU, (20, 20))
+    # PDF may OCR up to MAX_OCR_PAGES; every other format keeps the tight budget.
+    cpu = 20 + (MAX_OCR_PAGES * 12 if sys.argv[1] == 'PDF' else 0)
+    resource.setrlimit(resource.RLIMIT_CPU, (cpu, cpu))
     resource.setrlimit(resource.RLIMIT_AS, (512*1024*1024, 512*1024*1024))
     resource.setrlimit(resource.RLIMIT_FSIZE, (6*1024*1024, 6*1024*1024))
     try:
