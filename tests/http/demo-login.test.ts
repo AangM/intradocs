@@ -7,7 +7,9 @@
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { Pool } from 'pg';
-import { localAdminUrl } from '../../scripts/shared.ts';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { ROOT, localAdminUrl } from '../../scripts/shared.ts';
 import { IDS } from '../../fixtures/data.ts';
 
 // REVIEW_URL: a server whose public origin differs from .env.local (a tunnel for review).
@@ -26,8 +28,9 @@ const click = (email: string, origin = base, extra: Record<string, unknown> = {}
 
 test('the login page never carries a password, whether or not the list is shown', async () => {
   const html = await (await fetch(base + '/login')).text();
-  const accounts = (await import('../../var/demo-accounts.json', { with: { type: 'json' } }))
-    .default as Array<{ password: string }>;
+  const accounts = JSON.parse(
+    await readFile(path.join(ROOT, 'var/demo-accounts.json'), 'utf8'),
+  ) as Array<{ password: string }>;
   for (const a of accounts)
     assert(!html.includes(a.password), 'a demo password leaked into the page');
 });
