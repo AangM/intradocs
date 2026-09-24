@@ -1237,6 +1237,64 @@ tbody tr:hover td {
   }
 }
 
+/* Login: one-click demo accounts for a reviewer (DEMO_LOGIN only). */
+.demo-accounts {
+  margin-top: 18px;
+}
+.demo-accounts ul {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0 8px;
+  padding: 0;
+  list-style: none;
+}
+.demo-account {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+.demo-account:hover:not(:disabled) {
+  background: var(--blue-50);
+  border-color: var(--blue-200);
+}
+.demo-account:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.demo-account:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.demo-account .avatar {
+  width: 30px;
+  height: 30px;
+  font-size: 11px;
+}
+.demo-account-b {
+  display: grid;
+  line-height: 1.25;
+}
+.demo-account-b strong {
+  font-size: 13px;
+}
+.demo-account-b span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
 /* A switch: the one editable thing on the settings page. */
 .email-switch {
   margin-top: 6px;

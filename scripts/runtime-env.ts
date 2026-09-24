@@ -75,6 +75,7 @@ export function childEnvironment(
           'OIDC_CLIENT_ID',
           'OIDC_CLIENT_SECRET',
           'OIDC_LABEL',
+          'DEMO_LOGIN',
           'STORAGE_DRIVER',
           'STORAGE_ROOT',
           'DATABASE_URL',

@@ -17,6 +17,12 @@ export interface RuntimeConfig {
   sso: SsoConfig | null;
   /** Where the blobs live: a private directory, or an S3-compatible bucket. */
   storage: StorageConfig;
+  /**
+   * One-click sign-in as a synthetic demo account, for a reviewer walking through the
+   * roles. Only with DEMO_LOGIN=true, never on the production profile, and only for the
+   * @example.test accounts the seed created.
+   */
+  demoLogin: boolean;
 }
 export type StorageConfig =
   | { driver: 'filesystem'; root: string }
@@ -154,6 +160,11 @@ export function readRuntimeConfig(env: Record<string, string | undefined>): Runt
     throw new ConfigurationError('Auth dan aplikasi harus memakai database yang sama.');
   const authSecret = assertSecret(env.BETTER_AUTH_SECRET, hardened ? 48 : 32);
   const sso = env.AUTH_MODE === 'oidc' ? readSso(env, hardened) : null;
+  if (env.DEMO_LOGIN !== undefined && env.DEMO_LOGIN !== 'true' && env.DEMO_LOGIN !== 'false')
+    throw new ConfigurationError('DEMO_LOGIN hanya menerima true atau false.');
+  const demoLogin = env.DEMO_LOGIN === 'true';
+  if (demoLogin && profile === 'production')
+    throw new ConfigurationError('DEMO_LOGIN tidak boleh aktif pada profil production.');
   if (!env.INTRADOCS_ROOT) throw new ConfigurationError('INTRADOCS_ROOT belum diisi.');
   const storageRoot = env.STORAGE_ROOT ?? 'var/storage';
   const storage: StorageConfig =
@@ -171,6 +182,7 @@ export function readRuntimeConfig(env: Record<string, string | undefined>): Runt
     hardened,
     sso,
     storage,
+    demoLogin,
   };
 }
 /**

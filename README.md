@@ -123,6 +123,16 @@ SSO tidak pernah membuat akun. Untuk mencobanya di laptop: `pnpm idp:mock` (IdP 
 `OIDC_CLIENT_SECRET=mock-idp-secret-not-for-deployments`. Detail deployment di
 [docs/DEPLOY.md](docs/DEPLOY.md) §2a.
 
+## Review oleh mentor: tunnel + masuk cepat
+
+Untuk review jarak jauh tanpa server: jalankan app dengan profil `staging` di belakang
+Cloudflare Quick Tunnel (gratis, tanpa akun) dan `DEMO_LOGIN=true`. Halaman login lalu
+menampilkan daftar akun demo sintetis; satu klik masuk sebagai peran itu (Keluar untuk
+berganti). `DEMO_LOGIN` ditolak saat start pada profil `production`, hanya menerima akun
+`@example.test` dari `var/demo-accounts.json`, dan menjalankan login email biasa (rate limit
+dan penolakan akun nonaktif tetap berlaku); password tidak pernah dikirim ke browser.
+`WEB_PORT` menetapkan port lokal bila `APP_URL` adalah origin https tanpa port.
+
 ## OCR untuk PDF pindai
 
 Halaman PDF tanpa teks yang berisi gambar dibaca oleh Tesseract (ind+eng) di dalam container

@@ -4,6 +4,8 @@ import { safeReturnTo } from '@intradocs/core/validation';
 import { LoginForm } from '@/components/login-form';
 import { Icon } from '@/components/icon';
 import { readRuntimeConfig } from '@intradocs/core/config';
+import { DemoAccounts } from '@/components/demo-accounts';
+import { demoAccountChoices } from '@/lib/demo-accounts';
 export const dynamic = 'force-dynamic';
 export default async function Login({
   searchParams,
@@ -12,7 +14,9 @@ export default async function Login({
 }) {
   if (await currentActor()) redirect('/help-center');
   const params = await searchParams;
-  const sso = readRuntimeConfig(process.env).sso;
+  const config = readRuntimeConfig(process.env);
+  const sso = config.sso;
+  const demo = config.demoLogin ? await demoAccountChoices() : [];
   // Better Auth sends the callback's failure back here as ?error=...; the only case a
   // person can act on is "nobody invited this address", so that is the one named.
   const errorCode = typeof params.error === 'string' ? params.error : '';
@@ -103,6 +107,9 @@ export default async function Login({
             sso={sso?.label ?? null}
             ssoError={ssoError}
           />
+          {demo.length > 0 && (
+            <DemoAccounts accounts={demo} returnTo={safeReturnTo(params.returnTo)} />
+          )}
           <p className="privacy-note">
             <Icon name="help" size={14} />
             <span>

@@ -239,3 +239,16 @@ test('AUTH_MODE=oidc needs issuer, client id and secret, and the issuer must be 
     ConfigurationError,
   );
 });
+
+test('DEMO_LOGIN is opt-in, a boolean, and refused outright on production', () => {
+  assert.equal(readRuntimeConfig(deployed).demoLogin, false);
+  assert.equal(
+    readRuntimeConfig({ ...deployed, APP_PROFILE: 'staging', DEMO_LOGIN: 'true' }).demoLogin,
+    true,
+  );
+  assert.throws(() => readRuntimeConfig({ ...deployed, DEMO_LOGIN: 'true' }), ConfigurationError);
+  assert.throws(
+    () => readRuntimeConfig({ ...deployed, APP_PROFILE: 'staging', DEMO_LOGIN: 'yes' }),
+    ConfigurationError,
+  );
+});
