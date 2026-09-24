@@ -1,6 +1,6 @@
 # M4 — WeKnora lokal sebagai mesin RAG
 
-Status: **implementasi selesai, acceptance sebagian terblokir.** Baca [bagian 8](#8-status-gate) sebelum menyatakan M4 lulus. IntraDocs tetap system of record dan policy gate; WeKnora hanya mesin index/retrieval yang tidak pernah memutuskan siapa boleh membaca apa.
+Status: **implementasi selesai; pilot terblokir oleh keputusan organisasi.** Bukti tes terbaru ada di [PLAN.md §0](PLAN.md). Dokumen ini adalah rujukan teknis bertahap (§1–§10 dasar, §11–§28 fitur lanjutan termasuk Technology Architecture di §28); bacalah bagian yang relevan saja. IntraDocs tetap system of record dan policy gate; WeKnora hanya mesin index/retrieval yang tidak pernah memutuskan siapa boleh membaca apa.
 
 Referensi kontrak: [Tencent/WeKnora](https://github.com/Tencent/WeKnora) v0.8.0, lisensi MIT (`LICENSE` + `THIRD_PARTY_NOTICES.md` upstream), `docs/swagger.json` (`basePath /api/v1`) dan `internal/types/chat.go` untuk bentuk frame SSE. Diakses 10 September 2026.
 
@@ -216,7 +216,7 @@ Log yang aman dibagikan: `pnpm weknora:status` dan baris audit `rag.*` di `app.a
 
 ## 8. Status gate
 
-Dijalankan pada RC M1–M3 dengan profil `weknora` hidup, PostgreSQL lokal, dan Ollama `bge-m3` di host.
+Dijalankan saat M4 selesai (angka suite sejak itu bertambah; yang terbaru di [PLAN.md §0](PLAN.md)) dengan profil `weknora` hidup, PostgreSQL lokal, dan Ollama `bge-m3` di host.
 
 | Gate                                                       | Hasil                                                                                                                                                 |
 | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |

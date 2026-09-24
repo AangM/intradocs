@@ -1,6 +1,6 @@
 # UI — kontrak kesetiaan terhadap mockup
 
-**Acuan utama:** [HTML mentor](../reference/intradocs-mockup_1.html). Bukan tema generik GitDoc/shadcn. Perubahan di bawah adalah usulan D02, belum persetujuan pengguna. Dokumen ini merupakan audit sumber, **bukan hasil render atau bukti pixel parity**.
+**Acuan utama:** [HTML mentor](../reference/intradocs-mockup_1.html). Bukan tema generik GitDoc/shadcn. Delta U01–U15 di bawah adalah perbedaan yang disengaja terhadap mockup beserta alasannya; semuanya dibuktikan dengan screenshot berdampingan (`pnpm ui:shots`), belum dengan diff piksel otomatis.
 
 Integritas referensi: 177.825 byte; SHA-256 `f4aacfbc90a30a5e7b83370704de887b7804571d99b65614bee5104bf5745621`. File asli dipertahankan byte-for-byte.
 
@@ -61,7 +61,7 @@ Bukan seluruh HTML dipindahkan sebagai satu komponen. Ekstrak komponen nyata: Ap
 | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | U01   | Hilangkan bingkai browser palsu, tombol layar 01–11, dan catatan presentasi pada aplikasi produksi. Bandingkan area aplikasi, bukan deck.                                                                                        |
 | U02   | Ganti tinggi demo tetap 840 px dengan layout viewport/scroll yang benar. Mockup hanya menyembunyikan TOC pada ≤1200 px; responsivitas lengkap belum ada.                                                                         |
-| U03   | Sembunyikan hasil tanpa izin (D01). Status workflow, sensitivitas, freshness, dan status indeks tidak dicampur.                                                                                                                  |
+| U03   | Sembunyikan hasil tanpa izin. Status workflow, sensitivitas, freshness, dan status indeks tidak dicampur.                                                                                                                        |
 | U04   | Pada approval tahap awal: “Setujui tahap ini”. Hanya approver terakhir melihat “Setujui & proses publikasi”. Tampilkan indexing/failed/ready secara jujur.                                                                       |
 | U05   | Angka demo diganti data nyata atau “Belum ada data”. Jangan menampilkan “96% akurasi AI”, “0,18 detik”, “2,4 detik”, dan persentase kemiripan tanpa pengukuran yang benar.                                                       |
 | U06   | Search, checkbox, select, tombol, dan composer menjadi elemen semantik yang berfungsi; fokus keyboard, label, dan kontras AA diperbaiki. Target sentuh minimal 44 px dengan hit-area, sebisa mungkin tanpa mengubah ikon visual. |
@@ -76,21 +76,15 @@ Desktop lebar mengikuti mentor. Pada 1024 px, TOC jadi drawer dan antrean/detail
 
 Login adalah layar pendukung baru dengan token mentor: form credentials pada local-dev, tombol SSO pada mode organisasi; tanpa social-login dekoratif atau role-picker bypass. AI tanpa key menampilkan belum aktif, bukan jawaban contoh yang menyamar sebagai inference nyata. Semua alur menguji loading, kosong, error/retry, izin dicabut, dan tidak ditemukan. Tambahan: upload sebagian gagal/cancel/file ditolak; OCR berkualitas rendah; reviewer conflict/revisi; indexing gagal; AI timeout/tidak cukup bukti/konflik/quota. Form tidak kehilangan input saat gagal; dialog mendukung Escape dan focus return; `⌘/Ctrl+K` pencarian tanpa mengganggu pengetikan. Jangan membawa shortcut panah navigasi deck ke reader/editor.
 
-## 5. Pembuktian visual, nanti saat implementasi
+## 5. Pembuktian visual
 
 1. Bekukan HTML asli; gunakan fixtures dan waktu demo tetap. Lingkungan browser, font, zoom, dan DPR yang sama; baseline dari area `.app` setiap `#s1`–`#s10`.
 2. Pada viewport desktop 1480 px, ukur bounding box area aplikasi referensi; samakan ukuran area aplikasi implementasi, jangan membandingkan viewport deck dengan aplikasi fullscreen secara langsung. Uji pula 1024 dan 390 px; layout mobile dinilai terhadap delta yang disetujui, karena tidak ada desain mobile lengkap dari mentor.
 3. Ambil snapshot tiap layar, bagian bawah inner-scroll, tab/dialog penting dan state gagal; periksa satu per satu. Delta U01–U08 dicatat, bukan disembunyikan dengan mask seluruh area.
 4. Target awal diff ≤1% pada area stabil setelah normalisasi; selalu review side-by-side. Threshold bukan izin mengabaikan pergeseran layout, teks salah, clipping, atau aksesibilitas.
-5. Simpan snapshot/bukti di PR implementasi. **Saat paket rencana ini dibuat, render dan pemeriksaan visual tersebut belum dijalankan.**
+5. Simpan snapshot/bukti di PR implementasi.
 
 **Dijalankan (September 2026).** `pnpm ui:shots` (`scripts/ui-shots.ts`, Playwright Chromium headless) memotret area `.app` setiap `#s1`–`#s10` mockup dan semua halaman portal sebagai satu akun sintetis pada viewport yang sama (1440 px; `SHOT_W=390` untuk pass mobile) ke `var/shots/`. Dari perbandingan berdampingan itu, layar yang tadinya jauh dari mockup dibawa kembali: S06 approval menjadi master–detail dengan keputusan, temuan pra-cek, pratinjau dan timeline; S02 facet berjumlah dan highlight; S03 chip filter dan tabel berlabel; S04 kaki halaman ringkas; S07 tree berhitung dan form di balik tombol; S09 avatar, kartu sumber bernomor dan composer menempel; S10 chart CSS dari angka nyata. Yang sengaja tetap berbeda (delta U01–U08) tidak berubah: tidak ada angka demo, tidak ada toggle yang tidak berfungsi (aturan ditampilkan sebagai baris centang, bukan switch), dan konten di luar izin tidak pernah dirender. Belum ada diff piksel otomatis; buktinya adalah screenshot yang dibandingkan orang.
-
-## Delta M2a (source, belum visual acceptance)
-
-S05 tetap area 920 px, stepper empat langkah, dropzone, kartu metadata dan footer mentor. Tahap terakhir menjadi “Simpan Draft Privat”, bukan approval palsu. Format yang tersedia hanya MD/TXT ≤1 MiB; angka 50 MB dan format V1 tidak ditampilkan sebagai dukungan aktif. Metadata diisi manual, pemilik dari session, klasifikasi Internal. Pratinjau adalah teks lokal literal (dipotong eksplisit pada 20.000 karakter), bukan status scan. Proses simpan memakai pesan indeterminate, bukan progress persen yang dibuat-buat.
-
-S04 menambahkan detail source/hash, unduh original/provenance. H1 sumber hanya disembunyikan jika benar-benar sama dengan judul metadata, bukan semua heading pertama. Gambar/HTML tetap tidak dieksekusi. Semua perubahan desktop/mobile wajib dibandingkan dengan mockup setelah browser tersedia; belum ada screenshot yang disetujui.
 
 ## Delta U09 — tema "glass", topbar berisi, beranda bertanya ke AI (September 2026)
 
@@ -390,9 +384,9 @@ membuka menu, dialog, form, dan panel yang terlipat — bukan hanya tampilan awa
   menunjukkan 6 dengan satu item di antrean. Backlog seed Rizky (13 notifikasi "terbit"
   dari data awal) ditandai dibaca; yang tersisa hanya yang relevan untuk demo.
 
-## Delta U14 — role kustom (20 September 2026)
+## Delta U15 — role kustom (20 September 2026)
 
-**Keputusan desain.** PLAN.md §5 semula menaruh role kustom di luar rilis karena lima role
+**Keputusan desain.** Rencana awal menaruh role kustom di luar rilis karena lima role
 bawaan tertanam di 41 ekspresi policy RLS (`app.actor_role()`), dan mengganti itu dengan tabel
 kemampuan berarti mendesain ulang lapisan izin database. Yang dibangun sekarang **tidak**
 menyentuh policy: sebuah role kustom adalah _nama_ di atas **satu role dasar** (Admin Knowledge,
