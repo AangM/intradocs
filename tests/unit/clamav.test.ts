@@ -48,6 +48,14 @@ test('scanner endpoint stays loopback, even with unrelated unsafe variables', ()
   assert.equal(v.host, '127.0.0.1');
   assert.equal(v.port, 3310);
   assert.throws(() => clamAVOptions({ APP_PROFILE: 'telkom-prod' }));
+  assert.throws(() => clamAVOptions({}));
+  // Staging and production scan too (a guard once limited this to local-dev, which
+  // made every upload on a tunnel or server fail) -- and still only on loopback.
+  for (const APP_PROFILE of ['staging', 'production']) {
+    const s = clamAVOptions({ APP_PROFILE, CLAMAV_HOST: 'evil.example', CLAMAV_PORT: '3311' });
+    assert.equal(s.host, '127.0.0.1');
+    assert.equal(s.port, 3311);
+  }
   assert.throws(() => clamAVOptions({ APP_PROFILE: 'local-dev', CLAMAV_PORT: '80' }));
 });
 async function peer(mode: 'ok' | 'found' | 'timeout' | 'broken' | 'oversize' = 'ok') {

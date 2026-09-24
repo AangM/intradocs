@@ -18,7 +18,11 @@ export function converterOptions(env: Record<string, string | undefined>) {
   if (!/^\d{1,5}$/.test(raw) || Number(raw) < 1024 || Number(raw) > 65535)
     throw new UploadError('converter_config', 'Port converter tidak valid.', 503);
   const token = env.KNOWLEDGE_TOKEN ?? '';
-  if (env.APP_PROFILE !== 'local-dev' || !/^[A-Za-z0-9_-]{32,128}$/.test(token))
+  const profile = env.APP_PROFILE ?? '';
+  if (
+    !['local-dev', 'staging', 'production'].includes(profile) ||
+    !/^[A-Za-z0-9_-]{32,128}$/.test(token)
+  )
     throw new UploadError(
       'converter_unavailable',
       'Converter belum disiapkan. Jalankan pnpm knowledge:start.',

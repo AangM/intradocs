@@ -18,9 +18,12 @@ export type ClamAVOptions = {
   timeoutMs: number;
   maxDefinitionAgeDays: number;
 };
+// Every profile scans; the scanner is always reached on loopback, whatever the environment
+// says, so a misconfigured host can never route uploads to an unknown scanner.
+const SCANNING_PROFILES = new Set(['local-dev', 'staging', 'production']);
 export function clamAVOptions(env: Record<string, string | undefined>): ClamAVOptions {
-  if (env.APP_PROFILE !== 'local-dev')
-    throw new UploadError('scanner_config', 'Pemindai M2a hanya untuk profil lokal.', 503);
+  if (!SCANNING_PROFILES.has(env.APP_PROFILE ?? ''))
+    throw new UploadError('scanner_config', 'Profil aplikasi tidak dikenal untuk pemindai.', 503);
   const port = Number(env.CLAMAV_PORT ?? '3310');
   if (!Number.isInteger(port) || port < 1024 || port > 65535)
     throw new UploadError('scanner_config', 'CLAMAV_PORT tidak valid.', 503);

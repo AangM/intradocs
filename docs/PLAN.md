@@ -11,7 +11,7 @@ selain CI GitHub (format, lint, typecheck, unit, build, verifikasi source) pada 
 
 | Gate                                        | Hasil                                                         |
 | ------------------------------------------- | ------------------------------------------------------------- |
-| `pnpm check` (lint, types, unit, build)     | PASS — 375 unit                                               |
+| `pnpm check` (lint, types, unit, build)     | PASS — 377 unit                                               |
 | `pnpm test:integration` (RLS nyata)         | PASS — 72                                                     |
 | `pnpm test:http` (app + ClamAV + converter) | PASS — 126, 1 skip (demo-login bila `DEMO_LOGIN` off)         |
 | `pnpm test:e2e` axe desktop + mobile        | PASS — 8/8                                                    |
