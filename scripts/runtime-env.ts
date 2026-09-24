@@ -88,7 +88,11 @@ export function childEnvironment(
   const result: NodeJS.ProcessEnv = { NEXT_TELEMETRY_DISABLED: '1' };
   for (const key of [...operatingSystemKeys, ...shared, ...weknora, ...keys])
     if (source[key] !== undefined) result[key] = source[key];
+  // The listening port follows APP_URL locally. Behind a proxy or tunnel the public
+  // origin is https without a port while the app still listens on loopback, so
+  // WEB_PORT (the same name compose.prod.yaml uses) says which port that is.
   if (target === 'web')
-    result.PORT = new URL(source.APP_URL ?? 'http://localhost:3000').port || '80';
+    result.PORT =
+      source.WEB_PORT ?? (new URL(source.APP_URL ?? 'http://localhost:3000').port || '80');
   return result;
 }
