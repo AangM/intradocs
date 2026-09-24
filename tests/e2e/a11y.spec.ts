@@ -83,6 +83,9 @@ test('login has no serious or critical axe violations', async ({ page }) => {
 
 test('every portal screen S01-S10 has no serious or critical axe violations', async ({ page }) => {
   test.setTimeout(240_000);
+  const taElement = (
+    await db.query("SELECT id FROM app.ta_elements WHERE name='srv-db-01' LIMIT 1")
+  ).rows[0]?.id as string | undefined;
   await login(page, IDS.admin);
   const screens: Array<[string, string]> = [
     ['S01 help-center', '/help-center'],
@@ -98,6 +101,9 @@ test('every portal screen S01-S10 has no serious or critical axe violations', as
     ['notifikasi', '/notifikasi'],
     ['akses', '/akses'],
     ['pengaturan', '/pengaturan'],
+    ['TA katalog', '/arsitektur'],
+    ['TA elemen', taElement ? `/arsitektur/${taElement}` : '/arsitektur'],
+    ['TA impor', '/arsitektur/impor'],
   ];
   for (const [label, url] of screens) {
     await page.goto(url);

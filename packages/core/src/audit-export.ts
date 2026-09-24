@@ -62,6 +62,10 @@ export const AUDIT_ACTIONS: Record<string, { text: string; icon: string; tone: s
     tone: 'amber',
   },
   'audit.exported': { text: 'Audit log diekspor', icon: 'download', tone: 'amber' },
+  'ta.import_submitted': { text: 'Impor arsitektur diajukan', icon: 'upload', tone: 'blue' },
+  'ta.imported': { text: 'Impor arsitektur disetujui & diterapkan', icon: 'server', tone: 'green' },
+  'ta.import_rejected': { text: 'Impor arsitektur ditolak', icon: 'x', tone: 'red' },
+  'ta.import_withdrawn': { text: 'Impor arsitektur ditarik', icon: 'x', tone: 'grey' },
 };
 export const auditLabel = (action: string) =>
   AUDIT_ACTIONS[action] ?? { text: action, icon: 'act', tone: 'grey' };

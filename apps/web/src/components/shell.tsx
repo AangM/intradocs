@@ -23,6 +23,7 @@ const navigation: Array<{
 }> = [
   { href: '/help-center', label: 'Help Center', icon: 'home', group: 'knowledge' },
   { href: '/katalog', label: 'Katalog Dokumen', icon: 'book', group: 'knowledge' },
+  { href: '/arsitektur', label: 'Technology Architecture', icon: 'server', group: 'knowledge' },
   { href: '/katalog?view=favorites', label: 'Favorit', icon: 'star', group: 'knowledge' },
   { href: '/katalog?view=history', label: 'Riwayat baca', icon: 'clock', group: 'knowledge' },
   {

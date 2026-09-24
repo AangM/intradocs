@@ -1351,6 +1351,41 @@ function str(v: unknown): string {
   return typeof v === 'string' ? v : '';
 }
 
+/**
+ * The Technology Architecture knowledge base: one Markdown card per element, written by
+ * the worker from the database (never uploaded by a person). Plain vector + keyword
+ * index; no summaries, questions, tags or wiki -- a card is an index of the model, and
+ * every answer is read back from the database, so nothing generated here is shown.
+ */
+async function taSetup(): Promise<void> {
+  loadLocalEnv();
+  const ai = readAiConfig(process.env);
+  if (!ai.weknora) throw new Error('AI_PROVIDER masih off. Aktifkan weknora-local dulu.');
+  const client = new WeknoraClient(ai.weknora);
+  let id = process.env.WEKNORA_TA_KNOWLEDGE_BASE_ID ?? '';
+  const existing = id ? await client.knowledgeBase(id).catch(() => null) : null;
+  if (existing) {
+    console.log(`Knowledge base Technology Architecture sudah ada (id ${id}).`);
+    return;
+  }
+  const production = asKb(await client.knowledgeBase());
+  const embeddingModelId = str(production.embedding_model_id);
+  const summaryModelId = str(production.summary_model_id);
+  id = await client.createKnowledgeBase({
+    name: 'intradocs-technology-architecture',
+    description:
+      'Kartu elemen Technology Architecture (server, device, jaringan, platform, aplikasi) dari impor Sparx EA. Ditulis worker IntraDocs; jangan diubah manual.',
+    embeddingModelId,
+    summaryModelId,
+    wiki: false,
+    questionGeneration: { enabled: false, questionCount: 0, modelId: summaryModelId },
+    autoTag: { enabled: false, modelId: summaryModelId },
+  });
+  await ensureEnv({ WEKNORA_TA_KNOWLEDGE_BASE_ID: id });
+  console.log(
+    `Knowledge base Technology Architecture dibuat (id ${id}); ditulis ke .env.local. Restart pnpm start agar worker mulai mengisi kartu elemen.`,
+  );
+}
 async function main(): Promise<void> {
   const action = process.argv[2];
   if (action === 'setup') return setup();
@@ -1369,6 +1404,7 @@ async function main(): Promise<void> {
     return;
   }
   if (action === 'lab') return lab();
+  if (action === 'ta-setup') return taSetup();
   if (action === 'stop') {
     loadLocalEnv();
     command('docker', ['compose', '--env-file', '.env.local', '--profile', 'weknora', 'stop']);

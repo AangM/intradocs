@@ -923,6 +923,43 @@ async function main(): Promise<void> {
     }
     console.log('  percakapan asisten');
   }
+  // Technology Architecture: the synthetic Sparx export, imported by the knowledge admin
+  // through the same preview -> apply path an architect would use.
+  const ta = await db.query('SELECT count(*)::int AS n FROM app.ta_elements WHERE category_id=$1', [
+    IDS.infra,
+  ]);
+  if (ta.rows[0].n === 0) {
+    const bytes = await readFile(path.join(ROOT, 'fixtures/ta/sparx-technology-demo.xmi'));
+    const send = async (mode: 'preview' | 'submit', sha?: string) => {
+      const f = new FormData();
+      f.set(
+        'file',
+        new Blob([new Uint8Array(bytes)], { type: 'application/xml' }),
+        'sparx-technology-demo.xmi',
+      );
+      f.set('categoryId', IDS.infra);
+      f.set('mode', mode);
+      if (sha) f.set('sha256', sha);
+      const r = await fetch(base + '/api/ta/import', {
+        method: 'POST',
+        headers: { Cookie: await login(IDS.admin), Origin: base },
+        body: f,
+      });
+      if (!r.ok) throw new Error(`impor arsitektur ${mode}: HTTP ${r.status} ${await r.text()}`);
+      return (await r.json()) as { sha256: string; id?: string };
+    };
+    const preview = await send('preview');
+    const proposed = await send('submit', preview.sha256);
+    // Four eyes: the knowledge admin proposes, the super admin approves.
+    const decided = await api(IDS.super, `/api/ta/import/${proposed.id}`, {
+      decision: 'approve',
+      note: 'Model sintetis awal untuk demo.',
+    });
+    if (decided.status !== 200) throw new Error(`persetujuan arsitektur: HTTP ${decided.status}`);
+    console.log(
+      `  arsitektur: ${decided.body.created} elemen, ${decided.body.relations} relasi (diajukan Andi, disetujui Budi)`,
+    );
+  }
   await db.query('DELETE FROM auth."rateLimit"');
   await db.end();
   console.log('Selesai.');

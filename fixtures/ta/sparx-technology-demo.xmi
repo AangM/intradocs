@@ -1,0 +1,741 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- DATA SINTETIS untuk pengujian IntraDocs. Bukan model organisasi mana pun. -->
+<xmi:XMI xmi:version="2.1" xmlns:uml="http://schema.omg.org/spec/UML/2.1" xmlns:xmi="http://schema.omg.org/spec/XMI/2.1">
+	<xmi:Documentation exporter="Enterprise Architect" exporterVersion="6.5" exporterID="1628"/>
+	<uml:Model xmi:type="uml:Model" name="EA_Model" visibility="public">
+		<packagedElement xmi:type="uml:Package" xmi:id="EAPK_D6FE5F19_6D1A_9D11_1A7A_E6116D7C2D78" name="Technology Architecture - Sintetis" visibility="public">
+				<packagedElement xmi:type="uml:Node" xmi:id="EAID_8B83FC80_2ADD_989D_76C6_851014A038C0" name="DC Jakarta (Cibitung)" visibility="public"/>
+				<packagedElement xmi:type="uml:Node" xmi:id="EAID_D2C47F63_FCF9_753C_5667_EC0DAC29BF8E" name="DRC Surabaya" visibility="public"/>
+				<packagedElement xmi:type="uml:Node" xmi:id="EAID_720D8161_C694_8A81_2BE3_01EDE274CD1C" name="Segmen DMZ" visibility="public"/>
+				<packagedElement xmi:type="uml:Node" xmi:id="EAID_29CF8BCF_762B_D66E_C6A4_312DC1D60C06" name="Segmen Aplikasi" visibility="public"/>
+				<packagedElement xmi:type="uml:Node" xmi:id="EAID_170A9309_6F47_6BC8_C81A_2EA580C71373" name="Segmen Database" visibility="public"/>
+				<packagedElement xmi:type="uml:Node" xmi:id="EAID_A8E551EA_041B_5D09_26AA_5B9459018020" name="Segmen Manajemen" visibility="public"/>
+				<packagedElement xmi:type="uml:Device" xmi:id="EAID_8F31BF9E_E70A_8295_4B02_39221A101269" name="fw-jkt-01" visibility="public"/>
+				<packagedElement xmi:type="uml:Device" xmi:id="EAID_9F4D53C5_4DEE_DDF9_EB75_6634EC94FC5F" name="core-sw-jkt-01" visibility="public"/>
+				<packagedElement xmi:type="uml:Device" xmi:id="EAID_A6976FEB_C744_FFBE_2FDB_3D7EA217367D" name="lb-jkt-01" visibility="public"/>
+				<packagedElement xmi:type="uml:Node" xmi:id="EAID_86DA886E_91B3_C22D_7FFD_751D85739E1A" name="esx-jkt-01" visibility="public"/>
+				<packagedElement xmi:type="uml:Node" xmi:id="EAID_B8478A69_614F_F4CD_A81E_140E751FA69B" name="esx-jkt-02" visibility="public"/>
+				<packagedElement xmi:type="uml:Node" xmi:id="EAID_7DA4B198_82A6_122B_2DA6_BE9B50D91F33" name="esx-sby-01" visibility="public"/>
+				<packagedElement xmi:type="uml:Node" xmi:id="EAID_88D97FFB_F48F_3A0A_D109_24C9C06FA3A2" name="san-jkt-01" visibility="public"/>
+				<packagedElement xmi:type="uml:Node" xmi:id="EAID_44C79443_6D5D_F296_684A_715D7EE26967" name="srv-web-01" visibility="public"/>
+				<packagedElement xmi:type="uml:Node" xmi:id="EAID_78ED7912_2DB2_1A93_70FC_86915021FC7D" name="srv-web-02" visibility="public"/>
+				<packagedElement xmi:type="uml:Node" xmi:id="EAID_48E8B393_7A29_883F_D4AF_3C3525FC4BB8" name="srv-app-01" visibility="public"/>
+				<packagedElement xmi:type="uml:Node" xmi:id="EAID_EE5AEACC_FAF1_5C65_47EA_07B0F77C328B" name="srv-app-02" visibility="public"/>
+				<packagedElement xmi:type="uml:Node" xmi:id="EAID_A9BADE2C_929B_9092_AFA4_E855755DD958" name="srv-db-01" visibility="public"/>
+				<packagedElement xmi:type="uml:Node" xmi:id="EAID_C7FDAFD0_F848_D6EF_13F3_9A338946E5F3" name="srv-db-dr-01" visibility="public"/>
+				<packagedElement xmi:type="uml:Node" xmi:id="EAID_280C3D49_D517_9B56_1FFB_B73A33B930EE" name="srv-ad-01" visibility="public"/>
+				<packagedElement xmi:type="uml:Node" xmi:id="EAID_7A6CDBDA_DA40_FF6C_7F25_F884B6BD1B23" name="srv-mon-01" visibility="public"/>
+				<packagedElement xmi:type="uml:Node" xmi:id="EAID_78485970_37B1_840E_FE99_1BD9A1F2F71C" name="srv-app-stg-01" visibility="public"/>
+				<packagedElement xmi:type="uml:Node" xmi:id="EAID_9691288B_EE91_0B4C_26E5_09669FDF8000" name="srv-legacy-01" visibility="public"/>
+				<packagedElement xmi:type="uml:ExecutionEnvironment" xmi:id="EAID_59E459E9_8A66_691B_E7E0_523146934D8F" name="PostgreSQL 13" visibility="public"/>
+				<packagedElement xmi:type="uml:ExecutionEnvironment" xmi:id="EAID_0356630A_43A3_5EF9_62F1_338FC1813F89" name="PostgreSQL 16" visibility="public"/>
+				<packagedElement xmi:type="uml:ExecutionEnvironment" xmi:id="EAID_3D56288B_33AF_A4C7_6297_21B28912691B" name="Nginx" visibility="public"/>
+				<packagedElement xmi:type="uml:ExecutionEnvironment" xmi:id="EAID_842FA707_4AA2_561C_66D9_AD850946C02C" name="Active Directory" visibility="public"/>
+				<packagedElement xmi:type="uml:Component" xmi:id="EAID_DDF8D037_775B_7868_6060_3124736CCCE3" name="Portal Tiket" visibility="public"/>
+				<packagedElement xmi:type="uml:Component" xmi:id="EAID_31A534BC_6FF8_F348_3DA8_11F604A0381C" name="Aplikasi Absensi" visibility="public"/>
+				<packagedElement xmi:type="uml:Component" xmi:id="EAID_4F27EC59_CDC2_CD47_F761_F4754D1769E5" name="IntraDocs" visibility="public"/>
+				<packagedElement xmi:type="uml:Component" xmi:id="EAID_F64A3494_6DCA_4D0F_CD53_04092466EAF3" name="Zabbix Monitoring" visibility="public"/>
+				<packagedElement xmi:type="uml:Actor" xmi:id="EAID_DB14EAF4_B8AB_7709_5754_BD4FC21BAFAF" name="Divisi Keuangan" visibility="public"/>
+		</packagedElement>
+	</uml:Model>
+	<xmi:Extension extender="Enterprise Architect" extenderID="6.5">
+		<elements>
+			<element xmi:idref="EAPK_D6FE5F19_6D1A_9D11_1A7A_E6116D7C2D78" xmi:type="uml:Package" name="Technology Architecture - Sintetis" scope="public"/>
+			<element xmi:idref="EAID_8B83FC80_2ADD_989D_76C6_851014A038C0" xmi:type="uml:Node" name="DC Jakarta (Cibitung)" scope="public">
+				<model package="EAPK_D6FE5F19_6D1A_9D11_1A7A_E6116D7C2D78" ea_eleType="element"/>
+				<properties documentation="Data center utama, tier III." isSpecification="false" sType="Node" nType="0" scope="public" stereotype="ArchiMate_Location" status="Approved"/>
+				<project author="Arsitek Sintetis" version="1.0" phase="1.0" created="2026-09-15 09:00:00" modified="2026-09-22 16:30:00" complexity="1" status="Approved"/>
+				<tags/>
+				<xrefs/>
+			</element>
+			<element xmi:idref="EAID_D2C47F63_FCF9_753C_5667_EC0DAC29BF8E" xmi:type="uml:Node" name="DRC Surabaya" scope="public">
+				<model package="EAPK_D6FE5F19_6D1A_9D11_1A7A_E6116D7C2D78" ea_eleType="element"/>
+				<properties documentation="Disaster recovery center." isSpecification="false" sType="Node" nType="0" scope="public" stereotype="ArchiMate_Location" status="Approved"/>
+				<project author="Arsitek Sintetis" version="1.0" phase="1.0" created="2026-09-15 09:00:00" modified="2026-09-22 16:30:00" complexity="1" status="Approved"/>
+				<tags/>
+				<xrefs/>
+			</element>
+			<element xmi:idref="EAID_720D8161_C694_8A81_2BE3_01EDE274CD1C" xmi:type="uml:Node" name="Segmen DMZ" scope="public">
+				<model package="EAPK_D6FE5F19_6D1A_9D11_1A7A_E6116D7C2D78" ea_eleType="element"/>
+				<properties documentation="" isSpecification="false" sType="Node" nType="0" scope="public" stereotype="ArchiMate_CommunicationNetwork" status="Approved"/>
+				<project author="Arsitek Sintetis" version="1.0" phase="1.0" created="2026-09-15 09:00:00" modified="2026-09-22 16:30:00" complexity="1" status="Approved"/>
+				<tags>
+					<tag xmi:id="EAID_TGD718A358" name="vlan" value="110" modelElement="EAID_720D8161_C694_8A81_2BE3_01EDE274CD1C"/>
+					<tag xmi:id="EAID_TG5DE80898" name="subnet" value="10.10.10.0/24" modelElement="EAID_720D8161_C694_8A81_2BE3_01EDE274CD1C"/>
+					<tag xmi:id="EAID_TGA4DA87FC" name="location" value="DC Jakarta (Cibitung)" modelElement="EAID_720D8161_C694_8A81_2BE3_01EDE274CD1C"/>
+				</tags>
+				<xrefs/>
+			</element>
+			<element xmi:idref="EAID_29CF8BCF_762B_D66E_C6A4_312DC1D60C06" xmi:type="uml:Node" name="Segmen Aplikasi" scope="public">
+				<model package="EAPK_D6FE5F19_6D1A_9D11_1A7A_E6116D7C2D78" ea_eleType="element"/>
+				<properties documentation="" isSpecification="false" sType="Node" nType="0" scope="public" stereotype="ArchiMate_CommunicationNetwork" status="Approved"/>
+				<project author="Arsitek Sintetis" version="1.0" phase="1.0" created="2026-09-15 09:00:00" modified="2026-09-22 16:30:00" complexity="1" status="Approved"/>
+				<tags>
+					<tag xmi:id="EAID_TG60EDA137" name="vlan" value="120" modelElement="EAID_29CF8BCF_762B_D66E_C6A4_312DC1D60C06"/>
+					<tag xmi:id="EAID_TG882A0C5D" name="subnet" value="10.10.20.0/24" modelElement="EAID_29CF8BCF_762B_D66E_C6A4_312DC1D60C06"/>
+					<tag xmi:id="EAID_TG8C66CC37" name="location" value="DC Jakarta (Cibitung)" modelElement="EAID_29CF8BCF_762B_D66E_C6A4_312DC1D60C06"/>
+				</tags>
+				<xrefs/>
+			</element>
+			<element xmi:idref="EAID_170A9309_6F47_6BC8_C81A_2EA580C71373" xmi:type="uml:Node" name="Segmen Database" scope="public">
+				<model package="EAPK_D6FE5F19_6D1A_9D11_1A7A_E6116D7C2D78" ea_eleType="element"/>
+				<properties documentation="" isSpecification="false" sType="Node" nType="0" scope="public" stereotype="ArchiMate_CommunicationNetwork" status="Approved"/>
+				<project author="Arsitek Sintetis" version="1.0" phase="1.0" created="2026-09-15 09:00:00" modified="2026-09-22 16:30:00" complexity="1" status="Approved"/>
+				<tags>
+					<tag xmi:id="EAID_TGC49D0FE1" name="vlan" value="130" modelElement="EAID_170A9309_6F47_6BC8_C81A_2EA580C71373"/>
+					<tag xmi:id="EAID_TGAC0C52ED" name="subnet" value="10.10.30.0/24" modelElement="EAID_170A9309_6F47_6BC8_C81A_2EA580C71373"/>
+					<tag xmi:id="EAID_TG12470FAD" name="location" value="DC Jakarta (Cibitung)" modelElement="EAID_170A9309_6F47_6BC8_C81A_2EA580C71373"/>
+				</tags>
+				<xrefs/>
+			</element>
+			<element xmi:idref="EAID_A8E551EA_041B_5D09_26AA_5B9459018020" xmi:type="uml:Node" name="Segmen Manajemen" scope="public">
+				<model package="EAPK_D6FE5F19_6D1A_9D11_1A7A_E6116D7C2D78" ea_eleType="element"/>
+				<properties documentation="" isSpecification="false" sType="Node" nType="0" scope="public" stereotype="ArchiMate_CommunicationNetwork" status="Approved"/>
+				<project author="Arsitek Sintetis" version="1.0" phase="1.0" created="2026-09-15 09:00:00" modified="2026-09-22 16:30:00" complexity="1" status="Approved"/>
+				<tags>
+					<tag xmi:id="EAID_TG833A86CF" name="vlan" value="199" modelElement="EAID_A8E551EA_041B_5D09_26AA_5B9459018020"/>
+					<tag xmi:id="EAID_TG2BB61735" name="subnet" value="10.10.99.0/24" modelElement="EAID_A8E551EA_041B_5D09_26AA_5B9459018020"/>
+					<tag xmi:id="EAID_TG8A2A1357" name="location" value="DC Jakarta (Cibitung)" modelElement="EAID_A8E551EA_041B_5D09_26AA_5B9459018020"/>
+				</tags>
+				<xrefs/>
+			</element>
+			<element xmi:idref="EAID_8F31BF9E_E70A_8295_4B02_39221A101269" xmi:type="uml:Device" name="fw-jkt-01" scope="public">
+				<model package="EAPK_D6FE5F19_6D1A_9D11_1A7A_E6116D7C2D78" ea_eleType="element"/>
+				<properties documentation="" isSpecification="false" sType="Device" nType="0" scope="public" stereotype="firewall" status="Approved"/>
+				<project author="Arsitek Sintetis" version="1.0" phase="1.0" created="2026-09-15 09:00:00" modified="2026-09-22 16:30:00" complexity="1" status="Approved"/>
+				<tags>
+					<tag xmi:id="EAID_TG51735DCB" name="hostname" value="fw-jkt-01" modelElement="EAID_8F31BF9E_E70A_8295_4B02_39221A101269"/>
+					<tag xmi:id="EAID_TGB7FD8C35" name="ip_address" value="10.10.99.1" modelElement="EAID_8F31BF9E_E70A_8295_4B02_39221A101269"/>
+					<tag xmi:id="EAID_TG15231BBA" name="environment" value="production" modelElement="EAID_8F31BF9E_E70A_8295_4B02_39221A101269"/>
+					<tag xmi:id="EAID_TG06101B35" name="location" value="DC Jakarta (Cibitung)" modelElement="EAID_8F31BF9E_E70A_8295_4B02_39221A101269"/>
+					<tag xmi:id="EAID_TG66FF24FC" name="os" value="FortiOS" modelElement="EAID_8F31BF9E_E70A_8295_4B02_39221A101269"/>
+					<tag xmi:id="EAID_TG02ABD28D" name="os_version" value="7.2" modelElement="EAID_8F31BF9E_E70A_8295_4B02_39221A101269"/>
+					<tag xmi:id="EAID_TGA5943A56" name="owner" value="Tim Network" modelElement="EAID_8F31BF9E_E70A_8295_4B02_39221A101269"/>
+					<tag xmi:id="EAID_TG8B208E3E" name="end_of_support" value="2027-09-30" modelElement="EAID_8F31BF9E_E70A_8295_4B02_39221A101269"/>
+					<tag xmi:id="EAID_TG89BD6935" name="vendor" value="Fortinet (sintetis)" modelElement="EAID_8F31BF9E_E70A_8295_4B02_39221A101269"/>
+				</tags>
+				<xrefs/>
+			</element>
+			<element xmi:idref="EAID_9F4D53C5_4DEE_DDF9_EB75_6634EC94FC5F" xmi:type="uml:Device" name="core-sw-jkt-01" scope="public">
+				<model package="EAPK_D6FE5F19_6D1A_9D11_1A7A_E6116D7C2D78" ea_eleType="element"/>
+				<properties documentation="" isSpecification="false" sType="Device" nType="0" scope="public" stereotype="switch" status="Approved"/>
+				<project author="Arsitek Sintetis" version="1.0" phase="1.0" created="2026-09-15 09:00:00" modified="2026-09-22 16:30:00" complexity="1" status="Approved"/>
+				<tags>
+					<tag xmi:id="EAID_TG61656792" name="hostname" value="core-sw-jkt-01" modelElement="EAID_9F4D53C5_4DEE_DDF9_EB75_6634EC94FC5F"/>
+					<tag xmi:id="EAID_TGC8006E2C" name="ip_address" value="10.10.99.2" modelElement="EAID_9F4D53C5_4DEE_DDF9_EB75_6634EC94FC5F"/>
+					<tag xmi:id="EAID_TGAF0CCBB0" name="environment" value="production" modelElement="EAID_9F4D53C5_4DEE_DDF9_EB75_6634EC94FC5F"/>
+					<tag xmi:id="EAID_TGB5433BEC" name="location" value="DC Jakarta (Cibitung)" modelElement="EAID_9F4D53C5_4DEE_DDF9_EB75_6634EC94FC5F"/>
+					<tag xmi:id="EAID_TGC80A1633" name="os" value="NX-OS" modelElement="EAID_9F4D53C5_4DEE_DDF9_EB75_6634EC94FC5F"/>
+					<tag xmi:id="EAID_TG101C1DCE" name="os_version" value="9.3" modelElement="EAID_9F4D53C5_4DEE_DDF9_EB75_6634EC94FC5F"/>
+					<tag xmi:id="EAID_TG84F3E4DB" name="owner" value="Tim Network" modelElement="EAID_9F4D53C5_4DEE_DDF9_EB75_6634EC94FC5F"/>
+					<tag xmi:id="EAID_TG39079DBB" name="end_of_support" value="2028-12-31" modelElement="EAID_9F4D53C5_4DEE_DDF9_EB75_6634EC94FC5F"/>
+				</tags>
+				<xrefs/>
+			</element>
+			<element xmi:idref="EAID_A6976FEB_C744_FFBE_2FDB_3D7EA217367D" xmi:type="uml:Device" name="lb-jkt-01" scope="public">
+				<model package="EAPK_D6FE5F19_6D1A_9D11_1A7A_E6116D7C2D78" ea_eleType="element"/>
+				<properties documentation="" isSpecification="false" sType="Device" nType="0" scope="public" stereotype="load balancer" status="Approved"/>
+				<project author="Arsitek Sintetis" version="1.0" phase="1.0" created="2026-09-15 09:00:00" modified="2026-09-22 16:30:00" complexity="1" status="Approved"/>
+				<tags>
+					<tag xmi:id="EAID_TG22634BED" name="hostname" value="lb-jkt-01" modelElement="EAID_A6976FEB_C744_FFBE_2FDB_3D7EA217367D"/>
+					<tag xmi:id="EAID_TGD4DA6371" name="ip_address" value="10.10.10.5" modelElement="EAID_A6976FEB_C744_FFBE_2FDB_3D7EA217367D"/>
+					<tag xmi:id="EAID_TG8D24EA65" name="environment" value="production" modelElement="EAID_A6976FEB_C744_FFBE_2FDB_3D7EA217367D"/>
+					<tag xmi:id="EAID_TG834DDD8B" name="location" value="DC Jakarta (Cibitung)" modelElement="EAID_A6976FEB_C744_FFBE_2FDB_3D7EA217367D"/>
+					<tag xmi:id="EAID_TG841B749A" name="os" value="TMOS" modelElement="EAID_A6976FEB_C744_FFBE_2FDB_3D7EA217367D"/>
+					<tag xmi:id="EAID_TGCFA84B59" name="os_version" value="15.1" modelElement="EAID_A6976FEB_C744_FFBE_2FDB_3D7EA217367D"/>
+					<tag xmi:id="EAID_TGBE2A04F6" name="owner" value="Tim Network" modelElement="EAID_A6976FEB_C744_FFBE_2FDB_3D7EA217367D"/>
+					<tag xmi:id="EAID_TG431C8D7F" name="end_of_support" value="2026-12-31" modelElement="EAID_A6976FEB_C744_FFBE_2FDB_3D7EA217367D"/>
+				</tags>
+				<xrefs/>
+			</element>
+			<element xmi:idref="EAID_86DA886E_91B3_C22D_7FFD_751D85739E1A" xmi:type="uml:Node" name="esx-jkt-01" scope="public">
+				<model package="EAPK_D6FE5F19_6D1A_9D11_1A7A_E6116D7C2D78" ea_eleType="element"/>
+				<properties documentation="" isSpecification="false" sType="Node" nType="0" scope="public" stereotype="server" status="Approved"/>
+				<project author="Arsitek Sintetis" version="1.0" phase="1.0" created="2026-09-15 09:00:00" modified="2026-09-22 16:30:00" complexity="1" status="Approved"/>
+				<tags>
+					<tag xmi:id="EAID_TG51167B94" name="hostname" value="esx-jkt-01" modelElement="EAID_86DA886E_91B3_C22D_7FFD_751D85739E1A"/>
+					<tag xmi:id="EAID_TGA82FB79F" name="ip_address" value="10.10.99.11" modelElement="EAID_86DA886E_91B3_C22D_7FFD_751D85739E1A"/>
+					<tag xmi:id="EAID_TG22702DAB" name="environment" value="production" modelElement="EAID_86DA886E_91B3_C22D_7FFD_751D85739E1A"/>
+					<tag xmi:id="EAID_TG9DBE666A" name="location" value="DC Jakarta (Cibitung)" modelElement="EAID_86DA886E_91B3_C22D_7FFD_751D85739E1A"/>
+					<tag xmi:id="EAID_TG3B22C566" name="os" value="VMware ESXi" modelElement="EAID_86DA886E_91B3_C22D_7FFD_751D85739E1A"/>
+					<tag xmi:id="EAID_TGEDCBA3C8" name="os_version" value="7.0 U3" modelElement="EAID_86DA886E_91B3_C22D_7FFD_751D85739E1A"/>
+					<tag xmi:id="EAID_TGDFEA36AE" name="owner" value="Tim Infrastruktur" modelElement="EAID_86DA886E_91B3_C22D_7FFD_751D85739E1A"/>
+					<tag xmi:id="EAID_TG20692C9A" name="end_of_support" value="2025-10-02" modelElement="EAID_86DA886E_91B3_C22D_7FFD_751D85739E1A"/>
+					<tag xmi:id="EAID_TGFF634F75" name="cpu" value="2x 20 core" modelElement="EAID_86DA886E_91B3_C22D_7FFD_751D85739E1A"/>
+					<tag xmi:id="EAID_TGB0A89135" name="ram" value="512 GB" modelElement="EAID_86DA886E_91B3_C22D_7FFD_751D85739E1A"/>
+				</tags>
+				<xrefs/>
+			</element>
+			<element xmi:idref="EAID_B8478A69_614F_F4CD_A81E_140E751FA69B" xmi:type="uml:Node" name="esx-jkt-02" scope="public">
+				<model package="EAPK_D6FE5F19_6D1A_9D11_1A7A_E6116D7C2D78" ea_eleType="element"/>
+				<properties documentation="" isSpecification="false" sType="Node" nType="0" scope="public" stereotype="server" status="Approved"/>
+				<project author="Arsitek Sintetis" version="1.0" phase="1.0" created="2026-09-15 09:00:00" modified="2026-09-22 16:30:00" complexity="1" status="Approved"/>
+				<tags>
+					<tag xmi:id="EAID_TGDBD9DCC2" name="hostname" value="esx-jkt-02" modelElement="EAID_B8478A69_614F_F4CD_A81E_140E751FA69B"/>
+					<tag xmi:id="EAID_TGEBC19AB4" name="ip_address" value="10.10.99.12" modelElement="EAID_B8478A69_614F_F4CD_A81E_140E751FA69B"/>
+					<tag xmi:id="EAID_TG744A0582" name="environment" value="production" modelElement="EAID_B8478A69_614F_F4CD_A81E_140E751FA69B"/>
+					<tag xmi:id="EAID_TG4F6D9D6E" name="location" value="DC Jakarta (Cibitung)" modelElement="EAID_B8478A69_614F_F4CD_A81E_140E751FA69B"/>
+					<tag xmi:id="EAID_TG55033058" name="os" value="VMware ESXi" modelElement="EAID_B8478A69_614F_F4CD_A81E_140E751FA69B"/>
+					<tag xmi:id="EAID_TG41D4D2EA" name="os_version" value="8.0 U2" modelElement="EAID_B8478A69_614F_F4CD_A81E_140E751FA69B"/>
+					<tag xmi:id="EAID_TG7535849A" name="owner" value="Tim Infrastruktur" modelElement="EAID_B8478A69_614F_F4CD_A81E_140E751FA69B"/>
+					<tag xmi:id="EAID_TG6C981954" name="end_of_support" value="2027-10-11" modelElement="EAID_B8478A69_614F_F4CD_A81E_140E751FA69B"/>
+					<tag xmi:id="EAID_TG53C104C5" name="cpu" value="2x 24 core" modelElement="EAID_B8478A69_614F_F4CD_A81E_140E751FA69B"/>
+					<tag xmi:id="EAID_TG1A04AB1C" name="ram" value="768 GB" modelElement="EAID_B8478A69_614F_F4CD_A81E_140E751FA69B"/>
+				</tags>
+				<xrefs/>
+			</element>
+			<element xmi:idref="EAID_7DA4B198_82A6_122B_2DA6_BE9B50D91F33" xmi:type="uml:Node" name="esx-sby-01" scope="public">
+				<model package="EAPK_D6FE5F19_6D1A_9D11_1A7A_E6116D7C2D78" ea_eleType="element"/>
+				<properties documentation="" isSpecification="false" sType="Node" nType="0" scope="public" stereotype="server" status="Approved"/>
+				<project author="Arsitek Sintetis" version="1.0" phase="1.0" created="2026-09-15 09:00:00" modified="2026-09-22 16:30:00" complexity="1" status="Approved"/>
+				<tags>
+					<tag xmi:id="EAID_TG87BC481E" name="hostname" value="esx-sby-01" modelElement="EAID_7DA4B198_82A6_122B_2DA6_BE9B50D91F33"/>
+					<tag xmi:id="EAID_TGDC397BD9" name="ip_address" value="10.20.99.11" modelElement="EAID_7DA4B198_82A6_122B_2DA6_BE9B50D91F33"/>
+					<tag xmi:id="EAID_TGA11FA0D2" name="environment" value="dr" modelElement="EAID_7DA4B198_82A6_122B_2DA6_BE9B50D91F33"/>
+					<tag xmi:id="EAID_TG9301163D" name="location" value="DRC Surabaya" modelElement="EAID_7DA4B198_82A6_122B_2DA6_BE9B50D91F33"/>
+					<tag xmi:id="EAID_TGF221FF4C" name="os" value="VMware ESXi" modelElement="EAID_7DA4B198_82A6_122B_2DA6_BE9B50D91F33"/>
+					<tag xmi:id="EAID_TG157E70BC" name="os_version" value="8.0 U2" modelElement="EAID_7DA4B198_82A6_122B_2DA6_BE9B50D91F33"/>
+					<tag xmi:id="EAID_TG31E73E03" name="owner" value="Tim Infrastruktur" modelElement="EAID_7DA4B198_82A6_122B_2DA6_BE9B50D91F33"/>
+					<tag xmi:id="EAID_TGDCD72D1D" name="end_of_support" value="2027-10-11" modelElement="EAID_7DA4B198_82A6_122B_2DA6_BE9B50D91F33"/>
+				</tags>
+				<xrefs/>
+			</element>
+			<element xmi:idref="EAID_88D97FFB_F48F_3A0A_D109_24C9C06FA3A2" xmi:type="uml:Node" name="san-jkt-01" scope="public">
+				<model package="EAPK_D6FE5F19_6D1A_9D11_1A7A_E6116D7C2D78" ea_eleType="element"/>
+				<properties documentation="" isSpecification="false" sType="Node" nType="0" scope="public" stereotype="storage" status="Approved"/>
+				<project author="Arsitek Sintetis" version="1.0" phase="1.0" created="2026-09-15 09:00:00" modified="2026-09-22 16:30:00" complexity="1" status="Approved"/>
+				<tags>
+					<tag xmi:id="EAID_TG976122FB" name="hostname" value="san-jkt-01" modelElement="EAID_88D97FFB_F48F_3A0A_D109_24C9C06FA3A2"/>
+					<tag xmi:id="EAID_TGFC25C764" name="ip_address" value="10.10.99.21" modelElement="EAID_88D97FFB_F48F_3A0A_D109_24C9C06FA3A2"/>
+					<tag xmi:id="EAID_TG55CDAA8A" name="environment" value="production" modelElement="EAID_88D97FFB_F48F_3A0A_D109_24C9C06FA3A2"/>
+					<tag xmi:id="EAID_TG5DC3ACB3" name="location" value="DC Jakarta (Cibitung)" modelElement="EAID_88D97FFB_F48F_3A0A_D109_24C9C06FA3A2"/>
+					<tag xmi:id="EAID_TG067F7503" name="owner" value="Tim Infrastruktur" modelElement="EAID_88D97FFB_F48F_3A0A_D109_24C9C06FA3A2"/>
+					<tag xmi:id="EAID_TG4988E8C7" name="capacity" value="120 TB" modelElement="EAID_88D97FFB_F48F_3A0A_D109_24C9C06FA3A2"/>
+					<tag xmi:id="EAID_TG6719A2A9" name="end_of_support" value="2029-03-31" modelElement="EAID_88D97FFB_F48F_3A0A_D109_24C9C06FA3A2"/>
+				</tags>
+				<xrefs/>
+			</element>
+			<element xmi:idref="EAID_44C79443_6D5D_F296_684A_715D7EE26967" xmi:type="uml:Node" name="srv-web-01" scope="public">
+				<model package="EAPK_D6FE5F19_6D1A_9D11_1A7A_E6116D7C2D78" ea_eleType="element"/>
+				<properties documentation="" isSpecification="false" sType="Node" nType="0" scope="public" stereotype="virtual machine" status="Approved"/>
+				<project author="Arsitek Sintetis" version="1.0" phase="1.0" created="2026-09-15 09:00:00" modified="2026-09-22 16:30:00" complexity="1" status="Approved"/>
+				<tags>
+					<tag xmi:id="EAID_TGC7B012EC" name="hostname" value="srv-web-01" modelElement="EAID_44C79443_6D5D_F296_684A_715D7EE26967"/>
+					<tag xmi:id="EAID_TG2C3B6EC6" name="ip_address" value="10.10.10.21" modelElement="EAID_44C79443_6D5D_F296_684A_715D7EE26967"/>
+					<tag xmi:id="EAID_TG63324872" name="environment" value="production" modelElement="EAID_44C79443_6D5D_F296_684A_715D7EE26967"/>
+					<tag xmi:id="EAID_TG3C9D2206" name="location" value="DC Jakarta (Cibitung)" modelElement="EAID_44C79443_6D5D_F296_684A_715D7EE26967"/>
+					<tag xmi:id="EAID_TG36A783BA" name="os" value="Ubuntu Server" modelElement="EAID_44C79443_6D5D_F296_684A_715D7EE26967"/>
+					<tag xmi:id="EAID_TG06C2EA45" name="os_version" value="22.04 LTS" modelElement="EAID_44C79443_6D5D_F296_684A_715D7EE26967"/>
+					<tag xmi:id="EAID_TG390A4355" name="owner" value="Tim Aplikasi" modelElement="EAID_44C79443_6D5D_F296_684A_715D7EE26967"/>
+					<tag xmi:id="EAID_TGF41C078B" name="end_of_support" value="2027-04-30" modelElement="EAID_44C79443_6D5D_F296_684A_715D7EE26967"/>
+				</tags>
+				<xrefs/>
+			</element>
+			<element xmi:idref="EAID_78ED7912_2DB2_1A93_70FC_86915021FC7D" xmi:type="uml:Node" name="srv-web-02" scope="public">
+				<model package="EAPK_D6FE5F19_6D1A_9D11_1A7A_E6116D7C2D78" ea_eleType="element"/>
+				<properties documentation="" isSpecification="false" sType="Node" nType="0" scope="public" stereotype="virtual machine" status="Approved"/>
+				<project author="Arsitek Sintetis" version="1.0" phase="1.0" created="2026-09-15 09:00:00" modified="2026-09-22 16:30:00" complexity="1" status="Approved"/>
+				<tags>
+					<tag xmi:id="EAID_TG145AB30B" name="hostname" value="srv-web-02" modelElement="EAID_78ED7912_2DB2_1A93_70FC_86915021FC7D"/>
+					<tag xmi:id="EAID_TG1351DE49" name="ip_address" value="10.10.10.22" modelElement="EAID_78ED7912_2DB2_1A93_70FC_86915021FC7D"/>
+					<tag xmi:id="EAID_TG0BCEF18F" name="environment" value="production" modelElement="EAID_78ED7912_2DB2_1A93_70FC_86915021FC7D"/>
+					<tag xmi:id="EAID_TG61CB0824" name="location" value="DC Jakarta (Cibitung)" modelElement="EAID_78ED7912_2DB2_1A93_70FC_86915021FC7D"/>
+					<tag xmi:id="EAID_TG49A8965D" name="os" value="Ubuntu Server" modelElement="EAID_78ED7912_2DB2_1A93_70FC_86915021FC7D"/>
+					<tag xmi:id="EAID_TG98052A17" name="os_version" value="22.04 LTS" modelElement="EAID_78ED7912_2DB2_1A93_70FC_86915021FC7D"/>
+					<tag xmi:id="EAID_TGE7391262" name="owner" value="Tim Aplikasi" modelElement="EAID_78ED7912_2DB2_1A93_70FC_86915021FC7D"/>
+					<tag xmi:id="EAID_TGFF864744" name="end_of_support" value="2027-04-30" modelElement="EAID_78ED7912_2DB2_1A93_70FC_86915021FC7D"/>
+				</tags>
+				<xrefs/>
+			</element>
+			<element xmi:idref="EAID_48E8B393_7A29_883F_D4AF_3C3525FC4BB8" xmi:type="uml:Node" name="srv-app-01" scope="public">
+				<model package="EAPK_D6FE5F19_6D1A_9D11_1A7A_E6116D7C2D78" ea_eleType="element"/>
+				<properties documentation="" isSpecification="false" sType="Node" nType="0" scope="public" stereotype="virtual machine" status="Approved"/>
+				<project author="Arsitek Sintetis" version="1.0" phase="1.0" created="2026-09-15 09:00:00" modified="2026-09-22 16:30:00" complexity="1" status="Approved"/>
+				<tags>
+					<tag xmi:id="EAID_TGA4B696F1" name="hostname" value="srv-app-01" modelElement="EAID_48E8B393_7A29_883F_D4AF_3C3525FC4BB8"/>
+					<tag xmi:id="EAID_TGA407C015" name="ip_address" value="10.10.20.31" modelElement="EAID_48E8B393_7A29_883F_D4AF_3C3525FC4BB8"/>
+					<tag xmi:id="EAID_TGAF63AB2F" name="environment" value="production" modelElement="EAID_48E8B393_7A29_883F_D4AF_3C3525FC4BB8"/>
+					<tag xmi:id="EAID_TG786F7D15" name="location" value="DC Jakarta (Cibitung)" modelElement="EAID_48E8B393_7A29_883F_D4AF_3C3525FC4BB8"/>
+					<tag xmi:id="EAID_TGE56678CD" name="os" value="Windows Server" modelElement="EAID_48E8B393_7A29_883F_D4AF_3C3525FC4BB8"/>
+					<tag xmi:id="EAID_TG84EF36DB" name="os_version" value="2016" modelElement="EAID_48E8B393_7A29_883F_D4AF_3C3525FC4BB8"/>
+					<tag xmi:id="EAID_TG5DEBE3B6" name="owner" value="Tim Aplikasi" modelElement="EAID_48E8B393_7A29_883F_D4AF_3C3525FC4BB8"/>
+					<tag xmi:id="EAID_TG001294FD" name="end_of_support" value="2027-01-12" modelElement="EAID_48E8B393_7A29_883F_D4AF_3C3525FC4BB8"/>
+				</tags>
+				<xrefs/>
+			</element>
+			<element xmi:idref="EAID_EE5AEACC_FAF1_5C65_47EA_07B0F77C328B" xmi:type="uml:Node" name="srv-app-02" scope="public">
+				<model package="EAPK_D6FE5F19_6D1A_9D11_1A7A_E6116D7C2D78" ea_eleType="element"/>
+				<properties documentation="" isSpecification="false" sType="Node" nType="0" scope="public" stereotype="virtual machine" status="Approved"/>
+				<project author="Arsitek Sintetis" version="1.0" phase="1.0" created="2026-09-15 09:00:00" modified="2026-09-22 16:30:00" complexity="1" status="Approved"/>
+				<tags>
+					<tag xmi:id="EAID_TG0C8A199C" name="hostname" value="srv-app-02" modelElement="EAID_EE5AEACC_FAF1_5C65_47EA_07B0F77C328B"/>
+					<tag xmi:id="EAID_TG55C4B0E4" name="ip_address" value="10.10.20.32" modelElement="EAID_EE5AEACC_FAF1_5C65_47EA_07B0F77C328B"/>
+					<tag xmi:id="EAID_TG7A6B0A35" name="environment" value="production" modelElement="EAID_EE5AEACC_FAF1_5C65_47EA_07B0F77C328B"/>
+					<tag xmi:id="EAID_TG1B556E47" name="location" value="DC Jakarta (Cibitung)" modelElement="EAID_EE5AEACC_FAF1_5C65_47EA_07B0F77C328B"/>
+					<tag xmi:id="EAID_TG8328F9EA" name="os" value="Red Hat Enterprise Linux" modelElement="EAID_EE5AEACC_FAF1_5C65_47EA_07B0F77C328B"/>
+					<tag xmi:id="EAID_TG8C2A7351" name="os_version" value="8.10" modelElement="EAID_EE5AEACC_FAF1_5C65_47EA_07B0F77C328B"/>
+					<tag xmi:id="EAID_TGE9F64CBD" name="owner" value="Tim Aplikasi" modelElement="EAID_EE5AEACC_FAF1_5C65_47EA_07B0F77C328B"/>
+					<tag xmi:id="EAID_TGB8CE1F11" name="end_of_support" value="2029-05-31" modelElement="EAID_EE5AEACC_FAF1_5C65_47EA_07B0F77C328B"/>
+				</tags>
+				<xrefs/>
+			</element>
+			<element xmi:idref="EAID_A9BADE2C_929B_9092_AFA4_E855755DD958" xmi:type="uml:Node" name="srv-db-01" scope="public">
+				<model package="EAPK_D6FE5F19_6D1A_9D11_1A7A_E6116D7C2D78" ea_eleType="element"/>
+				<properties documentation="" isSpecification="false" sType="Node" nType="0" scope="public" stereotype="virtual machine" status="Approved"/>
+				<project author="Arsitek Sintetis" version="1.0" phase="1.0" created="2026-09-15 09:00:00" modified="2026-09-22 16:30:00" complexity="1" status="Approved"/>
+				<tags>
+					<tag xmi:id="EAID_TGC8425612" name="hostname" value="srv-db-01" modelElement="EAID_A9BADE2C_929B_9092_AFA4_E855755DD958"/>
+					<tag xmi:id="EAID_TG2C74F9AB" name="ip_address" value="10.10.30.41" modelElement="EAID_A9BADE2C_929B_9092_AFA4_E855755DD958"/>
+					<tag xmi:id="EAID_TG49BD8C52" name="environment" value="production" modelElement="EAID_A9BADE2C_929B_9092_AFA4_E855755DD958"/>
+					<tag xmi:id="EAID_TGE2308DCC" name="location" value="DC Jakarta (Cibitung)" modelElement="EAID_A9BADE2C_929B_9092_AFA4_E855755DD958"/>
+					<tag xmi:id="EAID_TG3634F51A" name="os" value="Red Hat Enterprise Linux" modelElement="EAID_A9BADE2C_929B_9092_AFA4_E855755DD958"/>
+					<tag xmi:id="EAID_TGD70A53F2" name="os_version" value="8.10" modelElement="EAID_A9BADE2C_929B_9092_AFA4_E855755DD958"/>
+					<tag xmi:id="EAID_TGA7E38DB9" name="owner" value="Tim Database" modelElement="EAID_A9BADE2C_929B_9092_AFA4_E855755DD958"/>
+					<tag xmi:id="EAID_TG65A6BF9D" name="end_of_support" value="2029-05-31" modelElement="EAID_A9BADE2C_929B_9092_AFA4_E855755DD958"/>
+				</tags>
+				<xrefs/>
+			</element>
+			<element xmi:idref="EAID_C7FDAFD0_F848_D6EF_13F3_9A338946E5F3" xmi:type="uml:Node" name="srv-db-dr-01" scope="public">
+				<model package="EAPK_D6FE5F19_6D1A_9D11_1A7A_E6116D7C2D78" ea_eleType="element"/>
+				<properties documentation="" isSpecification="false" sType="Node" nType="0" scope="public" stereotype="virtual machine" status="Approved"/>
+				<project author="Arsitek Sintetis" version="1.0" phase="1.0" created="2026-09-15 09:00:00" modified="2026-09-22 16:30:00" complexity="1" status="Approved"/>
+				<tags>
+					<tag xmi:id="EAID_TGECC13D89" name="hostname" value="srv-db-dr-01" modelElement="EAID_C7FDAFD0_F848_D6EF_13F3_9A338946E5F3"/>
+					<tag xmi:id="EAID_TGD81D6C6F" name="ip_address" value="10.20.30.41" modelElement="EAID_C7FDAFD0_F848_D6EF_13F3_9A338946E5F3"/>
+					<tag xmi:id="EAID_TG5AFEA5F7" name="environment" value="dr" modelElement="EAID_C7FDAFD0_F848_D6EF_13F3_9A338946E5F3"/>
+					<tag xmi:id="EAID_TG649F92D0" name="location" value="DRC Surabaya" modelElement="EAID_C7FDAFD0_F848_D6EF_13F3_9A338946E5F3"/>
+					<tag xmi:id="EAID_TGAEC1ECED" name="os" value="Red Hat Enterprise Linux" modelElement="EAID_C7FDAFD0_F848_D6EF_13F3_9A338946E5F3"/>
+					<tag xmi:id="EAID_TG564DC1B9" name="os_version" value="8.10" modelElement="EAID_C7FDAFD0_F848_D6EF_13F3_9A338946E5F3"/>
+					<tag xmi:id="EAID_TGF3EE878A" name="owner" value="Tim Database" modelElement="EAID_C7FDAFD0_F848_D6EF_13F3_9A338946E5F3"/>
+					<tag xmi:id="EAID_TGE4557A74" name="end_of_support" value="2029-05-31" modelElement="EAID_C7FDAFD0_F848_D6EF_13F3_9A338946E5F3"/>
+				</tags>
+				<xrefs/>
+			</element>
+			<element xmi:idref="EAID_280C3D49_D517_9B56_1FFB_B73A33B930EE" xmi:type="uml:Node" name="srv-ad-01" scope="public">
+				<model package="EAPK_D6FE5F19_6D1A_9D11_1A7A_E6116D7C2D78" ea_eleType="element"/>
+				<properties documentation="" isSpecification="false" sType="Node" nType="0" scope="public" stereotype="virtual machine" status="Approved"/>
+				<project author="Arsitek Sintetis" version="1.0" phase="1.0" created="2026-09-15 09:00:00" modified="2026-09-22 16:30:00" complexity="1" status="Approved"/>
+				<tags>
+					<tag xmi:id="EAID_TG37A9A215" name="hostname" value="srv-ad-01" modelElement="EAID_280C3D49_D517_9B56_1FFB_B73A33B930EE"/>
+					<tag xmi:id="EAID_TGA3B94A73" name="ip_address" value="10.10.99.51" modelElement="EAID_280C3D49_D517_9B56_1FFB_B73A33B930EE"/>
+					<tag xmi:id="EAID_TG1FE5AD15" name="environment" value="production" modelElement="EAID_280C3D49_D517_9B56_1FFB_B73A33B930EE"/>
+					<tag xmi:id="EAID_TGC7D43867" name="location" value="DC Jakarta (Cibitung)" modelElement="EAID_280C3D49_D517_9B56_1FFB_B73A33B930EE"/>
+					<tag xmi:id="EAID_TGA6DD7539" name="os" value="Windows Server" modelElement="EAID_280C3D49_D517_9B56_1FFB_B73A33B930EE"/>
+					<tag xmi:id="EAID_TG63C4497C" name="os_version" value="2019" modelElement="EAID_280C3D49_D517_9B56_1FFB_B73A33B930EE"/>
+					<tag xmi:id="EAID_TG706E8FCB" name="owner" value="Tim Infrastruktur" modelElement="EAID_280C3D49_D517_9B56_1FFB_B73A33B930EE"/>
+					<tag xmi:id="EAID_TG236D4994" name="end_of_support" value="2029-01-09" modelElement="EAID_280C3D49_D517_9B56_1FFB_B73A33B930EE"/>
+				</tags>
+				<xrefs/>
+			</element>
+			<element xmi:idref="EAID_7A6CDBDA_DA40_FF6C_7F25_F884B6BD1B23" xmi:type="uml:Node" name="srv-mon-01" scope="public">
+				<model package="EAPK_D6FE5F19_6D1A_9D11_1A7A_E6116D7C2D78" ea_eleType="element"/>
+				<properties documentation="Menunggu migrasi ke Rocky Linux 9." isSpecification="false" sType="Node" nType="0" scope="public" stereotype="virtual machine" status="Approved"/>
+				<project author="Arsitek Sintetis" version="1.0" phase="1.0" created="2026-09-15 09:00:00" modified="2026-09-22 16:30:00" complexity="1" status="Approved"/>
+				<tags>
+					<tag xmi:id="EAID_TGDE416A6D" name="hostname" value="srv-mon-01" modelElement="EAID_7A6CDBDA_DA40_FF6C_7F25_F884B6BD1B23"/>
+					<tag xmi:id="EAID_TG9607E97F" name="ip_address" value="10.10.99.61" modelElement="EAID_7A6CDBDA_DA40_FF6C_7F25_F884B6BD1B23"/>
+					<tag xmi:id="EAID_TG79CD29B4" name="environment" value="production" modelElement="EAID_7A6CDBDA_DA40_FF6C_7F25_F884B6BD1B23"/>
+					<tag xmi:id="EAID_TG09541345" name="location" value="DC Jakarta (Cibitung)" modelElement="EAID_7A6CDBDA_DA40_FF6C_7F25_F884B6BD1B23"/>
+					<tag xmi:id="EAID_TG0106D93E" name="os" value="CentOS" modelElement="EAID_7A6CDBDA_DA40_FF6C_7F25_F884B6BD1B23"/>
+					<tag xmi:id="EAID_TG03546D15" name="os_version" value="7.9" modelElement="EAID_7A6CDBDA_DA40_FF6C_7F25_F884B6BD1B23"/>
+					<tag xmi:id="EAID_TG1C907CB9" name="owner" value="Tim Infrastruktur" modelElement="EAID_7A6CDBDA_DA40_FF6C_7F25_F884B6BD1B23"/>
+					<tag xmi:id="EAID_TGFC4E1CA5" name="end_of_support" value="2024-06-30" modelElement="EAID_7A6CDBDA_DA40_FF6C_7F25_F884B6BD1B23"/>
+				</tags>
+				<xrefs/>
+			</element>
+			<element xmi:idref="EAID_78485970_37B1_840E_FE99_1BD9A1F2F71C" xmi:type="uml:Node" name="srv-app-stg-01" scope="public">
+				<model package="EAPK_D6FE5F19_6D1A_9D11_1A7A_E6116D7C2D78" ea_eleType="element"/>
+				<properties documentation="" isSpecification="false" sType="Node" nType="0" scope="public" stereotype="virtual machine" status="Approved"/>
+				<project author="Arsitek Sintetis" version="1.0" phase="1.0" created="2026-09-15 09:00:00" modified="2026-09-22 16:30:00" complexity="1" status="Approved"/>
+				<tags>
+					<tag xmi:id="EAID_TGE5784893" name="hostname" value="srv-app-stg-01" modelElement="EAID_78485970_37B1_840E_FE99_1BD9A1F2F71C"/>
+					<tag xmi:id="EAID_TG1D2DA415" name="ip_address" value="10.10.20.131" modelElement="EAID_78485970_37B1_840E_FE99_1BD9A1F2F71C"/>
+					<tag xmi:id="EAID_TGD409707E" name="environment" value="staging" modelElement="EAID_78485970_37B1_840E_FE99_1BD9A1F2F71C"/>
+					<tag xmi:id="EAID_TG789D2D1E" name="location" value="DC Jakarta (Cibitung)" modelElement="EAID_78485970_37B1_840E_FE99_1BD9A1F2F71C"/>
+					<tag xmi:id="EAID_TG2E764793" name="os" value="Red Hat Enterprise Linux" modelElement="EAID_78485970_37B1_840E_FE99_1BD9A1F2F71C"/>
+					<tag xmi:id="EAID_TG23D5A792" name="os_version" value="8.10" modelElement="EAID_78485970_37B1_840E_FE99_1BD9A1F2F71C"/>
+					<tag xmi:id="EAID_TG3F534A2F" name="owner" value="Tim Aplikasi" modelElement="EAID_78485970_37B1_840E_FE99_1BD9A1F2F71C"/>
+					<tag xmi:id="EAID_TGFDF1458C" name="end_of_support" value="2029-05-31" modelElement="EAID_78485970_37B1_840E_FE99_1BD9A1F2F71C"/>
+				</tags>
+				<xrefs/>
+			</element>
+			<element xmi:idref="EAID_9691288B_EE91_0B4C_26E5_09669FDF8000" xmi:type="uml:Node" name="srv-legacy-01" scope="public">
+				<model package="EAPK_D6FE5F19_6D1A_9D11_1A7A_E6116D7C2D78" ea_eleType="element"/>
+				<properties documentation="Dijadwalkan pensiun setelah migrasi Aplikasi Absensi versi lama." isSpecification="false" sType="Node" nType="0" scope="public" stereotype="virtual machine" status="Retiring"/>
+				<project author="Arsitek Sintetis" version="1.0" phase="1.0" created="2026-09-15 09:00:00" modified="2026-09-22 16:30:00" complexity="1" status="Retiring"/>
+				<tags>
+					<tag xmi:id="EAID_TG9F42BAF1" name="hostname" value="srv-legacy-01" modelElement="EAID_9691288B_EE91_0B4C_26E5_09669FDF8000"/>
+					<tag xmi:id="EAID_TGFC8E12C2" name="ip_address" value="10.10.20.99" modelElement="EAID_9691288B_EE91_0B4C_26E5_09669FDF8000"/>
+					<tag xmi:id="EAID_TG40A6CB32" name="environment" value="production" modelElement="EAID_9691288B_EE91_0B4C_26E5_09669FDF8000"/>
+					<tag xmi:id="EAID_TG741F4B74" name="location" value="DC Jakarta (Cibitung)" modelElement="EAID_9691288B_EE91_0B4C_26E5_09669FDF8000"/>
+					<tag xmi:id="EAID_TG081EA1DD" name="os" value="Windows Server" modelElement="EAID_9691288B_EE91_0B4C_26E5_09669FDF8000"/>
+					<tag xmi:id="EAID_TGDC77483C" name="os_version" value="2012 R2" modelElement="EAID_9691288B_EE91_0B4C_26E5_09669FDF8000"/>
+					<tag xmi:id="EAID_TG7B023914" name="owner" value="Tim Aplikasi" modelElement="EAID_9691288B_EE91_0B4C_26E5_09669FDF8000"/>
+					<tag xmi:id="EAID_TGF465CF10" name="end_of_support" value="2023-10-10" modelElement="EAID_9691288B_EE91_0B4C_26E5_09669FDF8000"/>
+				</tags>
+				<xrefs/>
+			</element>
+			<element xmi:idref="EAID_59E459E9_8A66_691B_E7E0_523146934D8F" xmi:type="uml:ExecutionEnvironment" name="PostgreSQL 13" scope="public">
+				<model package="EAPK_D6FE5F19_6D1A_9D11_1A7A_E6116D7C2D78" ea_eleType="element"/>
+				<properties documentation="" isSpecification="false" sType="ExecutionEnvironment" nType="0" scope="public" stereotype="ArchiMate_SystemSoftware" status="Approved"/>
+				<project author="Arsitek Sintetis" version="1.0" phase="1.0" created="2026-09-15 09:00:00" modified="2026-09-22 16:30:00" complexity="1" status="Approved"/>
+				<tags>
+					<tag xmi:id="EAID_TG55318219" name="os" value="PostgreSQL" modelElement="EAID_59E459E9_8A66_691B_E7E0_523146934D8F"/>
+					<tag xmi:id="EAID_TG6316F50F" name="os_version" value="13.14" modelElement="EAID_59E459E9_8A66_691B_E7E0_523146934D8F"/>
+					<tag xmi:id="EAID_TGE21134FA" name="environment" value="production" modelElement="EAID_59E459E9_8A66_691B_E7E0_523146934D8F"/>
+					<tag xmi:id="EAID_TGABE22014" name="owner" value="Tim Database" modelElement="EAID_59E459E9_8A66_691B_E7E0_523146934D8F"/>
+					<tag xmi:id="EAID_TG760C2F56" name="end_of_support" value="2025-11-13" modelElement="EAID_59E459E9_8A66_691B_E7E0_523146934D8F"/>
+				</tags>
+				<xrefs/>
+			</element>
+			<element xmi:idref="EAID_0356630A_43A3_5EF9_62F1_338FC1813F89" xmi:type="uml:ExecutionEnvironment" name="PostgreSQL 16" scope="public">
+				<model package="EAPK_D6FE5F19_6D1A_9D11_1A7A_E6116D7C2D78" ea_eleType="element"/>
+				<properties documentation="" isSpecification="false" sType="ExecutionEnvironment" nType="0" scope="public" stereotype="ArchiMate_SystemSoftware" status="Approved"/>
+				<project author="Arsitek Sintetis" version="1.0" phase="1.0" created="2026-09-15 09:00:00" modified="2026-09-22 16:30:00" complexity="1" status="Approved"/>
+				<tags>
+					<tag xmi:id="EAID_TG677D7B56" name="os" value="PostgreSQL" modelElement="EAID_0356630A_43A3_5EF9_62F1_338FC1813F89"/>
+					<tag xmi:id="EAID_TG6936EE97" name="os_version" value="16.3" modelElement="EAID_0356630A_43A3_5EF9_62F1_338FC1813F89"/>
+					<tag xmi:id="EAID_TG01827E1D" name="environment" value="production" modelElement="EAID_0356630A_43A3_5EF9_62F1_338FC1813F89"/>
+					<tag xmi:id="EAID_TG72C246F9" name="owner" value="Tim Database" modelElement="EAID_0356630A_43A3_5EF9_62F1_338FC1813F89"/>
+					<tag xmi:id="EAID_TG8BBA0B1F" name="end_of_support" value="2028-11-09" modelElement="EAID_0356630A_43A3_5EF9_62F1_338FC1813F89"/>
+				</tags>
+				<xrefs/>
+			</element>
+			<element xmi:idref="EAID_3D56288B_33AF_A4C7_6297_21B28912691B" xmi:type="uml:ExecutionEnvironment" name="Nginx" scope="public">
+				<model package="EAPK_D6FE5F19_6D1A_9D11_1A7A_E6116D7C2D78" ea_eleType="element"/>
+				<properties documentation="" isSpecification="false" sType="ExecutionEnvironment" nType="0" scope="public" stereotype="ArchiMate_SystemSoftware" status="Approved"/>
+				<project author="Arsitek Sintetis" version="1.0" phase="1.0" created="2026-09-15 09:00:00" modified="2026-09-22 16:30:00" complexity="1" status="Approved"/>
+				<tags>
+					<tag xmi:id="EAID_TGC0581187" name="os" value="Nginx" modelElement="EAID_3D56288B_33AF_A4C7_6297_21B28912691B"/>
+					<tag xmi:id="EAID_TGC73D3A82" name="os_version" value="1.24" modelElement="EAID_3D56288B_33AF_A4C7_6297_21B28912691B"/>
+					<tag xmi:id="EAID_TGD2D68EAC" name="environment" value="production" modelElement="EAID_3D56288B_33AF_A4C7_6297_21B28912691B"/>
+					<tag xmi:id="EAID_TG7699BBAF" name="owner" value="Tim Aplikasi" modelElement="EAID_3D56288B_33AF_A4C7_6297_21B28912691B"/>
+				</tags>
+				<xrefs/>
+			</element>
+			<element xmi:idref="EAID_842FA707_4AA2_561C_66D9_AD850946C02C" xmi:type="uml:ExecutionEnvironment" name="Active Directory" scope="public">
+				<model package="EAPK_D6FE5F19_6D1A_9D11_1A7A_E6116D7C2D78" ea_eleType="element"/>
+				<properties documentation="" isSpecification="false" sType="ExecutionEnvironment" nType="0" scope="public" stereotype="ArchiMate_SystemSoftware" status="Approved"/>
+				<project author="Arsitek Sintetis" version="1.0" phase="1.0" created="2026-09-15 09:00:00" modified="2026-09-22 16:30:00" complexity="1" status="Approved"/>
+				<tags>
+					<tag xmi:id="EAID_TG47F2E88C" name="environment" value="production" modelElement="EAID_842FA707_4AA2_561C_66D9_AD850946C02C"/>
+					<tag xmi:id="EAID_TG9FA09F52" name="owner" value="Tim Infrastruktur" modelElement="EAID_842FA707_4AA2_561C_66D9_AD850946C02C"/>
+				</tags>
+				<xrefs/>
+			</element>
+			<element xmi:idref="EAID_DDF8D037_775B_7868_6060_3124736CCCE3" xmi:type="uml:Component" name="Portal Tiket" scope="public">
+				<model package="EAPK_D6FE5F19_6D1A_9D11_1A7A_E6116D7C2D78" ea_eleType="element"/>
+				<properties documentation="Portal permintaan layanan TI." isSpecification="false" sType="Component" nType="0" scope="public" stereotype="ArchiMate_ApplicationComponent" status="Approved"/>
+				<project author="Arsitek Sintetis" version="1.0" phase="1.0" created="2026-09-15 09:00:00" modified="2026-09-22 16:30:00" complexity="1" status="Approved"/>
+				<tags>
+					<tag xmi:id="EAID_TG3AE9F186" name="environment" value="production" modelElement="EAID_DDF8D037_775B_7868_6060_3124736CCCE3"/>
+					<tag xmi:id="EAID_TGE5F6F925" name="owner" value="Tim Aplikasi" modelElement="EAID_DDF8D037_775B_7868_6060_3124736CCCE3"/>
+					<tag xmi:id="EAID_TGAE30418C" name="criticality" value="Tinggi" modelElement="EAID_DDF8D037_775B_7868_6060_3124736CCCE3"/>
+				</tags>
+				<xrefs/>
+			</element>
+			<element xmi:idref="EAID_31A534BC_6FF8_F348_3DA8_11F604A0381C" xmi:type="uml:Component" name="Aplikasi Absensi" scope="public">
+				<model package="EAPK_D6FE5F19_6D1A_9D11_1A7A_E6116D7C2D78" ea_eleType="element"/>
+				<properties documentation="" isSpecification="false" sType="Component" nType="0" scope="public" stereotype="ArchiMate_ApplicationComponent" status="Approved"/>
+				<project author="Arsitek Sintetis" version="1.0" phase="1.0" created="2026-09-15 09:00:00" modified="2026-09-22 16:30:00" complexity="1" status="Approved"/>
+				<tags>
+					<tag xmi:id="EAID_TGCA12C2DD" name="environment" value="production" modelElement="EAID_31A534BC_6FF8_F348_3DA8_11F604A0381C"/>
+					<tag xmi:id="EAID_TG3987DF92" name="owner" value="Tim Aplikasi" modelElement="EAID_31A534BC_6FF8_F348_3DA8_11F604A0381C"/>
+					<tag xmi:id="EAID_TG388CB9DC" name="criticality" value="Tinggi" modelElement="EAID_31A534BC_6FF8_F348_3DA8_11F604A0381C"/>
+				</tags>
+				<xrefs/>
+			</element>
+			<element xmi:idref="EAID_4F27EC59_CDC2_CD47_F761_F4754D1769E5" xmi:type="uml:Component" name="IntraDocs" scope="public">
+				<model package="EAPK_D6FE5F19_6D1A_9D11_1A7A_E6116D7C2D78" ea_eleType="element"/>
+				<properties documentation="" isSpecification="false" sType="Component" nType="0" scope="public" stereotype="ArchiMate_ApplicationComponent" status="Approved"/>
+				<project author="Arsitek Sintetis" version="1.0" phase="1.0" created="2026-09-15 09:00:00" modified="2026-09-22 16:30:00" complexity="1" status="Approved"/>
+				<tags>
+					<tag xmi:id="EAID_TGE4B3E7D3" name="environment" value="production" modelElement="EAID_4F27EC59_CDC2_CD47_F761_F4754D1769E5"/>
+					<tag xmi:id="EAID_TG5DF629C9" name="owner" value="Tim Aplikasi" modelElement="EAID_4F27EC59_CDC2_CD47_F761_F4754D1769E5"/>
+					<tag xmi:id="EAID_TGF515D3CC" name="criticality" value="Sedang" modelElement="EAID_4F27EC59_CDC2_CD47_F761_F4754D1769E5"/>
+				</tags>
+				<xrefs/>
+			</element>
+			<element xmi:idref="EAID_F64A3494_6DCA_4D0F_CD53_04092466EAF3" xmi:type="uml:Component" name="Zabbix Monitoring" scope="public">
+				<model package="EAPK_D6FE5F19_6D1A_9D11_1A7A_E6116D7C2D78" ea_eleType="element"/>
+				<properties documentation="" isSpecification="false" sType="Component" nType="0" scope="public" stereotype="ArchiMate_ApplicationComponent" status="Approved"/>
+				<project author="Arsitek Sintetis" version="1.0" phase="1.0" created="2026-09-15 09:00:00" modified="2026-09-22 16:30:00" complexity="1" status="Approved"/>
+				<tags>
+					<tag xmi:id="EAID_TG2DC9152D" name="environment" value="production" modelElement="EAID_F64A3494_6DCA_4D0F_CD53_04092466EAF3"/>
+					<tag xmi:id="EAID_TG26156007" name="owner" value="Tim Infrastruktur" modelElement="EAID_F64A3494_6DCA_4D0F_CD53_04092466EAF3"/>
+					<tag xmi:id="EAID_TGF984AF15" name="criticality" value="Sedang" modelElement="EAID_F64A3494_6DCA_4D0F_CD53_04092466EAF3"/>
+				</tags>
+				<xrefs/>
+			</element>
+			<element xmi:idref="EAID_DB14EAF4_B8AB_7709_5754_BD4FC21BAFAF" xmi:type="uml:Actor" name="Divisi Keuangan" scope="public">
+				<model package="EAPK_D6FE5F19_6D1A_9D11_1A7A_E6116D7C2D78" ea_eleType="element"/>
+				<properties documentation="" isSpecification="false" sType="Actor" nType="0" scope="public" stereotype="ArchiMate_BusinessActor" status="Approved"/>
+				<project author="Arsitek Sintetis" version="1.0" phase="1.0" created="2026-09-15 09:00:00" modified="2026-09-22 16:30:00" complexity="1" status="Approved"/>
+				<tags/>
+				<xrefs/>
+			</element>
+		</elements>
+		<connectors>
+			<connector xmi:idref="EAID_22C1801F_5202_2DF7_6DBF_1630AA02AB70">
+				<source xmi:idref="EAID_86DA886E_91B3_C22D_7FFD_751D85739E1A"><model type="Node" name="esx-jkt-01"/></source>
+				<target xmi:idref="EAID_8B83FC80_2ADD_989D_76C6_851014A038C0"><model type="Node" name="DC Jakarta (Cibitung)"/></target>
+				<properties ea_type="Association" stereotype="located in" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_FBCFC1CE_7896_9641_A606_3DAFA350904C">
+				<source xmi:idref="EAID_B8478A69_614F_F4CD_A81E_140E751FA69B"><model type="Node" name="esx-jkt-02"/></source>
+				<target xmi:idref="EAID_8B83FC80_2ADD_989D_76C6_851014A038C0"><model type="Node" name="DC Jakarta (Cibitung)"/></target>
+				<properties ea_type="Association" stereotype="located in" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_4F093470_B32D_3199_8130_B6F2609D9911">
+				<source xmi:idref="EAID_88D97FFB_F48F_3A0A_D109_24C9C06FA3A2"><model type="Node" name="san-jkt-01"/></source>
+				<target xmi:idref="EAID_8B83FC80_2ADD_989D_76C6_851014A038C0"><model type="Node" name="DC Jakarta (Cibitung)"/></target>
+				<properties ea_type="Association" stereotype="located in" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_D59A4E23_0201_428F_AF3A_45AEA1B582E2">
+				<source xmi:idref="EAID_8F31BF9E_E70A_8295_4B02_39221A101269"><model type="Device" name="fw-jkt-01"/></source>
+				<target xmi:idref="EAID_8B83FC80_2ADD_989D_76C6_851014A038C0"><model type="Node" name="DC Jakarta (Cibitung)"/></target>
+				<properties ea_type="Association" stereotype="located in" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_6E4718CE_F5A5_69F3_DEAF_FADFE67DE886">
+				<source xmi:idref="EAID_9F4D53C5_4DEE_DDF9_EB75_6634EC94FC5F"><model type="Device" name="core-sw-jkt-01"/></source>
+				<target xmi:idref="EAID_8B83FC80_2ADD_989D_76C6_851014A038C0"><model type="Node" name="DC Jakarta (Cibitung)"/></target>
+				<properties ea_type="Association" stereotype="located in" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_C4101C25_C4BA_4100_01ED_9B960CB71B8B">
+				<source xmi:idref="EAID_A6976FEB_C744_FFBE_2FDB_3D7EA217367D"><model type="Device" name="lb-jkt-01"/></source>
+				<target xmi:idref="EAID_8B83FC80_2ADD_989D_76C6_851014A038C0"><model type="Node" name="DC Jakarta (Cibitung)"/></target>
+				<properties ea_type="Association" stereotype="located in" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_7D83EE08_BDA6_770D_E78B_CFDAAE9100D2">
+				<source xmi:idref="EAID_7DA4B198_82A6_122B_2DA6_BE9B50D91F33"><model type="Node" name="esx-sby-01"/></source>
+				<target xmi:idref="EAID_D2C47F63_FCF9_753C_5667_EC0DAC29BF8E"><model type="Node" name="DRC Surabaya"/></target>
+				<properties ea_type="Association" stereotype="located in" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_B7C40075_D1B0_6050_ECBC_454895CAE47D">
+				<source xmi:idref="EAID_9F4D53C5_4DEE_DDF9_EB75_6634EC94FC5F"><model type="Device" name="core-sw-jkt-01"/></source>
+				<target xmi:idref="EAID_8F31BF9E_E70A_8295_4B02_39221A101269"><model type="Device" name="fw-jkt-01"/></target>
+				<properties ea_type="Association" stereotype="connects" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_E68CF4C7_567A_8937_6D19_08A54C25E816">
+				<source xmi:idref="EAID_720D8161_C694_8A81_2BE3_01EDE274CD1C"><model type="Node" name="Segmen DMZ"/></source>
+				<target xmi:idref="EAID_9F4D53C5_4DEE_DDF9_EB75_6634EC94FC5F"><model type="Device" name="core-sw-jkt-01"/></target>
+				<properties ea_type="Association" stereotype="connects" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_B6CEDD73_0A9C_5E27_3C74_AF6D4B389B16">
+				<source xmi:idref="EAID_29CF8BCF_762B_D66E_C6A4_312DC1D60C06"><model type="Node" name="Segmen Aplikasi"/></source>
+				<target xmi:idref="EAID_9F4D53C5_4DEE_DDF9_EB75_6634EC94FC5F"><model type="Device" name="core-sw-jkt-01"/></target>
+				<properties ea_type="Association" stereotype="connects" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_F33BB456_26E2_9913_5F42_65256889A9C8">
+				<source xmi:idref="EAID_170A9309_6F47_6BC8_C81A_2EA580C71373"><model type="Node" name="Segmen Database"/></source>
+				<target xmi:idref="EAID_9F4D53C5_4DEE_DDF9_EB75_6634EC94FC5F"><model type="Device" name="core-sw-jkt-01"/></target>
+				<properties ea_type="Association" stereotype="connects" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_AE0854A8_7E8A_8E6D_4218_BB0534C69A35">
+				<source xmi:idref="EAID_A8E551EA_041B_5D09_26AA_5B9459018020"><model type="Node" name="Segmen Manajemen"/></source>
+				<target xmi:idref="EAID_9F4D53C5_4DEE_DDF9_EB75_6634EC94FC5F"><model type="Device" name="core-sw-jkt-01"/></target>
+				<properties ea_type="Association" stereotype="connects" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_91701D8A_3B8D_DF11_6823_8C04C5EDCB12">
+				<source xmi:idref="EAID_A6976FEB_C744_FFBE_2FDB_3D7EA217367D"><model type="Device" name="lb-jkt-01"/></source>
+				<target xmi:idref="EAID_720D8161_C694_8A81_2BE3_01EDE274CD1C"><model type="Node" name="Segmen DMZ"/></target>
+				<properties ea_type="Association" stereotype="connects" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_CC1C6074_B84F_A98E_4AC8_57D60B4ECB65">
+				<source xmi:idref="EAID_44C79443_6D5D_F296_684A_715D7EE26967"><model type="Node" name="srv-web-01"/></source>
+				<target xmi:idref="EAID_720D8161_C694_8A81_2BE3_01EDE274CD1C"><model type="Node" name="Segmen DMZ"/></target>
+				<properties ea_type="Association" stereotype="connects" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_9EA99305_0BA9_189B_8F96_9CB864335EC1">
+				<source xmi:idref="EAID_78ED7912_2DB2_1A93_70FC_86915021FC7D"><model type="Node" name="srv-web-02"/></source>
+				<target xmi:idref="EAID_720D8161_C694_8A81_2BE3_01EDE274CD1C"><model type="Node" name="Segmen DMZ"/></target>
+				<properties ea_type="Association" stereotype="connects" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_EF083B88_25DE_6CC3_2B93_BCD5E8D47ABA">
+				<source xmi:idref="EAID_48E8B393_7A29_883F_D4AF_3C3525FC4BB8"><model type="Node" name="srv-app-01"/></source>
+				<target xmi:idref="EAID_29CF8BCF_762B_D66E_C6A4_312DC1D60C06"><model type="Node" name="Segmen Aplikasi"/></target>
+				<properties ea_type="Association" stereotype="connects" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_94917EE1_80C8_AC88_5A93_F7ECF7BCFDCE">
+				<source xmi:idref="EAID_EE5AEACC_FAF1_5C65_47EA_07B0F77C328B"><model type="Node" name="srv-app-02"/></source>
+				<target xmi:idref="EAID_29CF8BCF_762B_D66E_C6A4_312DC1D60C06"><model type="Node" name="Segmen Aplikasi"/></target>
+				<properties ea_type="Association" stereotype="connects" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_FCAED7BE_AE8C_DA4D_E158_A5D747F425FE">
+				<source xmi:idref="EAID_9691288B_EE91_0B4C_26E5_09669FDF8000"><model type="Node" name="srv-legacy-01"/></source>
+				<target xmi:idref="EAID_29CF8BCF_762B_D66E_C6A4_312DC1D60C06"><model type="Node" name="Segmen Aplikasi"/></target>
+				<properties ea_type="Association" stereotype="connects" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_57FCAA86_EEB2_7901_C250_A9438404B25C">
+				<source xmi:idref="EAID_A9BADE2C_929B_9092_AFA4_E855755DD958"><model type="Node" name="srv-db-01"/></source>
+				<target xmi:idref="EAID_170A9309_6F47_6BC8_C81A_2EA580C71373"><model type="Node" name="Segmen Database"/></target>
+				<properties ea_type="Association" stereotype="connects" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_0C431888_FEDA_C68E_C3B0_0213D12352B6">
+				<source xmi:idref="EAID_280C3D49_D517_9B56_1FFB_B73A33B930EE"><model type="Node" name="srv-ad-01"/></source>
+				<target xmi:idref="EAID_A8E551EA_041B_5D09_26AA_5B9459018020"><model type="Node" name="Segmen Manajemen"/></target>
+				<properties ea_type="Association" stereotype="connects" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_A27867CE_787F_5A2B_39FB_2ACDCAEF9E8F">
+				<source xmi:idref="EAID_7A6CDBDA_DA40_FF6C_7F25_F884B6BD1B23"><model type="Node" name="srv-mon-01"/></source>
+				<target xmi:idref="EAID_A8E551EA_041B_5D09_26AA_5B9459018020"><model type="Node" name="Segmen Manajemen"/></target>
+				<properties ea_type="Association" stereotype="connects" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_9A7BC5FA_86F4_7975_FB3E_3FD99BC86B72">
+				<source xmi:idref="EAID_86DA886E_91B3_C22D_7FFD_751D85739E1A"><model type="Node" name="esx-jkt-01"/></source>
+				<target xmi:idref="EAID_44C79443_6D5D_F296_684A_715D7EE26967"><model type="Node" name="srv-web-01"/></target>
+				<properties ea_type="Association" stereotype="ArchiMate_Assignment" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_3ADDE421_89EB_3043_3993_9BAA99DE57DD">
+				<source xmi:idref="EAID_86DA886E_91B3_C22D_7FFD_751D85739E1A"><model type="Node" name="esx-jkt-01"/></source>
+				<target xmi:idref="EAID_48E8B393_7A29_883F_D4AF_3C3525FC4BB8"><model type="Node" name="srv-app-01"/></target>
+				<properties ea_type="Association" stereotype="ArchiMate_Assignment" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_87FF655C_72C4_157A_2961_F008DDBC2AFA">
+				<source xmi:idref="EAID_86DA886E_91B3_C22D_7FFD_751D85739E1A"><model type="Node" name="esx-jkt-01"/></source>
+				<target xmi:idref="EAID_7A6CDBDA_DA40_FF6C_7F25_F884B6BD1B23"><model type="Node" name="srv-mon-01"/></target>
+				<properties ea_type="Association" stereotype="ArchiMate_Assignment" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_8882C1D9_EF6C_0962_7D0E_524CFAEC9C71">
+				<source xmi:idref="EAID_86DA886E_91B3_C22D_7FFD_751D85739E1A"><model type="Node" name="esx-jkt-01"/></source>
+				<target xmi:idref="EAID_9691288B_EE91_0B4C_26E5_09669FDF8000"><model type="Node" name="srv-legacy-01"/></target>
+				<properties ea_type="Association" stereotype="ArchiMate_Assignment" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_8240078E_103C_C7EA_DEC4_9FE40475578B">
+				<source xmi:idref="EAID_B8478A69_614F_F4CD_A81E_140E751FA69B"><model type="Node" name="esx-jkt-02"/></source>
+				<target xmi:idref="EAID_78ED7912_2DB2_1A93_70FC_86915021FC7D"><model type="Node" name="srv-web-02"/></target>
+				<properties ea_type="Association" stereotype="ArchiMate_Assignment" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_7AF3568F_BBCD_BE06_FAA4_D41FBA7CD8A5">
+				<source xmi:idref="EAID_B8478A69_614F_F4CD_A81E_140E751FA69B"><model type="Node" name="esx-jkt-02"/></source>
+				<target xmi:idref="EAID_EE5AEACC_FAF1_5C65_47EA_07B0F77C328B"><model type="Node" name="srv-app-02"/></target>
+				<properties ea_type="Association" stereotype="ArchiMate_Assignment" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_83DC4362_222C_E427_9FCE_9FAF67DC3FEE">
+				<source xmi:idref="EAID_B8478A69_614F_F4CD_A81E_140E751FA69B"><model type="Node" name="esx-jkt-02"/></source>
+				<target xmi:idref="EAID_A9BADE2C_929B_9092_AFA4_E855755DD958"><model type="Node" name="srv-db-01"/></target>
+				<properties ea_type="Association" stereotype="ArchiMate_Assignment" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_79036B7F_F59C_CB9C_314B_6A3C1252F6A4">
+				<source xmi:idref="EAID_B8478A69_614F_F4CD_A81E_140E751FA69B"><model type="Node" name="esx-jkt-02"/></source>
+				<target xmi:idref="EAID_280C3D49_D517_9B56_1FFB_B73A33B930EE"><model type="Node" name="srv-ad-01"/></target>
+				<properties ea_type="Association" stereotype="ArchiMate_Assignment" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_3740A253_A021_4367_8FDC_E67ED44D47E7">
+				<source xmi:idref="EAID_B8478A69_614F_F4CD_A81E_140E751FA69B"><model type="Node" name="esx-jkt-02"/></source>
+				<target xmi:idref="EAID_78485970_37B1_840E_FE99_1BD9A1F2F71C"><model type="Node" name="srv-app-stg-01"/></target>
+				<properties ea_type="Association" stereotype="ArchiMate_Assignment" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_2DED03BA_69B7_67A1_5201_5853C3073610">
+				<source xmi:idref="EAID_7DA4B198_82A6_122B_2DA6_BE9B50D91F33"><model type="Node" name="esx-sby-01"/></source>
+				<target xmi:idref="EAID_C7FDAFD0_F848_D6EF_13F3_9A338946E5F3"><model type="Node" name="srv-db-dr-01"/></target>
+				<properties ea_type="Association" stereotype="ArchiMate_Assignment" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_F1B952A8_B1CE_2215_2350_F33F035A5F0B">
+				<source xmi:idref="EAID_86DA886E_91B3_C22D_7FFD_751D85739E1A"><model type="Node" name="esx-jkt-01"/></source>
+				<target xmi:idref="EAID_88D97FFB_F48F_3A0A_D109_24C9C06FA3A2"><model type="Node" name="san-jkt-01"/></target>
+				<properties ea_type="Dependency" stereotype="stores" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_2690E823_67F6_F52B_4172_999BCD876ADE">
+				<source xmi:idref="EAID_B8478A69_614F_F4CD_A81E_140E751FA69B"><model type="Node" name="esx-jkt-02"/></source>
+				<target xmi:idref="EAID_88D97FFB_F48F_3A0A_D109_24C9C06FA3A2"><model type="Node" name="san-jkt-01"/></target>
+				<properties ea_type="Dependency" stereotype="stores" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_D0AEFF17_CE5B_D056_228F_16BDD1CF4735">
+				<source xmi:idref="EAID_3D56288B_33AF_A4C7_6297_21B28912691B"><model type="ExecutionEnvironment" name="Nginx"/></source>
+				<target xmi:idref="EAID_44C79443_6D5D_F296_684A_715D7EE26967"><model type="Node" name="srv-web-01"/></target>
+				<properties ea_type="Deployment" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_40A3552F_9E49_3514_D27F_EB168D261E50">
+				<source xmi:idref="EAID_3D56288B_33AF_A4C7_6297_21B28912691B"><model type="ExecutionEnvironment" name="Nginx"/></source>
+				<target xmi:idref="EAID_78ED7912_2DB2_1A93_70FC_86915021FC7D"><model type="Node" name="srv-web-02"/></target>
+				<properties ea_type="Deployment" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_7C82586F_EAC6_E80F_5B1B_27911D59DFA1">
+				<source xmi:idref="EAID_0356630A_43A3_5EF9_62F1_338FC1813F89"><model type="ExecutionEnvironment" name="PostgreSQL 16"/></source>
+				<target xmi:idref="EAID_A9BADE2C_929B_9092_AFA4_E855755DD958"><model type="Node" name="srv-db-01"/></target>
+				<properties ea_type="Deployment" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_FA2B593D_B123_BBA0_61ED_407D4F45AEEA">
+				<source xmi:idref="EAID_59E459E9_8A66_691B_E7E0_523146934D8F"><model type="ExecutionEnvironment" name="PostgreSQL 13"/></source>
+				<target xmi:idref="EAID_9691288B_EE91_0B4C_26E5_09669FDF8000"><model type="Node" name="srv-legacy-01"/></target>
+				<properties ea_type="Deployment" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_ACC7BCFE_BC6F_DCA9_06FB_3C8818262769">
+				<source xmi:idref="EAID_842FA707_4AA2_561C_66D9_AD850946C02C"><model type="ExecutionEnvironment" name="Active Directory"/></source>
+				<target xmi:idref="EAID_280C3D49_D517_9B56_1FFB_B73A33B930EE"><model type="Node" name="srv-ad-01"/></target>
+				<properties ea_type="Deployment" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_7CB0EB1F_DAE1_0303_7F42_DFC28D0CE7C9">
+				<source xmi:idref="EAID_DDF8D037_775B_7868_6060_3124736CCCE3"><model type="Component" name="Portal Tiket"/></source>
+				<target xmi:idref="EAID_EE5AEACC_FAF1_5C65_47EA_07B0F77C328B"><model type="Node" name="srv-app-02"/></target>
+				<properties ea_type="Deployment" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_BC5A1EFE_AABE_AB80_31ED_A1A6CBA61894">
+				<source xmi:idref="EAID_DDF8D037_775B_7868_6060_3124736CCCE3"><model type="Component" name="Portal Tiket"/></source>
+				<target xmi:idref="EAID_3D56288B_33AF_A4C7_6297_21B28912691B"><model type="ExecutionEnvironment" name="Nginx"/></target>
+				<properties ea_type="Dependency" stereotype="uses" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_92062C4F_D370_6BF6_1ABE_B679EA26078F">
+				<source xmi:idref="EAID_DDF8D037_775B_7868_6060_3124736CCCE3"><model type="Component" name="Portal Tiket"/></source>
+				<target xmi:idref="EAID_0356630A_43A3_5EF9_62F1_338FC1813F89"><model type="ExecutionEnvironment" name="PostgreSQL 16"/></target>
+				<properties ea_type="Dependency" stereotype="uses" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_413CC132_D06C_3F09_EAE4_EE2992F55760">
+				<source xmi:idref="EAID_DDF8D037_775B_7868_6060_3124736CCCE3"><model type="Component" name="Portal Tiket"/></source>
+				<target xmi:idref="EAID_842FA707_4AA2_561C_66D9_AD850946C02C"><model type="ExecutionEnvironment" name="Active Directory"/></target>
+				<properties ea_type="Dependency" stereotype="uses" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_C36EBDB5_FF8F_19D5_8ECE_1E571E51FD18">
+				<source xmi:idref="EAID_31A534BC_6FF8_F348_3DA8_11F604A0381C"><model type="Component" name="Aplikasi Absensi"/></source>
+				<target xmi:idref="EAID_48E8B393_7A29_883F_D4AF_3C3525FC4BB8"><model type="Node" name="srv-app-01"/></target>
+				<properties ea_type="Deployment" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_AF8D03D0_7F34_AEF0_4344_E37A8B8328C0">
+				<source xmi:idref="EAID_31A534BC_6FF8_F348_3DA8_11F604A0381C"><model type="Component" name="Aplikasi Absensi"/></source>
+				<target xmi:idref="EAID_0356630A_43A3_5EF9_62F1_338FC1813F89"><model type="ExecutionEnvironment" name="PostgreSQL 16"/></target>
+				<properties ea_type="Dependency" stereotype="uses" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_2F4DEBC0_F042_5A3B_6C01_28ED8C1A315A">
+				<source xmi:idref="EAID_31A534BC_6FF8_F348_3DA8_11F604A0381C"><model type="Component" name="Aplikasi Absensi"/></source>
+				<target xmi:idref="EAID_842FA707_4AA2_561C_66D9_AD850946C02C"><model type="ExecutionEnvironment" name="Active Directory"/></target>
+				<properties ea_type="Dependency" stereotype="uses" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_BB965892_6444_02A2_139E_8AC011CE56D8">
+				<source xmi:idref="EAID_31A534BC_6FF8_F348_3DA8_11F604A0381C"><model type="Component" name="Aplikasi Absensi"/></source>
+				<target xmi:idref="EAID_A6976FEB_C744_FFBE_2FDB_3D7EA217367D"><model type="Device" name="lb-jkt-01"/></target>
+				<properties ea_type="Dependency" stereotype="uses" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_501C8A71_F54B_9A37_62AB_469DE1CC8F6E">
+				<source xmi:idref="EAID_4F27EC59_CDC2_CD47_F761_F4754D1769E5"><model type="Component" name="IntraDocs"/></source>
+				<target xmi:idref="EAID_EE5AEACC_FAF1_5C65_47EA_07B0F77C328B"><model type="Node" name="srv-app-02"/></target>
+				<properties ea_type="Deployment" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_D75B0BCE_65CD_E916_5A94_1A0740565235">
+				<source xmi:idref="EAID_4F27EC59_CDC2_CD47_F761_F4754D1769E5"><model type="Component" name="IntraDocs"/></source>
+				<target xmi:idref="EAID_0356630A_43A3_5EF9_62F1_338FC1813F89"><model type="ExecutionEnvironment" name="PostgreSQL 16"/></target>
+				<properties ea_type="Dependency" stereotype="uses" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_CDD95578_222E_9CD3_061A_39FBA3DEBF04">
+				<source xmi:idref="EAID_F64A3494_6DCA_4D0F_CD53_04092466EAF3"><model type="Component" name="Zabbix Monitoring"/></source>
+				<target xmi:idref="EAID_7A6CDBDA_DA40_FF6C_7F25_F884B6BD1B23"><model type="Node" name="srv-mon-01"/></target>
+				<properties ea_type="Deployment" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_8FD64D05_5F77_BB87_27D8_5AA0714E5543">
+				<source xmi:idref="EAID_F64A3494_6DCA_4D0F_CD53_04092466EAF3"><model type="Component" name="Zabbix Monitoring"/></source>
+				<target xmi:idref="EAID_59E459E9_8A66_691B_E7E0_523146934D8F"><model type="ExecutionEnvironment" name="PostgreSQL 13"/></target>
+				<properties ea_type="Dependency" stereotype="uses" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_B3CE8863_6C41_C7CA_1F16_16AE4A2C4328">
+				<source xmi:idref="EAID_A6976FEB_C744_FFBE_2FDB_3D7EA217367D"><model type="Device" name="lb-jkt-01"/></source>
+				<target xmi:idref="EAID_DDF8D037_775B_7868_6060_3124736CCCE3"><model type="Component" name="Portal Tiket"/></target>
+				<properties ea_type="Association" stereotype="ArchiMate_Serving" direction="Source -&gt; Destination"/>
+			</connector>
+			<connector xmi:idref="EAID_FC61D1A8_A777_241C_27EC_5DACB6AC582D">
+				<source xmi:idref="EAID_DB14EAF4_B8AB_7709_5754_BD4FC21BAFAF"><model type="Actor" name="Divisi Keuangan"/></source>
+				<target xmi:idref="EAID_31A534BC_6FF8_F348_3DA8_11F604A0381C"><model type="Component" name="Aplikasi Absensi"/></target>
+				<properties ea_type="Association" stereotype="ArchiMate_Serving" direction="Source -&gt; Destination"/>
+			</connector>
+		</connectors>
+	</xmi:Extension>
+</xmi:XMI>

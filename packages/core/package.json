@@ -29,6 +29,7 @@
     "./rag-messages": "./src/rag-messages.ts",
     "./mail": "./src/mail.ts",
     "./audit-export": "./src/audit-export.ts",
-    "./s3": "./src/s3.ts"
+    "./s3": "./src/s3.ts",
+    "./ta": "./src/ta.ts"
   }
 }
