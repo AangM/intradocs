@@ -1,10 +1,14 @@
 import { redirect } from 'next/navigation';
 import { currentActor } from '@/lib/session';
 import { safeReturnTo } from '@intradocs/core/validation';
+import { readRuntimeConfig } from '@intradocs/core/config';
 import { LoginForm } from '@/components/login-form';
 import { Icon } from '@/components/icon';
-import { readRuntimeConfig } from '@intradocs/core/config';
+import '../login.css';
 export const dynamic = 'force-dynamic';
+
+// Layout pattern of mature knowledge-base sign-ins (form card on one side, one line and a
+// glimpse of the product on the other); the glimpse is IntraDocs' own answer card.
 export default async function Login({
   searchParams,
 }: {
@@ -12,7 +16,8 @@ export default async function Login({
 }) {
   if (await currentActor()) redirect('/help-center');
   const params = await searchParams;
-  const sso = readRuntimeConfig(process.env).sso;
+  const config = readRuntimeConfig(process.env);
+  const sso = config.sso;
   // Better Auth sends the callback's failure back here as ?error=...; the only case a
   // person can act on is "nobody invited this address", so that is the one named.
   const errorCode = typeof params.error === 'string' ? params.error : '';
@@ -23,95 +28,71 @@ export default async function Login({
         : 'Masuk lewat SSO tidak berhasil. Coba lagi atau hubungi admin.'
       : '';
   return (
-    <main className="login-page">
-      <section className="login-story">
-        <div className="logo">
-          <span className="logo-mark">
-            <Icon name="book" />
+    <main className="signin">
+      <section className="signin-main">
+        <div className="signin-logo">
+          <span className="signin-mark">
+            <Icon name="book" size={18} />
           </span>
           <span>
             IntraDocs<small>Knowledge Hub · Divisi IT</small>
           </span>
         </div>
-        <div className="login-story-body">
-          <span className="hero-badge">
-            <Icon name="shield" size={14} />
-            Satu tempat untuk pengetahuan tim
-          </span>
-          <p className="login-tagline">
-            Tanya, temukan, <em>percaya.</em>
-          </p>
-          <p>
-            SOP, panduan, dan kebijakan IT dalam satu tempat — dan asisten yang menjawab dari
-            dokumen resmi, lengkap dengan sumbernya.
-          </p>
-          <div className="login-sample" aria-hidden="true">
-            <div className="login-sample-q">
-              <span className="avatar">S</span>
-              Apakah MFA wajib untuk VPN lab?
-            </div>
-            <div className="login-sample-a">
-              <span className="avatar ai">
-                <Icon name="spark" size={13} />
-              </span>
-              <div>
-                Ya. Profil VPN laboratorium mensyaratkan akun uji dan MFA saat masuk.
-                <span className="login-sample-src">
-                  <Icon name="file" size={12} />
-                  Konfigurasi VPN · Langkah konfigurasi
-                </span>
-              </div>
-            </div>
-            <span className="login-sample-tag">Contoh · dokumen sintetis</span>
-          </div>
-          <div className="login-points">
-            <div className="login-proof">
-              <Icon name="spark" />
-              <span>
-                Jawaban bersumber
-                <br />
-                <small>Setiap jawaban menyebut dokumen dan bagiannya</small>
-              </span>
-            </div>
-            <div className="login-proof">
-              <Icon name="lock" />
-              <span>
-                Sesuai akses Anda
-                <br />
-                <small>Hanya dokumen yang boleh Anda baca yang muncul</small>
-              </span>
-            </div>
-            <div className="login-proof">
-              <Icon name="check-c" />
-              <span>
-                Selalu versi resmi
-                <br />
-                <small>Dokumen terbit setelah ditinjau; versi lama tetap tercatat</small>
-              </span>
-            </div>
-          </div>
-        </div>
-        <span className="login-profile">Build lokal · seluruh data sintetis</span>
-      </section>
-      <section className="login-panel">
-        <div className="login-card">
-          <span className="pill p-blue">SELAMAT DATANG</span>
-          <h1>Masuk ke IntraDocs</h1>
-          <p className="sub">Pakai akun demo dari setup lokal Anda.</p>
+        <h1>Selamat datang kembali</h1>
+        <div className="signin-card">
           <LoginForm
             returnTo={safeReturnTo(params.returnTo)}
             sso={sso?.label ?? null}
             ssoError={ssoError}
           />
-          <p className="privacy-note">
-            <Icon name="help" size={14} />
-            <span>
-              Akun demo ada di <code>var/demo-accounts.json</code>; tidak ada pendaftaran publik.
-              Jangan masukkan password atau data perusahaan yang nyata.
-            </span>
-          </p>
         </div>
+        <p className="signin-help">
+          Belum punya akun? Minta undangan ke admin.
+          {!config.hardened && (
+            <>
+              <br />
+              Akun demo: <code>var/demo-accounts.json</code>
+            </>
+          )}
+        </p>
       </section>
+      <aside className="signin-aside" aria-hidden="true">
+        <p className="signin-tagline">
+          Semua SOP dan panduan IT di satu tempat.
+          <strong>Tanya, dan dapat jawaban bersumber.</strong>
+        </p>
+        <div className="signin-preview">
+          <div className="signin-preview-bar">
+            <span />
+            <span />
+            <span />
+          </div>
+          <div className="signin-q">
+            <span className="signin-avatar">S</span>
+            Apakah MFA wajib untuk VPN lab?
+          </div>
+          <div className="signin-a">
+            <span className="signin-avatar ai">
+              <Icon name="spark" size={13} />
+            </span>
+            <div>
+              <p>Ya. Profil VPN laboratorium mensyaratkan akun uji dan MFA saat masuk.</p>
+              <span className="signin-cite">
+                <Icon name="file" size={12} />
+                Konfigurasi VPN · Langkah 2
+              </span>
+            </div>
+          </div>
+          <div className="signin-chips">
+            <span>
+              <Icon name="lock" size={12} /> Sesuai akses
+            </span>
+            <span>
+              <Icon name="check-c" size={12} /> Versi resmi
+            </span>
+          </div>
+        </div>
+      </aside>
     </main>
   );
 }

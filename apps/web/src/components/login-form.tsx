@@ -18,6 +18,7 @@ export function LoginForm({
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(ssoError);
+  const [showPassword, setShowPassword] = useState(false);
   // The form has no action/method, so a submit before React attaches onSubmit falls back
   // to a native GET and puts the password in the URL, the history and the server log --
   // observed as `GET /login?email=...&password=...` in a real run. Staying disabled until
@@ -90,60 +91,65 @@ export function LoginForm({
     }
   }
   return (
-    <form onSubmit={submit} className="login-form">
-      <div className="field">
+    <form onSubmit={submit} className="auth-form">
+      <div className="auth-field">
         <label htmlFor="email">Email</label>
         <input
-          className="inp"
+          className="auth-input"
           id="email"
           name="email"
           type="email"
           autoComplete="username"
-          placeholder="nama@example.test"
+          placeholder="nama@perusahaan.co.id"
           required
           maxLength={254}
         />
       </div>
-      <div className="field">
+      <div className="auth-field">
         <label htmlFor="password">Password</label>
-        <input
-          className="inp"
-          id="password"
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          required
-          minLength={12}
-          maxLength={128}
-        />
+        <div className="auth-password">
+          <input
+            className="auth-input"
+            id="password"
+            name="password"
+            type={showPassword ? 'text' : 'password'}
+            autoComplete="current-password"
+            required
+            minLength={12}
+            maxLength={128}
+          />
+          <button
+            type="button"
+            className="auth-reveal"
+            aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+            aria-pressed={showPassword}
+            onClick={() => setShowPassword((v) => !v)}
+          >
+            <Icon name="eye" size={16} />
+          </button>
+        </div>
       </div>
       {error && (
-        <p role="alert" className="inline-error">
+        <p role="alert" className="auth-error">
+          <Icon name="alert" size={15} />
           {error}
         </p>
       )}
-      <button type="submit" className="btn btn-p full-width" disabled={busy || !ready}>
-        {busy ? 'Memeriksa akun…' : 'Masuk ke IntraDocs'}
-        <Icon name="arrow-r" size={16} />
+      <button type="submit" className="auth-submit" disabled={busy || !ready}>
+        {busy ? 'Memeriksa…' : 'Masuk'}
       </button>
-      <div className="login-separator">
-        <span>Identitas perusahaan</span>
-      </div>
-      <button
-        className="btn full-width"
-        type="button"
-        disabled={!sso || busy || !ready}
-        aria-describedby="sso-note"
-        onClick={startSso}
-      >
-        <Icon name="shield" size={16} />
-        {sso ? `Masuk dengan ${sso}` : 'Masuk dengan SSO'}
-      </button>
-      <p id="sso-note" className="sub tiny login-note">
-        {sso
-          ? 'Hanya untuk akun yang sudah diundang admin; SSO tidak membuat akun baru.'
-          : 'Belum terhubung: AUTH_MODE=oidc dan IdP organisasi belum dikonfigurasi.'}
-      </p>
+      {/* SSO appears only when an IdP is configured; there is nothing to explain otherwise. */}
+      {sso && (
+        <>
+          <div className="auth-divider">
+            <span>atau</span>
+          </div>
+          <button className="auth-sso" type="button" disabled={busy || !ready} onClick={startSso}>
+            <Icon name="shield" size={16} />
+            Masuk dengan {sso}
+          </button>
+        </>
+      )}
     </form>
   );
 }
