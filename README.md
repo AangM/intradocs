@@ -123,6 +123,14 @@ SSO tidak pernah membuat akun. Untuk mencobanya di laptop: `pnpm idp:mock` (IdP 
 `OIDC_CLIENT_SECRET=mock-idp-secret-not-for-deployments`. Detail deployment di
 [docs/DEPLOY.md](docs/DEPLOY.md) §2a.
 
+## Halaman login
+
+Dirombak (keputusan UI, menyimpang dari mockup mentor atas permintaan pengguna): panel merek
+gelap dengan satu kalimat dan tiga poin, formulir di sisi kanan dengan tombol tampilkan
+password. Tombol SSO hanya muncul bila IdP dikonfigurasi, dan petunjuk akun demo hanya pada
+profil `local-dev`. Di layar < 900 px hanya formulir yang tampil. Gaya ada di namespace
+`auth-*` (`apps/web/src/app/login.css`); halaman undangan tetap memakai gaya lama.
+
 ## OCR untuk PDF pindai
 
 Halaman PDF tanpa teks yang berisi gambar dibaca oleh Tesseract (ind+eng) di dalam container

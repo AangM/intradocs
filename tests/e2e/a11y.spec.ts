@@ -36,7 +36,7 @@ async function login(page: Page, actorId: string) {
   await page.goto('/login');
   await page.getByLabel('Email', { exact: true }).fill(account.email);
   await page.getByLabel('Password', { exact: true }).fill(account.password);
-  await page.getByRole('button', { name: 'Masuk ke IntraDocs' }).click();
+  await page.getByRole('button', { name: 'Masuk', exact: true }).click();
   await expect(page).toHaveURL(/help-center/);
 }
 
