@@ -1,56 +1,25 @@
 # Implementasi — satu gate, satu bukti
 
-**7 September 2026 · eksekusi ketiga: 0.2.1-m2a, HARDENING SOURCE READY; FULL ACCEPTANCE OPEN.** Melanjutkan source M2a sebelum review pengguna, bukan menganggap M2a sudah lolos UAT. Original ZIP M1 pengguna dan paket M2a disimpan sebagai baseline. Tidak ada format baru/approval/AI/deployment yang diaktifkan.
+## 0. Status terkini (24 September 2026)
 
-## 0. Checkpoint terbaru
+**MVP lokal M0–M4 selesai; M5 (V1) hampir lengkap; modul Technology Architecture ada. Semua
+pada data sintetis. Pilot/go-live Telkom BLOCKED** oleh hal yang memang butuh organisasi
+(IdP SSO nyata, kebijakan data, review security/ops, UAT pemilik domain).
 
-### Perubahan nyata
+Bukti yang dijalankan pada commit terakhir di laptop pengembang (Windows 11, Docker WSL 3,8 GB),
+selain CI GitHub (lint, typecheck, unit, build, integrasi PostgreSQL) pada setiap PR:
 
-1. **Empat regresi dibuktikan merah → hijau:** cancel transport yang tidak selesai (JSON/multipart), mutasi byte original oleh adapter, dan abort setelah satu artefak. Pembacaan sekarang bounded byte+waktu; snapshot chunk; hash sebelum write; abort dicek di antara write.
-2. **Recovery:** file sync dan POSIX directory sync sebelum storage berhasil; respons scanner lebih ketat. Callback transaction mempertahankan error asli dan membuang koneksi jika rollback/commit ambigu—tidak mengembalikan transaksi kotor ke pool.
-3. **Orphan cleanup lokal:** default dry-run, minimum 24 jam sejak perubahan filesystem; semua reference/receipt selesai/lease aktif dipin. Admin snapshot wajib tidak terkena RLS. Apply memakai lock bersama dengan admission/commit, recheck per direktori, file whitelist, tanpa recursive rm, batch 100 dan jurnal privat. Scheduler otomatis belum ada.
-4. **Verifikasi ringkas:** `pnpm verify:local` menjalankan gate bertahap dengan timeout/output cap/redaksi; berhenti pada kegagalan. Tidak auto install/reset/seed/migrate. Perlu `pnpm dev` di terminal lain. JSON ringkas dapat ditinjau untuk melanjutkan chat.
-5. **Update kumulatif:** source M1 yang dikirim pengguna atau M2a dapat langsung diperbarui; unknown edit/migrasi tambahan ditolak. Migrasi 001–003, lockfile, auth/origin fix dan mockup tetap utuh; tidak ada dependency npm baru.
+| Gate                                        | Hasil                                                         |
+| ------------------------------------------- | ------------------------------------------------------------- |
+| `pnpm check` (lint, types, unit, build)     | PASS — 375 unit                                               |
+| `pnpm test:integration` (RLS nyata)         | PASS — 72                                                     |
+| `pnpm test:http` (app + ClamAV + converter) | PASS — 126, 1 skip (demo-login bila `DEMO_LOGIN` off)         |
+| `pnpm test:e2e` axe desktop + mobile        | PASS — 8/8                                                    |
+| `pnpm rag:eval` (40 pertanyaan berlabel)    | recall@5 100%, 0 kebocoran lintas izin — lihat WEKNORA.md §22 |
+| Security review, UAT, deploy nyata          | NOT RUN — butuh persetujuan organisasi                        |
 
-### Bukti, bukan asumsi
-
-| Pemeriksaan                                          | Status                    | Batas                                                                                                                                                          |
-| ---------------------------------------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Login/migrate/seed M1 di Windows                     | USER-REPORTED PASS        | Laporan pengguna: login 200, 93 unit pass + 2 skip. Bukan eksekusi sandbox.                                                                                    |
-| Regresi sebelum perbaikan                            | 4 FAIL (EXPECTED)         | Bukti masalah benar-benar direproduksi, bukan tes sukses palsu.                                                                                                |
-| Unit/regresi/filesystem/command runner               | 205 PASS, 0 gagal, 0 skip | Unit AV/DB memakai doubles eksplisit; filesystem dan subprocess benar-benar dijalankan.                                                                        |
-| Semantic core + transaction helper + unit            | PASS                      | Compiler sandbox TypeScript 7.0.2 + Node types 18; smoke tambahan, bukan toolchain pinned 5.9.3/Node types 24 atau seluruh aplikasi.                           |
-| Semantic verifier dengan types sandbox               | BLOCKED BY TYPE ENV       | `process.loadEnvFile` ada pada Node 24 runtime, tidak ada pada types Node 18 sandbox. Jangan tambahkan deklarasi palsu atau menurunkan pin untuk menutupi ini. |
-| Syntax/import/route/icon/format                      | 95 FILES / FORMAT PASS    | Syntax/format bukan lint/build.                                                                                                                                |
-| Cumulative updater                                   | PASS                      | Hanya diuji pada salinan M1/M2a; tidak pada laptop pengguna.                                                                                                   |
-| `verify:local --preflight` di sandbox                | BLOCKED (EXPECTED)        | Dependency pinned dan .env lokal tidak tersedia. Tidak menyatakan full verification PASS.                                                                      |
-| Full pinned typecheck/lint/build/render              | BLOCKED / NOT RUN         | Registry tidak bisa dijangkau; dependency app belum terpasang.                                                                                                 |
-| PostgreSQL/RLS/GC lock dan upload HTTP + ClamAV asli | NOT RUN                   | Source regression ada, tetapi Docker/PostgreSQL/ClamAV tidak tersedia di sandbox.                                                                              |
-| Visual, load, restore/power-loss, security approval  | NOT RUN                   | Browser assistance off. File sync bukan bukti RPO/RTO atau kebal kehilangan daya.                                                                              |
-
-Log aktual disertakan pada `artifacts/` dalam ZIP; updater tidak menimpa log lokal. Core semantic smoke dijalankan dengan compiler alternatif yang tersedia, tanpa stub dependency. Tes satu-perintah tidak memulai server sendiri atau mengklaim semua gate lengkap ketika prasyarat belum ada.
-
-### Serah-terima hemat konteks
-
-Unggah source terbaru tanpa `.env*`, `var/`, credential, node_modules, .next, .git atau data nyata. Sertakan migrasi dan lockfile byte-for-byte. Bila tersedia, tambahkan `artifacts/local-verification.json` yang sudah ditinjau. Source terbaru dan bagian ini adalah sumber status, bukan ingatan percakapan.
-
-```text
-Lanjutkan IntraDocs 0.2.1-m2a dari source terbaru terlampir.
-Baca AGENTS.md, README.md, dan bagian 0 docs/PLAN.md.
-Jangan ulang analisis 11 layar atau mengganti stack/desain.
-Pertahankan auth/origin/issuer fix, lockfile dan migrasi 001–003.
-Prioritas: jalankan/tutup gate pinned typecheck/build, PostgreSQL RLS,
-GC snapshot/locking, HTTP upload dengan ClamAV asli, dan UI.
-Gunakan verify:local setelah app lokal berjalan; jangan memalsukan
-PASS, membuat stub dependency, menonaktifkan scanner/RLS, atau reset DB.
-Setelah stabil lanjut satu irisan M2 yang jelas, bukan semua milestone.
-AI, provider/billing, deployment, dan data Telkom nyata belum diizinkan.
-Perbarui checkpoint ini dan kembalikan source + ringkasan singkat.
-```
-
-**Peta kode baru:** `http-input.ts` / `upload-request.ts`, `draft-ingestion.ts`, `storage.ts`, `orphan-cleanup.ts`; transaction helper + `maintenance.ts` di DB; `scripts/storage-gc.ts`, `command-runner.ts`, `verify-local.ts`. Perbaikan origin/issuer lama tetap pada auth/validation/seed dan SQL 002.
-
-**Batas berikut:** scheduler/retensi produksi, full M2 PDF/Office, DLP, edit/submit/approval, RAG dan SSO belum selesai. Tidak menandai M2 full selesai hanya dari MD/TXT. Jalankan gate lokal, perbaiki kegagalan, lalu sepakati format berikutnya.
+Rincian per milestone/quality gate ada di §4, per layar PRD di §5; keputusan organisasi yang
+tersisa di [DEPLOY.md §6](DEPLOY.md). Riwayat checkpoint sebelumnya ada di git log, bukan di sini.
 
 ## 1. Urutan pelaksanaan
 
@@ -136,11 +105,7 @@ Satu PR = satu vertical slice yang dapat didemokan, bukan seluruh platform. Impl
 
 Demo visual memakai fixture deterministik; functional test memakai identitas dan data uji yang konsisten dengan RBAC. Jangan mengirim dokumen internal ke chat coding hanya agar test bisa dibuat—utamakan sampel yang sudah disanitasi/disetujui.
 
-## 4. Status tunggal — diperbarui, bukan ditumpuk di chat
-
-**Diperbarui 13 September 2026** setelah review kebutuhan PRD §2–§4 terhadap source dan bukti
-yang benar-benar dijalankan (bagian 0 di atas adalah checkpoint 7 September 2026 dan dibiarkan
-sebagai sejarah; tabel ini yang berlaku).
+## 4. Status per milestone dan quality gate
 
 | Item                  | Status sekarang                                                                                                                                                                                                                                                                             | Bukti                                                                                                                                                                                |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -149,7 +114,7 @@ sebagai sejarah; tabel ini yang berlaku).
 | M4 · RAG lokal        | DONE (lokal); gate pilot BLOCKED                                                                                                                                                                                                                                                            | `rag:eval --chat` 20/20 · 8/10 · 0 bocor (WEKNORA.md §8, §25); SSO/OIDC belum ada                                                                                                    |
 | M5 · V1               | SEBAGIAN — lihat §5 di bawah                                                                                                                                                                                                                                                                | Yang ada: saran label, akses, bacaan wajib, cabut massal, diff+rollback, merge label, gap, undangan, PPTX/HTML, role kustom. Yang tidak: OCR (butuh docreader ~4 GB), email/@mention |
 | Q1 kode               | LULUS lokal; CI tertulis, **belum pernah dilihat berjalan**                                                                                                                                                                                                                                 | `pnpm check`, `.github/workflows/ci.yml`                                                                                                                                             |
-| Q2 akses              | LULUS pada suite lokal; OIDC/offboarding BELUM (butuh IdP organisasi)                                                                                                                                                                                                                       | integrasi RLS 52, HTTP 47, e2e canary; §5 WEKNORA.md                                                                                                                                 |
+| Q2 akses              | LULUS pada suite lokal; OIDC ADA dan diuji dengan IdP tiruan (`pnpm idp:mock`); IdP organisasi dan offboarding BELUM                                                                                                                                                                        | integrasi RLS 52, HTTP 47, e2e canary; §5 WEKNORA.md                                                                                                                                 |
 | Q3 data/workflow      | LULUS pada fixture; PPTX/HTML ADA; OCR PDF pindai ADA (Tesseract lokal, tes Python+HTTP); DOC lama/ZIP BELUM                                                                                                                                                                                | tests/integration, tests/http/uploads                                                                                                                                                |
 | Q4 kualitas AI        | LULUS pada corpus sintetis; review grounding pemilik domain BELUM                                                                                                                                                                                                                           | 40 gold questions, `pnpm rag:eval`                                                                                                                                                   |
 | Q5 UI/aksesibilitas   | Visual DONE (UI.md §5, U09–U14); **axe + keyboard-only LULUS**; **load test ADA** (`pnpm ops:loadtest`) — pada mesin rujukan p95 memenuhi anggaran 800 ms sampai ≈4 pembaca serentak, jenuh ≈10 req/s, 0 gagal; ulangi di host target                                                       | `pnpm ui:shots`, `pnpm exec playwright test tests/e2e/a11y.spec.ts`, `pnpm ops:loadtest` (angka di docs/DEPLOY.md §5)                                                                |
@@ -169,7 +134,7 @@ Legenda: ✅ ada dan diuji · ◐ ada sebagian / dengan batas · ✗ belum ada �
 | S05   | ✅ empat langkah, multi-file, 50 MiB, konversi→preview→metadata→submit, MD/TXT/PDF berteks/DOCX/XLSX, duplicate warning                                                                                                                                                                                                           | ◐ bantuan metadata ✅; **PPTX ✅** via parser WeKnora (§27, hanya bila WeKnora aktif); **HTML ✅** via converter lokal (teks + struktur blok, skrip/gaya/tautan dibuang); **OCR/DOC lama/ZIP ✗** — tidak ditampilkan sebagai didukung |
 | S06   | ✅ antrean/detail, preview asli & konversi, catatan, approve/revisi/tolak, 1–2 tahap, larangan self-approval, ClamAV + pola secret, audit, publikasi lalu indeks                                                                                                                                                                  | ◐ bacaan wajib ✅, pra-cek otomatis ✅; **@mention ✗, email/kanal ✗** (butuh integrasi yang disetujui), bantuan AI duplikasi hanya di unggah                                                                                          |
 | S07   | ✅ CRUD ≤3 tingkat, leaf, label multi, urutan, cegah siklus/hapus terpakai, aturan akses/Kritikal/review                                                                                                                                                                                                                          | ✅ drag-and-drop + ↑/↓, ekspor, merge label, saran mirip/tidak terpakai                                                                                                                                                               |
-| S08   | ✅ lima role, matriks, scope, aktivasi/nonaktivasi, audit, login lokal nyata; reviewer tidak lintas cakupan. **SSO ✗ (blokir pilot)**                                                                                                                                                                                             | ✅ undangan lokal sekali pakai; **editor role kustom ✅** — role bernama di atas satu role bawaan yang hanya _mempersempit_ kemampuan (migrasi 039–040, `docs/UI.md` U14); dipakai di penugasan dan undangan, dicatat di audit        |
+| S08   | ✅ lima role, matriks, scope, aktivasi/nonaktivasi, audit, login lokal nyata; reviewer tidak lintas cakupan. **SSO OIDC ◐** — ada dan diuji dengan IdP tiruan; IdP organisasi belum (blokir pilot)                                                                                                                                | ✅ undangan lokal sekali pakai; **editor role kustom ✅** — role bernama di atas satu role bawaan yang hanya _mempersempit_ kemampuan (migrasi 039–040, `docs/UI.md` U14); dipakai di penugasan dan undangan, dicatat di audit        |
 | S09   | ✅ percakapan pribadi multi-turn (§24), scope KB/kategori/dokumen, sumber versi+lokasi, tidak ditemukan, status proses (jawaban tampil saat ditulis) + **Hentikan**, feedback, histori dgn recheck izin. **Konflik antar-sumber ◐** — dideteksi untuk angka+satuan yang berbeda antar dokumen (§27), bukan pertentangan kata-kata | ✅ ekspor Markdown, saran lanjutan (§25), tautan sumber berautentikasi; "lampirkan" = scope dokumen yang dibuka ◐                                                                                                                     |
 | S10   | ✅ KPI per status, aktivitas baca/chat, durasi approval, pencarian tanpa hasil, kontributor, filter periode/unit, empty state                                                                                                                                                                                                     | ◐ knowledge gap teragregasi ✅ + "Jawab sebagai dokumen"; **laporan ekspor CSV ✅** (`/api/reports/dashboard`, tanpa istilah gap dan tanpa data per orang); penugasan penulis formal ✗                                                |
 | TA    | ✅ Technology Architecture (layer teknologi EA): impor Sparx XMI/CSV lewat alur review (ClamAV, original immutable, diff per field, empat mata, audit), katalog, halaman elemen dengan dampak/dependensi/riwayat, pencarian global, tanya arsitektur deterministik + pencarian semantik KB WeKnora kedua; axe desktop+mobile      | Impor langsung dari repositori Sparx (Pro Cloud/OSLC) ✗; layer Business/Data/Application ✗                                                                                                                                            |

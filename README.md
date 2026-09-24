@@ -1,6 +1,6 @@
 # IntraDocs · M1–M5 lokal
 
-Portal knowledge base **local-dev, corpus sintetis, AI opt-in dan off secara default**. Melanjutkan `intradocs-m3-work-checkpoint.zip`, bukan prototipe pengganti. Desain mentor, stack pinned, dan migrasi 001–017 dipertahankan.
+Portal knowledge base internal: **corpus sintetis, AI lokal opt-in dan off secara default**. Desain mentor ([reference/](reference/)), stack pinned, dan migrasi yang sudah diterapkan dipertahankan byte-for-byte.
 
 ## Hasil implementasi
 
@@ -10,7 +10,7 @@ Portal knowledge base **local-dev, corpus sintetis, AI opt-in dan off secara def
 - **M5 (V1):** saran label dari auto-tag WeKnora yang disaring kosakata kategori (tidak pernah diterapkan otomatis), permintaan akses dengan keputusan tercatat, bacaan wajib per kategori dengan konfirmasi versi, aksi cabut massal yang atomik, rollback versi via draft, merge label sebagai alias, gerbang relevansi yang membuat asisten menjawab "tidak tahu" pada pertanyaan tanpa bukti, metrik AI dari jejak audit di dashboard, cakupan jawaban (seluruh KB / kategori / dokumen yang dibuka) dan riwayat percakapan yang tunduk RLS di asisten, kartu sumber AI di halaman pencarian ([docs/WEKNORA.md §16](docs/WEKNORA.md)), summary dan pertanyaan yang dihasilkan WeKnora saat ingest sebagai saran — pertanyaan untuk pembaca, draf ringkasan hanya untuk yang boleh merevisi ([§17](docs/WEKNORA.md)), penilaian jawaban dan pertanyaan tak terjawab sebagai knowledge gap ([§18](docs/WEKNORA.md)), perapian taksonomi ([§19](docs/WEKNORA.md)), bantuan metadata saat unggah tanpa mengirim draft ([§20](docs/WEKNORA.md)), dan undangan pengguna lokal dengan tautan sekali pakai ([§21](docs/WEKNORA.md)).
 - **M3:** satu/dua reviewer berbeda, larangan self-approval, justifikasi temuan, minta revisi/tolak, outbox ber-lease/retry, publikasi dan indeks atomik, lexical search ber-RLS, favorit, feedback pemilik, histori, notifikasi, pengingat/expiry, dokumen terkait, dan KPI aktual berfilter periode/unit.
 
-**Bukti dan batas acceptance hanya pada [docs/PLAN.md §0](docs/PLAN.md) dan [docs/WEKNORA.md §8](docs/WEKNORA.md).** Implementasi lokal bukan izin pilot/go-live. SSO, OCR, format V1, diff/rollback, backup/restore produksi, dan persetujuan mentor/security/ops tetap di luar rilis ini. Kualitas retrieval **sudah diukur** pada corpus sintetis lewat `pnpm rag:eval`: recall@5 100% pada 20 pertanyaan answerable, abstain penuh 8/10 pada pertanyaan tanpa bukti, nol kebocoran pada 10 percobaan lintas izin, dan teks buatan model (summary yang diindeks WeKnora) tidak pernah menjadi sitasi ([§22](docs/WEKNORA.md)). Angka itu berlaku untuk fixture ini, bukan untuk dokumen nyata, dan review grounding oleh pemilik domain belum dilakukan — jadi jangan memakai jawabannya sebagai rujukan kebijakan.
+**Bukti dan batas acceptance hanya pada [docs/PLAN.md §0](docs/PLAN.md) dan [docs/WEKNORA.md §8](docs/WEKNORA.md).** Implementasi lokal bukan izin pilot/go-live. IdP SSO organisasi, format DOC lama/ZIP, backup off-site, dan persetujuan mentor/security/ops tetap di luar rilis ini. Kualitas retrieval **sudah diukur** pada corpus sintetis lewat `pnpm rag:eval`: recall@5 100% pada 20 pertanyaan answerable, abstain penuh 8/10 pada pertanyaan tanpa bukti, nol kebocoran pada 10 percobaan lintas izin, dan teks buatan model (summary yang diindeks WeKnora) tidak pernah menjadi sitasi ([§22](docs/WEKNORA.md)). Angka itu berlaku untuk fixture ini, bukan untuk dokumen nyata, dan review grounding oleh pemilik domain belum dilakukan — jadi jangan memakai jawabannya sebagai rujukan kebijakan.
 
 ## Jalankan di laptop
 
@@ -49,16 +49,10 @@ docker compose --env-file .env.local --profile weknora --profile weknora-rerank 
 pnpm weknora:rerank                                                      # daftarkan + pin ke agen
 ```
 
-## Memperbarui folder sebelumnya
+## Memperbarui instalasi
 
-Backup DB + `var/storage` menurut kebijakan Anda; jangan menghapus data. Dari folder paket baru:
-
-```sh
-node scripts/apply-update.mjs --target "PATH_FOLDER_LAMA" --check
-node scripts/apply-update.mjs --target "PATH_FOLDER_LAMA" --apply
-```
-
-Updater menolak modifikasi lokal yang tidak dikenal, tidak menimpa `.env*`, `var`, atau log, serta tidak menjalankan dependency/migrasi. Hentikan app, kemudian dari folder tujuan:
+Backup DB + `var/storage` (`pnpm ops:backup`); jangan menghapus data. Hentikan app, tarik
+source terbaru (`git pull`), lalu:
 
 ```sh
 pnpm install --frozen-lockfile
@@ -281,4 +275,4 @@ Fixture kecil yang disertakan benar-benar sintetis. `scripts/generate-conversion
 - `tests`: unit, renderer, PostgreSQL, HTTP end-to-end, Python, Playwright.
 - `docs`: PRD/arsitektur/UI/plan; `reference`: mockup mentor asli.
 
-Lanjutkan dari README dan **§0 docs/PLAN.md**, bukan status historis pada artefak lama. Jangan sertakan `.env*`, `var`, `node_modules`, `.next`, session, atau data organisasi ketika membagikan source.
+Status terkini ada di **§0 docs/PLAN.md**. Jangan sertakan `.env*`, `var`, `node_modules`, `.next`, session, atau data organisasi ketika membagikan source.

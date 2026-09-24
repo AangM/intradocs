@@ -2,13 +2,13 @@
 
 Berlaku untuk implementasi lokal menurut rencana v0.2: dua developer, tanpa deadline, data sintetis dahulu. Bahasa diskusi: Indonesia. Kode/identifier: English. Tujuan: portal internal yang dapat dipercaya, bukan demo dengan data sukses palsu.
 
-## Checkpoint 0.3.0 — M1–M3 lokal
+## Checkpoint — M1–M5 lokal + Technology Architecture
 
-- Status/bukti/acceptance yang berlaku hanya **docs/PLAN.md §0**. Seluruh source M1–M3 sudah diimplementasikan; bedakan tes lokal dari persetujuan pilot.
+- Status/bukti/acceptance yang berlaku hanya **docs/PLAN.md §0**. Source M1–M5 dan modul Technology Architecture sudah diimplementasikan; bedakan tes lokal dari persetujuan pilot.
 - Pertahankan lockfile, reference mentor dan seluruh migrasi 001–009 byte-for-byte. Tambahkan migrasi baru; jangan mengubah checksum yang telah diterapkan.
 - ClamAV wajib pada setiap original/lampiran. Tidak ada bypass produksi, fallback clean, atau provider AI. Converter non-AI memiliki batas ukuran, CPU, RAM, format dan waktu.
 - Cleanup operator default dry-run dan snapshot admin; jangan menjalankan suite mutasi paralel pada database sama atau mereset data untuk memperbaiki tes.
-- Update source melalui updater konservatif. Pertahankan .env.local, var/storage, credential, volume DB dan perubahan lokal yang tidak dikenal.
+- Update source lewat git (PR ke master). Pertahankan .env.local, var/storage, credential, volume DB dan perubahan lokal yang tidak dikenal.
 - Catat PASS/FAIL/BLOCKED/NOT RUN berdasarkan eksekusi. Review mentor, keamanan, deployment/SSO dan data organisasi tetap memerlukan persetujuan tersendiri.
 - Setelah mengubah source, jalankan gate terkait lalu perbarui README dan PLAN; jangan menambah dokumen STATUS/HANDOFF.
 
@@ -40,11 +40,3 @@ Perubahan mencantumkan Sxx, tes yang membuktikan perilaku, negative cases, dan s
 Update status singkat di docs/PLAN.md; jangan membuat STATUS/PROGRESS/ROADMAP tambahan yang mengulang informasi. Tulis keputusan baru di README.md. Satu PR mudah dibatalkan dan diuji ulang.
 
 Laporan chat target ≤180 kata: perubahan, tes+bukti, blocker/risiko, satu langkah berikut. Jangan menempelkan seluruh kode/rencana, mengulang riset yang masih berlaku, atau menjalankan semua milestone sekaligus. Kehematan konteks tidak boleh mengorbankan tes, integritas data, atau kejujuran hasil.
-
-## Checkpoint M1–M3 (8 September 2026)
-
-Permintaan pengguna terbaru memperluas irisan ke M1, M2, dan M3. Source kini memuat lima format+lampiran, workflow dan discovery. Status acceptance yang berlaku hanya README dan docs/PLAN.md §0. Jangan mengaktifkan AI, provider, data nyata, atau deployment. Pertahankan seluruh migration yang sudah ada byte-for-byte; gunakan migration additive untuk koreksi. Jalankan tes terurut, jangan paralelkan suite mutasi pada DB yang sama. Catat NOT RUN/BLOCKED secara jujur, dan baca log gate sebelum mengklaim selesai.
-
-## Checkpoint M1–M3 (8 September 2026)
-
-Permintaan pengguna terbaru memperluas irisan ke M1, M2, dan M3. Source kini memuat lima format+lampiran, workflow dan discovery. Status acceptance yang berlaku hanya README dan docs/PLAN.md §0. Jangan mengaktifkan AI, provider, data nyata, atau deployment. Pertahankan seluruh migration yang sudah ada byte-for-byte; gunakan migration additive untuk koreksi. Jalankan tes terurut, jangan paralelkan suite mutasi pada DB yang sama. Catat NOT RUN/BLOCKED secara jujur, dan baca log gate sebelum mengklaim selesai.
