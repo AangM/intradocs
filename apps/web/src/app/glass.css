@@ -1237,6 +1237,252 @@ tbody tr:hover td {
   }
 }
 
+/* Technology Architecture: catalogue, question box, element detail, import. */
+.ta-ask {
+  margin-bottom: 14px;
+}
+.ta-ask-h {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+.ta-ask-h .h3 {
+  margin: 0;
+}
+.ta-ask-ic {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--ai, #7c5cf6), var(--accent));
+}
+.ta-ask-form {
+  display: flex;
+  gap: 8px;
+}
+.ta-ask-form .inp {
+  flex: 1;
+}
+.ta-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.ta-examples .chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.7);
+  font: inherit;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.ta-examples .chip:hover:not(:disabled) {
+  color: var(--accent-ink);
+  border-color: var(--blue-200);
+  background: var(--blue-50);
+}
+.ta-answer {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--ai-tint, rgba(124, 92, 246, 0.06));
+  border: 1px solid var(--ai-line, rgba(124, 92, 246, 0.2));
+}
+.ta-answer-text {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+.ta-subject {
+  font-weight: 700;
+}
+.ta-answer-group {
+  margin-top: 8px;
+}
+.ta-answer-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.ta-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.ta-kpi {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 10px;
+  align-items: center;
+  padding: 12px 14px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.ta-kpi-ic {
+  grid-row: span 2;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  color: var(--accent-ink);
+  background: var(--blue-50);
+}
+.ta-kpi strong {
+  font-size: 20px;
+  line-height: 1.1;
+}
+.ta-kpi span:last-child {
+  font-size: 12px;
+  color: var(--muted);
+}
+.ta-kpi.warn .ta-kpi-ic {
+  color: #b45309;
+  background: rgba(217, 119, 6, 0.1);
+}
+.ta-kpi.is-on {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.ta-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.ta-search {
+  position: relative;
+  flex: 1;
+  min-width: 220px;
+}
+.ta-search svg {
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted-2);
+}
+.ta-search .inp {
+  width: 100%;
+  padding-left: 32px;
+}
+.ta-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 650;
+}
+.ta-status {
+  margin-left: 6px;
+}
+.ta-table code,
+.ta-facts code {
+  font-size: 12.5px;
+}
+.ta-detail {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 14px;
+}
+.ta-detail .h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+}
+.ta-facts {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+.ta-facts > div {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr);
+  gap: 10px;
+}
+.ta-facts dt {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted-2);
+}
+.ta-facts dd {
+  margin: 0;
+  font-size: 13.5px;
+}
+.ta-desc {
+  margin: 12px 0 0;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.ta-rel {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13.5px;
+}
+.ta-import-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 10px;
+}
+.ta-import-row label {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted-2);
+}
+.ta-preview {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.ta-preview-nums {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin: 8px 0;
+}
+.ta-skipped {
+  margin: 8px 0 12px;
+  font-size: 13px;
+}
+.ta-skipped ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+}
+.ta-ok {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--flow-ok, #0f9d6e);
+  font-weight: 600;
+}
+@media (max-width: 640px) {
+  .ta-ask-form {
+    flex-direction: column;
+  }
+  .ta-facts > div {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}
+
 /* Login: one-click demo accounts for a reviewer (DEMO_LOGIN only). */
 .demo-accounts {
   margin-top: 18px;

@@ -123,6 +123,30 @@ SSO tidak pernah membuat akun. Untuk mencobanya di laptop: `pnpm idp:mock` (IdP 
 `OIDC_CLIENT_SECRET=mock-idp-secret-not-for-deployments`. Detail deployment di
 [docs/DEPLOY.md](docs/DEPLOY.md) §2a.
 
+## Technology Architecture (layer teknologi EA) dari Sparx EA
+
+Menu **Technology Architecture** memuat model layer teknologi TOGAF/ArchiMate: lokasi,
+segmen jaringan, perangkat jaringan, server fisik, storage, VM, platform, dan aplikasi,
+beserta relasinya (meng-host, berjalan di, bergantung pada, terhubung ke, berada di,
+menyimpan data di). Sumbernya **ekspor Sparx EA**: XMI 2.1 (_Publish › Export XMI_) atau
+template CSV; stereotype ArchiMate dan tagged value (`hostname`, `ip_address`,
+`environment`, `os`, `os_version`, `location`, `owner`, `end_of_support`) dipetakan
+otomatis, tag lain disimpan sebagai atribut, elemen bisnis dilewati dengan alasan.
+
+- **Impor** (admin kategori): pratinjau → terapkan berkas yang sama; upsert per GUID
+  Sparx, tidak pernah menghapus elemen, relasi yang hilang dari model dihapus; tercatat di
+  audit (`ta.imported`). XMI dengan DOCTYPE/ENTITY ditolak.
+- **Akses** per kategori seperti dokumen (RLS); dampak dan dependensi hanya sejauh yang
+  boleh dilihat pembaca.
+- **Halaman elemen**: atribut, relasi, _dampak jika tidak tersedia_ (berantai, dengan
+  jalurnya), _bergantung pada_, dan dokumen yang menyebut hostname-nya.
+- **Tanya arsitektur**: dampak, dependensi, end of support, inventori per jenis /
+  lingkungan / lokasi / OS — dijawab dari data. Pertanyaan bebas dicari lewat KB WeKnora
+  khusus kartu elemen (`pnpm weknora:ta-setup`, docs/WEKNORA.md §28).
+- Data sintetis: `fixtures/ta/sparx-technology-demo.xmi` (31 elemen, 51 relasi) dan
+  `technology-template.csv` (`pnpm ta:fixture` membuat ulang); `pnpm demo:content`
+  mengimpornya ke Infrastruktur & Jaringan.
+
 ## Review oleh mentor: tunnel + masuk cepat
 
 Untuk review jarak jauh tanpa server: jalankan app dengan profil `staging` di belakang

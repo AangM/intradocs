@@ -65,6 +65,7 @@ export function childEnvironment(
     'WEKNORA_MIN_RELEVANCE',
     'WEKNORA_GENERATION_MODEL_ID',
     'WEKNORA_AGENT_ID',
+    'WEKNORA_TA_KNOWLEDGE_BASE_ID',
   ];
   const keys =
     target === 'web'

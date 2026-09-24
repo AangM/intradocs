@@ -923,6 +923,40 @@ async function main(): Promise<void> {
     }
     console.log('  percakapan asisten');
   }
+  // Technology Architecture: the synthetic Sparx export, imported by the knowledge admin
+  // through the same preview -> apply path an architect would use.
+  const ta = await db.query('SELECT count(*)::int AS n FROM app.ta_elements WHERE category_id=$1', [
+    IDS.infra,
+  ]);
+  if (ta.rows[0].n === 0) {
+    const bytes = await readFile(path.join(ROOT, 'fixtures/ta/sparx-technology-demo.xmi'));
+    const send = async (mode: 'preview' | 'apply', sha?: string) => {
+      const f = new FormData();
+      f.set(
+        'file',
+        new Blob([new Uint8Array(bytes)], { type: 'application/xml' }),
+        'sparx-technology-demo.xmi',
+      );
+      f.set('categoryId', IDS.infra);
+      f.set('mode', mode);
+      if (sha) f.set('sha256', sha);
+      const r = await fetch(base + '/api/ta/import', {
+        method: 'POST',
+        headers: { Cookie: await login(IDS.admin), Origin: base },
+        body: f,
+      });
+      if (!r.ok) throw new Error(`impor arsitektur ${mode}: HTTP ${r.status} ${await r.text()}`);
+      return (await r.json()) as {
+        sha256: string;
+        summary?: { created: number; relations: number };
+      };
+    };
+    const preview = await send('preview');
+    const applied = await send('apply', preview.sha256);
+    console.log(
+      `  arsitektur: ${applied.summary?.created} elemen, ${applied.summary?.relations} relasi dari ekspor Sparx sintetis`,
+    );
+  }
   await db.query('DELETE FROM auth."rateLimit"');
   await db.end();
   console.log('Selesai.');

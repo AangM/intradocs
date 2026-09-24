@@ -11,6 +11,7 @@ import { processRagExport, sweepRagOrphans } from '@intradocs/core/rag';
 import { processEmailDigests } from '@intradocs/core/mail';
 import { PostgresPublicationRepository } from './publication.ts';
 import { PostgresDigestRepository, createMailTransport } from './mail.ts';
+import { syncTaIndex } from './ta-index.ts';
 import { PostgresRagExportRepository, WeknoraIndexTarget } from './rag-export.ts';
 
 const sha256Hex = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
@@ -42,6 +43,14 @@ async function start() {
   const mail = createMailTransport(process.env, path.resolve(root));
   const digests = mail ? new PostgresDigestRepository(pool) : null;
   let digestDue = Date.now();
+  // Technology Architecture cards go to their own knowledge base, when one is set up
+  // (pnpm weknora:ta-setup); without it the TA pages work and search is exact-match only.
+  const taKnowledgeBase = process.env.WEKNORA_TA_KNOWLEDGE_BASE_ID ?? '';
+  const taIndex =
+    ai.weknora && taKnowledgeBase
+      ? new WeknoraClient({ ...ai.weknora, knowledgeBaseId: taKnowledgeBase })
+      : null;
+  let taDue = Date.now();
   boss.on('error', () => console.error('Antrean worker gagal; periksa PostgreSQL.'));
   pool.on('error', () => console.error('Koneksi worker gagal.'));
   await boss.start();
@@ -103,6 +112,15 @@ async function start() {
           }
         } catch {
           console.error('Ekspor RAG tertunda; antrean mempertahankan status dan retry.');
+        }
+      }
+      if (taIndex && taDue <= Date.now()) {
+        taDue = Date.now() + 30000;
+        try {
+          const n = await syncTaIndex(pool, taIndex);
+          if (n > 0) console.log(`Indeks arsitektur: ${n} kartu elemen diperbarui.`);
+        } catch {
+          console.error('Indeks arsitektur tertunda; dicoba lagi pada putaran berikutnya.');
         }
       }
       if (digestDue <= Date.now()) {

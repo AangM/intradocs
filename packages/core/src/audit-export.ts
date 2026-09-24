@@ -62,6 +62,7 @@ export const AUDIT_ACTIONS: Record<string, { text: string; icon: string; tone: s
     tone: 'amber',
   },
   'audit.exported': { text: 'Audit log diekspor', icon: 'download', tone: 'amber' },
+  'ta.imported': { text: 'Model arsitektur diimpor dari Sparx', icon: 'server', tone: 'blue' },
 };
 export const auditLabel = (action: string) =>
   AUDIT_ACTIONS[action] ?? { text: action, icon: 'act', tone: 'grey' };
