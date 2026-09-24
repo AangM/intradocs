@@ -930,7 +930,7 @@ async function main(): Promise<void> {
   ]);
   if (ta.rows[0].n === 0) {
     const bytes = await readFile(path.join(ROOT, 'fixtures/ta/sparx-technology-demo.xmi'));
-    const send = async (mode: 'preview' | 'apply', sha?: string) => {
+    const send = async (mode: 'preview' | 'submit', sha?: string) => {
       const f = new FormData();
       f.set(
         'file',
@@ -946,15 +946,18 @@ async function main(): Promise<void> {
         body: f,
       });
       if (!r.ok) throw new Error(`impor arsitektur ${mode}: HTTP ${r.status} ${await r.text()}`);
-      return (await r.json()) as {
-        sha256: string;
-        summary?: { created: number; relations: number };
-      };
+      return (await r.json()) as { sha256: string; id?: string };
     };
     const preview = await send('preview');
-    const applied = await send('apply', preview.sha256);
+    const proposed = await send('submit', preview.sha256);
+    // Four eyes: the knowledge admin proposes, the super admin approves.
+    const decided = await api(IDS.super, `/api/ta/import/${proposed.id}`, {
+      decision: 'approve',
+      note: 'Model sintetis awal untuk demo.',
+    });
+    if (decided.status !== 200) throw new Error(`persetujuan arsitektur: HTTP ${decided.status}`);
     console.log(
-      `  arsitektur: ${applied.summary?.created} elemen, ${applied.summary?.relations} relasi dari ekspor Sparx sintetis`,
+      `  arsitektur: ${decided.body.created} elemen, ${decided.body.relations} relasi (diajukan Andi, disetujui Budi)`,
     );
   }
   await db.query('DELETE FROM auth."rateLimit"');

@@ -1473,6 +1473,52 @@ tbody tr:hover td {
   color: var(--flow-ok, #0f9d6e);
   font-weight: 600;
 }
+.ta-diff {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 10px;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+.ta-diff ul,
+.ta-diff-fields {
+  margin: 3px 0 0 14px;
+  padding: 0;
+  list-style: none;
+}
+.ta-diff del,
+.ta-diff-fields del {
+  color: var(--red, #b42318);
+}
+.ta-diff ins,
+.ta-diff-fields ins {
+  color: var(--flow-ok, #0f9d6e);
+  text-decoration: none;
+  font-weight: 600;
+}
+.ta-queue-item {
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+.ta-queue-item:first-of-type {
+  border-top: 0;
+}
+.ta-queue-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.ta-queue-actions .inp {
+  flex: 1;
+  min-width: 220px;
+}
+.ta-search-hits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
 @media (max-width: 640px) {
   .ta-ask-form {
     flex-direction: column;
@@ -1553,7 +1599,8 @@ tbody tr:hover td {
   border-radius: 999px;
   border: 1px solid var(--line);
   background: rgba(15, 23, 42, 0.08);
-  color: var(--muted);
+  /* 4.5:1 against the track in both states (axe color-contrast). */
+  color: var(--ink-2);
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
@@ -1570,7 +1617,7 @@ tbody tr:hover td {
   transition: transform 0.18s ease;
 }
 .switch.is-on {
-  background: var(--flow-ok);
+  background: #047857;
   border-color: transparent;
   color: #fff;
   padding: 3px 3px 3px 10px;

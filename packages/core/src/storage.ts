@@ -22,7 +22,7 @@ export function sha256(bytes: Uint8Array): string {
 }
 /** The byte ceiling per artefact kind, the same for every store. */
 export function limitFor(key: string) {
-  return /\/(?:original|attachment-[1-4])\.(md|txt|pdf|docx|xlsx|html|pptx)$/.test(key)
+  return /\/(?:original|attachment-[1-4])\.(md|txt|pdf|docx|xlsx|html|pptx|xmi|xml|csv)$/.test(key)
     ? 50 * 1024 * 1024
     : 2 * 1024 * 1024;
 }

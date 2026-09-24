@@ -2,6 +2,9 @@ import Link from 'next/link';
 import { requireActor } from '@/lib/session';
 import { getAiConfig } from '@/lib/rag';
 import { SearchAiCard } from '@/components/search-ai-card';
+import { taModel } from '@intradocs/db/ta';
+import { TA_KIND_LABELS } from '@intradocs/core/ta';
+import { TA_KIND_ICON } from '@/components/ta-shared';
 import { searchDocuments, searchFacets } from '@intradocs/db/discovery';
 import { catalogHref } from '@/components/discovery-filters';
 import { parseCatalogQuery, type CatalogQuery } from '@intradocs/core/validation';
@@ -72,10 +75,19 @@ export default async function Search({
   }
   const aiConfig = getAiConfig();
   const aiOn = aiConfig.retrieval === 'weknora-local' && Boolean(aiConfig.weknora);
-  const [data, facets] = await Promise.all([
+  const [data, facets, ta] = await Promise.all([
     searchDocuments(actor.id, query),
     searchFacets(actor.id, query.q),
+    query.q.trim().length >= 2 ? taModel(actor.id) : Promise.resolve(null),
   ]);
+  // Technology Architecture elements whose name, hostname, IP or OS contain the words,
+  // in the reader's scope; documents stay the main result list.
+  const needle = query.q.trim().toLowerCase();
+  const elements = (ta?.elements ?? [])
+    .filter((e) =>
+      [e.name, e.hostname, e.ipAddress, e.os].some((v) => v && v.toLowerCase().includes(needle)),
+    )
+    .slice(0, 8);
   // A facet is a link to the same search with one parameter changed; clicking the
   // active one clears it. No script needed, and every state has a URL.
   const withParam = (key: keyof CatalogQuery, value: string | undefined) =>
@@ -254,6 +266,23 @@ export default async function Search({
           )
         )}
 
+        {elements.length > 0 && (
+          <section className="card card-b mb" aria-label="Elemen arsitektur">
+            <div className="ft-l">Technology Architecture</div>
+            <div className="ta-search-hits">
+              {elements.map((e) => (
+                <Link
+                  key={e.id}
+                  href={`/arsitektur/${e.id}`}
+                  className="tag"
+                  title={TA_KIND_LABELS[e.kind]}
+                >
+                  <Icon name={TA_KIND_ICON[e.kind]} size={12} /> {e.name}
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
         {data.items.length ? (
           <div className="res-list">
             {data.items.map((d) => {

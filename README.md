@@ -133,19 +133,24 @@ template CSV; stereotype ArchiMate dan tagged value (`hostname`, `ip_address`,
 `environment`, `os`, `os_version`, `location`, `owner`, `end_of_support`) dipetakan
 otomatis, tag lain disimpan sebagai atribut, elemen bisnis dilewati dengan alasan.
 
-- **Impor** (admin kategori): pratinjau → terapkan berkas yang sama; upsert per GUID
-  Sparx, tidak pernah menghapus elemen, relasi yang hilang dari model dihapus; tercatat di
-  audit (`ta.imported`). XMI dengan DOCTYPE/ENTITY ditolak.
+- **Impor = alur review, sama seperti dokumen.** Berkas dipindai ClamAV dan disimpan
+  immutable; admin kategori mengajukan (pratinjau diff per field), lalu **admin lain**
+  menyetujui atau menolak dengan alasan — pengaju tidak bisa menyetujui sendiri, dan model
+  baru berubah setelah disetujui. Upsert per GUID Sparx, elemen tidak pernah dihapus,
+  relasi yang hilang dari model dihapus, setiap perubahan field tercatat per elemen
+  (_Riwayat perubahan_), semua langkah di audit. XMI dengan DOCTYPE/ENTITY ditolak. Badge
+  antrean muncul di menu untuk admin yang bisa memutuskan.
 - **Akses** per kategori seperti dokumen (RLS); dampak dan dependensi hanya sejauh yang
   boleh dilihat pembaca.
 - **Halaman elemen**: atribut, relasi, _dampak jika tidak tersedia_ (berantai, dengan
   jalurnya), _bergantung pada_, dan dokumen yang menyebut hostname-nya.
+- **Pencarian** global ikut menampilkan elemen yang cocok (nama, hostname, IP, OS).
 - **Tanya arsitektur**: dampak, dependensi, end of support, inventori per jenis /
   lingkungan / lokasi / OS — dijawab dari data. Pertanyaan bebas dicari lewat KB WeKnora
   khusus kartu elemen (`pnpm weknora:ta-setup`, docs/WEKNORA.md §28).
 - Data sintetis: `fixtures/ta/sparx-technology-demo.xmi` (31 elemen, 51 relasi) dan
   `technology-template.csv` (`pnpm ta:fixture` membuat ulang); `pnpm demo:content`
-  mengimpornya ke Infrastruktur & Jaringan.
+  mengajukannya sebagai Andi dan menyetujuinya sebagai Budi di Infrastruktur & Jaringan.
 
 ## Review oleh mentor: tunnel + masuk cepat
 

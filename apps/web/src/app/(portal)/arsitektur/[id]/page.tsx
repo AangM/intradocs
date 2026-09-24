@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { requireActor } from '@/lib/session';
-import { taModel } from '@intradocs/db/ta';
+import { taElementChanges, taModel } from '@intradocs/db/ta';
 import { listDocuments } from '@intradocs/db/queries';
 import { parseCatalogQuery, parseUuid } from '@intradocs/core/validation';
 import { formatDate } from '@intradocs/core';
@@ -19,6 +19,12 @@ import { Icon } from '@/components/icon';
 import { TaEosPill, TA_KIND_ICON } from '@/components/ta-shared';
 export const dynamic = 'force-dynamic';
 
+const fmt = (v: unknown) =>
+  v === null || v === undefined || v === ''
+    ? '—'
+    : typeof v === 'object'
+      ? `${Object.keys(v as object).length} tag`
+      : String(v);
 async function currentTime() {
   return new Date();
 }
@@ -38,6 +44,7 @@ export default async function TaElementPage({ params }: { params: Promise<{ id: 
   const byId = new Map(elements.map((e) => [e.id, e]));
   const outgoing = relations.filter((r) => r.sourceId === id);
   const incoming = relations.filter((r) => r.targetId === id);
+  const changes = await taElementChanges(actor.id, id);
   const impact = impactOf(id, relations);
   const needs = dependenciesOf(id, relations);
   // Runbooks and SOPs that mention this element by hostname or name, in the reader's scope.
@@ -173,6 +180,37 @@ export default async function TaElementPage({ params }: { params: Promise<{ id: 
             </ul>
           ) : (
             <p className="sub">Belum ada dokumen yang menyebut {term}.</p>
+          )}
+        </section>
+        <section className="card card-b">
+          <h2 className="h3">
+            <Icon name="clock" size={15} /> Riwayat perubahan
+          </h2>
+          {changes.length ? (
+            <ul className="ta-rel">
+              {changes.map((c, i) => (
+                <li key={i}>
+                  <span className={`pill ${c.change === 'created' ? 'p-green' : 'p-amber'}`}>
+                    {c.change === 'created' ? 'dibuat' : 'diubah'}
+                  </span>{' '}
+                  <span className="sub tiny">
+                    {formatDate(c.changedAt)} · diajukan {c.proposedBy ?? '—'}, disetujui{' '}
+                    {c.approvedBy ?? '—'} · {c.filename}
+                  </span>
+                  {c.change === 'updated' && (
+                    <ul className="ta-diff-fields">
+                      {Object.entries(c.fields).map(([k, [o, n]]) => (
+                        <li key={k} className="sub tiny">
+                          {k}: <del>{fmt(o)}</del> → <ins>{fmt(n)}</ins>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="sub">Belum ada perubahan tercatat.</p>
           )}
         </section>
       </div>
