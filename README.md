@@ -1,278 +1,126 @@
-# IntraDocs · M1–M5 lokal
+# IntraDocs
 
-Portal knowledge base internal: **corpus sintetis, AI lokal opt-in dan off secara default**. Desain mentor ([reference/](reference/)), stack pinned, dan migrasi yang sudah diterapkan dipertahankan byte-for-byte.
+Portal knowledge base internal untuk dokumentasi IT: kontributor mengunggah dokumen, reviewer
+memvalidasinya, lalu karyawan mencari dan bertanya ke asisten AI yang **hanya menjawab dari
+dokumen yang sudah disetujui dan boleh mereka baca**, selalu dengan sitasi. Termasuk modul
+**Technology Architecture** (layer teknologi Enterprise Architecture) yang diimpor dari Sparx EA.
 
-## Hasil implementasi
+Semua data di repo ini **sintetis**. AI berjalan lokal (WeKnora + Ollama); tidak ada dokumen
+yang dikirim ke provider cloud. Desain mengikuti [mockup mentor](reference/intradocs-mockup_1.html).
 
-- **M1:** Better Auth/session lokal, lima role, category scope, RLS PostgreSQL, proteksi URL/file, audit, shell responsif, penugasan role/scope dan aktivasi akun.
-- **M2:** MD/TXT/PDF berteks/DOCX/XLSX/HTML (+ PPTX lewat parser WeKnora bila aktif, [§27](docs/WEKNORA.md)), original + maksimal empat lampiran, scan ClamAV wajib, converter non-AI, canonical gabungan dan provenance/locator, preview, private draft, duplicate/idempotency, retry, revisi immutable, taksonomi.
-- **M4:** WeKnora lokal sebagai mesin RAG di belakang policy gate IntraDocs — ekspor idempoten versi final-approved, retrieval ber-scope, sitasi yang divalidasi ulang ke database pada setiap request, dan abstain bila tidak ada bukti sah. Aktif hanya bila `AI_PROVIDER=weknora-local` diisi sendiri. Rinciannya di [docs/WEKNORA.md](docs/WEKNORA.md).
-- **M5 (V1):** saran label dari auto-tag WeKnora yang disaring kosakata kategori (tidak pernah diterapkan otomatis), permintaan akses dengan keputusan tercatat, bacaan wajib per kategori dengan konfirmasi versi, aksi cabut massal yang atomik, rollback versi via draft, merge label sebagai alias, gerbang relevansi yang membuat asisten menjawab "tidak tahu" pada pertanyaan tanpa bukti, metrik AI dari jejak audit di dashboard, cakupan jawaban (seluruh KB / kategori / dokumen yang dibuka) dan riwayat percakapan yang tunduk RLS di asisten, kartu sumber AI di halaman pencarian ([docs/WEKNORA.md §16](docs/WEKNORA.md)), summary dan pertanyaan yang dihasilkan WeKnora saat ingest sebagai saran — pertanyaan untuk pembaca, draf ringkasan hanya untuk yang boleh merevisi ([§17](docs/WEKNORA.md)), penilaian jawaban dan pertanyaan tak terjawab sebagai knowledge gap ([§18](docs/WEKNORA.md)), perapian taksonomi ([§19](docs/WEKNORA.md)), bantuan metadata saat unggah tanpa mengirim draft ([§20](docs/WEKNORA.md)), dan undangan pengguna lokal dengan tautan sekali pakai ([§21](docs/WEKNORA.md)).
-- **M3:** satu/dua reviewer berbeda, larangan self-approval, justifikasi temuan, minta revisi/tolak, outbox ber-lease/retry, publikasi dan indeks atomik, lexical search ber-RLS, favorit, feedback pemilik, histori, notifikasi, pengingat/expiry, dokumen terkait, dan KPI aktual berfilter periode/unit.
+## Untuk reviewer
 
-**Bukti dan batas acceptance hanya pada [docs/PLAN.md §0](docs/PLAN.md) dan [docs/WEKNORA.md §8](docs/WEKNORA.md).** Implementasi lokal bukan izin pilot/go-live. IdP SSO organisasi, format DOC lama/ZIP, backup off-site, dan persetujuan mentor/security/ops tetap di luar rilis ini. Kualitas retrieval **sudah diukur** pada corpus sintetis lewat `pnpm rag:eval`: recall@5 100% pada 20 pertanyaan answerable, abstain penuh 8/10 pada pertanyaan tanpa bukti, nol kebocoran pada 10 percobaan lintas izin, dan teks buatan model (summary yang diindeks WeKnora) tidak pernah menjadi sitasi ([§22](docs/WEKNORA.md)). Angka itu berlaku untuk fixture ini, bukan untuk dokumen nyata, dan review grounding oleh pemilik domain belum dilakukan — jadi jangan memakai jawabannya sebagai rujukan kebijakan.
+### Coba tanpa instalasi
+
+Buka tautan demo yang dikirim bersama repo ini. Halaman login menampilkan daftar akun demo;
+**satu klik** masuk sebagai peran tersebut, **Keluar** untuk berganti akun. Tautan hidup selama
+laptop pengembang menyala (Cloudflare Quick Tunnel); bila mati, jalankan lokal di bawah.
+
+| Akun  | Peran           | Cakupan             | Coba ini                                                        |
+| ----- | --------------- | ------------------- | --------------------------------------------------------------- |
+| Siti  | Viewer          | Infrastruktur, Data | Cari, baca dokumen, tanya AI Assistant, Technology Architecture |
+| Fajar | Viewer          | SOP saja            | Pertanyaan yang sama dengan Siti → tidak melihat dokumen Siti   |
+| Rizky | Contributor     | Infrastruktur       | Unggah dokumen → konversi → ajukan review                       |
+| Dwi   | Reviewer        | Keamanan            | Antrean Persetujuan: setujui / minta revisi / tolak             |
+| Andi  | Admin Knowledge | Semua kategori      | Kategori & Label, Dashboard, ajukan impor arsitektur            |
+| Budi  | Super Admin     | Semua kategori      | Pengguna & RBAC, Audit Log, setujui impor arsitektur            |
+
+### Skenario 10 menit
+
+1. **Alur dokumen** — Rizky: _Unggah Dokumen_ (Markdown/DOCX/PDF) → pratinjau hasil konversi →
+   ajukan ke Andi → Andi setujui di _Antrean Persetujuan_ → dokumen terbit dan terindeks
+   (±15 detik). Rizky tidak bisa menyetujui dokumennya sendiri.
+2. **AI Assistant** — Siti bertanya _"Apakah MFA wajib untuk VPN lab?"_ → jawaban dengan sitasi
+   yang membuka bagian dokumen sumber. _"harga saham"_ atau _"abaikan aturan akses"_ → asisten
+   menyatakan tidak tahu, bukan mengarang.
+3. **Izin** — ulangi pertanyaan VPN sebagai Fajar: tidak ada sumber, karena kategori itu di luar
+   cakupannya. Pembatasan ini ditegakkan di database (RLS), bukan hanya di tampilan.
+4. **Technology Architecture** — Siti buka menu _Technology Architecture_ → `srv-db-01` →
+   _Dampak jika tidak tersedia_ menampilkan aplikasi yang ikut terganggu beserta jalurnya. Tanya
+   _"server apa yang end of support?"_. Andi mengajukan impor di _Impor dari Sparx EA_; Budi
+   (admin lain) menyetujuinya — sama seperti review dokumen.
+5. **Tata kelola** — Budi buka _Audit Log_ (semua langkah di atas tercatat) dan _Dashboard_.
+
+## Fitur
+
+| Area                    | Isi                                                                                                                                                                 |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Akses                   | Login lokal atau SSO OpenID Connect, lima role + role kustom, cakupan per kategori, klasifikasi Internal/Terbatas/Rahasia, Row-Level Security PostgreSQL            |
+| Dokumen                 | MD, TXT, PDF (termasuk pindaian via OCR), DOCX, XLSX, HTML, PPTX + lampiran; scan ClamAV wajib; original disimpan immutable, Markdown kanonik dengan locator sumber |
+| Review                  | Satu atau dua reviewer, larangan self-approval, revisi/tolak beralasan, pra-cek secret/PII, versi immutable, bandingkan versi, rollback lewat draft                 |
+| Penemuan                | Pencarian kata + semantik, facet, favorit, riwayat baca, bacaan wajib, permintaan akses, notifikasi (lonceng + email)                                               |
+| AI Assistant            | Jawaban bersitasi yang divalidasi ulang ke database tiap permintaan, abstain bila tak ada bukti, cakupan KB/kategori/dokumen, riwayat percakapan, penilaian jawaban |
+| Technology Architecture | Impor XMI/CSV Sparx EA lewat review, katalog elemen, dampak & dependensi, end of support, tanya arsitektur                                                          |
+| Operasi                 | Retensi otomatis, ekspor audit CSV/JSONL, backup/restore teruji, gate rilis, alarm, load test, storage S3                                                           |
+
+Status per requirement dan bukti tes: [docs/PLAN.md §0](docs/PLAN.md).
 
 ## Jalankan di laptop
 
-Prasyarat: Node **24**, pnpm **10.34.5**, Docker + Compose. RAM 8 GiB atau lebih disarankan untuk ClamAV, database, converter, dan build; ukur pada laptop target.
+Prasyarat: Node **24**, pnpm **10.34.5**, Docker + Compose, RAM ≥ 8 GB.
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm setup:local
-pnpm knowledge:start
-pnpm scanner:check
-pnpm knowledge:check
-pnpm dev
+pnpm setup:local        # database, migrasi, akun demo sintetis
+pnpm knowledge:start    # ClamAV + converter (wajib untuk unggah)
+pnpm dev                # http://localhost:3000
+pnpm demo:content       # terminal lain: 18 dokumen sintetis + model arsitektur, lewat alur aplikasi
 ```
 
-Buka `http://localhost:3000`. Credential acak ada **hanya** di `var/demo-accounts.json`; jangan kirim/publikasikan file itu. Tidak ada registrasi publik, password default, provider key, atau deploy otomatis. `knowledge:start` mengunduh image/dependency dan signature, lalu menyediakan converter terisolasi; dokumen tidak dikirim ke provider.
+Password akun demo acak per instalasi dan hanya ada di `var/demo-accounts.json` (tidak masuk
+Git). `DEMO_LOGIN=true` di `.env.local` menampilkan tombol masuk cepat seperti pada tautan demo
+(ditolak pada profil `production`).
 
-`knowledge:start` membuat token converter acak di `.env.local` bila belum ada; **restart `pnpm dev` sesudahnya**. Scanner belum siap/signature kedaluwarsa = upload ditolak, bukan bypass. `pnpm services:stop`/`pnpm knowledge:stop` tidak menghapus volume.
+**AI Assistant (opsional):** pasang [Ollama](https://ollama.com), `ollama pull bge-m3`, lalu
+`pnpm weknora:setup`, isi `AI_PROVIDER=weknora-local` di `.env.local`, dan restart. Tanpa ini
+portal, pencarian kata, dan reader tetap berjalan. Langkah lengkap, jawaban tersusun
+(`AI_GENERATION`), dan reranker: [docs/WEKNORA.md §3](docs/WEKNORA.md).
 
-### Sebelum demo: jalankan build produksi
-
-`pnpm dev` mengompilasi setiap halaman saat pertama dibuka; di laptop yang sekaligus menjalankan WeKnora, Ollama, ClamAV, dan converter, itu terasa sebagai jeda 5–15 detik per halaman. Untuk demo pakai build produksi:
-
-```sh
-docker compose --env-file .env.local --profile weknora up -d   # postgres, WeKnora, scanner, converter
-pnpm weknora:status                                            # health, hybrid search, jumlah index
-pnpm build && pnpm start                                       # web + worker, mode produksi
-```
-
-Cek terakhir sebelum orang lain melihat: Ollama hidup (`curl http://localhost:11434/api/version`), `pnpm weknora:status` menyebut "Hybrid search: ok", dan satu pertanyaan pemantik di AI Assistant dijawab dengan sitasi.
-
-**Reranker (opsional, ~571 MB unduhan sekali):** membuat asisten memilih potongan yang benar-benar menjawab dan menolak menyusun jawaban dari potongan yang hanya mirip — dengan biaya beberapa detik CPU per pertanyaan (p50 jawaban 4,5 s → 8–10 s; di VM Docker 3,8 GB matikan profil `knowledge` selama demo asisten agar VM tidak swap). Tanpa reranker, "nomor kontrak vendor yang berlaku?" dijawab dengan lokasi yang dikarang; dengan reranker, pembaca mendapat "tidak ada bagian dokumen yang menjawab secara langsung" di atas sumber terdekat. Rinciannya dan angkanya di [docs/WEKNORA.md §17](docs/WEKNORA.md).
-
-```sh
-pnpm weknora:rerank-weights                                              # unduh bobot int8 terpin ke volume
-docker compose --env-file .env.local --profile weknora --profile weknora-rerank up -d
-pnpm weknora:rerank                                                      # daftarkan + pin ke agen
-```
-
-## Memperbarui instalasi
-
-Backup DB + `var/storage` (`pnpm ops:backup`); jangan menghapus data. Hentikan app, tarik
-source terbaru (`git pull`), lalu:
-
-```sh
-pnpm install --frozen-lockfile
-pnpm db:migrate
-pnpm knowledge:start
-pnpm dev
-```
-
-Migrasi bersifat additive. SQL yang sudah diterapkan tidak ditulis ulang. Jangan menjalankan `db:seed` untuk mereset data yang ada.
-
-## Deployment
-
-Build ini tidak lagi terkunci di laptop. Profil `staging` dan `production` ada, dan
-aturannya lebih ketat daripada `local-dev`: origin wajib https, cookie `Secure`, HSTS,
-secret 48+ karakter, database lintas host wajib TLS, storage wajib path absolut di luar
-webroot, dan akun demo menahan rilis. Konfigurasi divalidasi **saat proses start** —
-salah konfigurasi keluar dengan kode 78 dan masuk crash-loop, jadi rilis sebelumnya tetap
-melayani.
-
-```sh
-cp .env.production.example .env.production        # isi semua; tidak ada default
-docker build -t intradocs:0.3.0 .
-pnpm ops:preflight                                # gate rilis; exit 1 menahan deploy
-docker compose -f compose.prod.yaml --env-file .env.production up -d
-pnpm ops:bootstrap-admin --email anda@org.example --name "Nama" --unit "Divisi IT"
-```
-
-Runbook lengkap — persiapan, tiap rilis, alarm, rollback, kapasitas terukur, dan daftar
-hal yang masih menjadi keputusan organisasi (SSO, TLS, kebijakan data) — ada di
-[docs/DEPLOY.md](docs/DEPLOY.md).
-
-## Operasi lokal (Q6, sebagian)
-
-```sh
-pnpm ops:ready                          # tabel kesiapan: DB, web, storage, ClamAV, converter, WeKnora, Ollama + pemilik
-pnpm ops:backup                         # var/backups/<stamp>/{db.dump,storage.tar,manifest.json}; .env dan akun demo tidak ikut
-pnpm ops:verify-backup var/backups/<stamp>   # restore drill ke database uji + folder sementara; tidak menyentuh yang hidup
-pnpm ops:restore var/backups/<stamp> --yes   # menimpa DB dan storage lokal; app harus berhenti dulu
-pnpm ops:preflight                          # gate rilis: konfigurasi, migrasi, akun demo, backup terverifikasi
-pnpm ops:watch --interval 30 --grace 3      # alarm: satu baris per perubahan status, exit 1 saat down berulang
-pnpm ops:rollback-check v0.2.0              # apakah rollback kode saja aman, atau butuh restore database
-pnpm ops:loadtest --users 4 --seconds 20    # kapasitas terukur; exit 1 bila p95 melewati anggaran
-```
-
-WeKnora tidak ikut di-backup: indeksnya turunan dari `app.rag_index_entries` + Markdown kanonik dan dibangun ulang oleh `pnpm weknora:sync`. Rollback rilis = checkout tag sebelumnya + `pnpm build`; migrasi hanya maju, jadi rollback skema berarti restore dari backup sebelum migrasi itu.
-
-## Demo alur lengkap
-
-1. Contributor unggah berkas sintetis dan lampiran ke kategori leaf yang diizinkan. Maksimal **50 MiB/berkas, 100 MiB total**, canonical gabungan **2 MiB**.
-2. Periksa canonical, original, dan locator di reader. Gunakan klasifikasi minimal kategori. Terbatas/Rahasia memerlukan grant eksplisit; bahkan Super Admin tidak punya akses menyeluruh.
-3. Untuk kategori/label Kritikal atau dokumen sensitif, pilih **dua reviewer** berbeda dalam scope. Berikan grant sensitif melalui panel pemilik sebelum memilih reviewer. Viewer tetap tidak dapat membaca data sensitif.
-4. Reviewer pertama dan kedua meninjau versi yang sama. Minta revisi/tolak wajib beralasan. Credential palsu/pola PII memerlukan justifikasi; private key harus dihapus lewat versi baru.
-5. Sesudah persetujuan final, worker membangun indeks. Pembaca baru melihat versi setelah `ready/published`; versi aktif lama tetap tersedia bila revisi sedang diproses atau gagal.
-6. Cari kata di dalam isi; filter metadata, simpan favorit, beri feedback. Revisi, pencabutan, expiry, dan perubahan scope/grant berlaku pada query berikutnya termasuk download.
-
-## SSO lewat OpenID Connect
-
-`AUTH_MODE=oidc` menambahkan tombol "Masuk dengan <IdP>" untuk akun yang sudah diundang;
-SSO tidak pernah membuat akun. Untuk mencobanya di laptop: `pnpm idp:mock` (IdP tiruan di
-`http://localhost:3099`, memilih nama = "masuk"), lalu di `.env.local` set `AUTH_MODE=oidc`,
-`OIDC_ISSUER=http://localhost:3099`, `OIDC_CLIENT_ID=intradocs-local`,
-`OIDC_CLIENT_SECRET=mock-idp-secret-not-for-deployments`. Detail deployment di
-[docs/DEPLOY.md](docs/DEPLOY.md) §2a.
-
-## Technology Architecture (layer teknologi EA) dari Sparx EA
-
-Menu **Technology Architecture** memuat model layer teknologi TOGAF/ArchiMate: lokasi,
-segmen jaringan, perangkat jaringan, server fisik, storage, VM, platform, dan aplikasi,
-beserta relasinya (meng-host, berjalan di, bergantung pada, terhubung ke, berada di,
-menyimpan data di). Sumbernya **ekspor Sparx EA**: XMI 2.1 (_Publish › Export XMI_) atau
-template CSV; stereotype ArchiMate dan tagged value (`hostname`, `ip_address`,
-`environment`, `os`, `os_version`, `location`, `owner`, `end_of_support`) dipetakan
-otomatis, tag lain disimpan sebagai atribut, elemen bisnis dilewati dengan alasan.
-
-- **Impor = alur review, sama seperti dokumen.** Berkas dipindai ClamAV dan disimpan
-  immutable; admin kategori mengajukan (pratinjau diff per field), lalu **admin lain**
-  menyetujui atau menolak dengan alasan — pengaju tidak bisa menyetujui sendiri, dan model
-  baru berubah setelah disetujui. Upsert per GUID Sparx, elemen tidak pernah dihapus,
-  relasi yang hilang dari model dihapus, setiap perubahan field tercatat per elemen
-  (_Riwayat perubahan_), semua langkah di audit. XMI dengan DOCTYPE/ENTITY ditolak. Badge
-  antrean muncul di menu untuk admin yang bisa memutuskan.
-- **Akses** per kategori seperti dokumen (RLS); dampak dan dependensi hanya sejauh yang
-  boleh dilihat pembaca.
-- **Halaman elemen**: atribut, relasi, _dampak jika tidak tersedia_ (berantai, dengan
-  jalurnya), _bergantung pada_, dan dokumen yang menyebut hostname-nya.
-- **Pencarian** global ikut menampilkan elemen yang cocok (nama, hostname, IP, OS).
-- **Tanya arsitektur**: dampak, dependensi, end of support, inventori per jenis /
-  lingkungan / lokasi / OS — dijawab dari data. Pertanyaan bebas dicari lewat KB WeKnora
-  khusus kartu elemen (`pnpm weknora:ta-setup`, docs/WEKNORA.md §28).
-- Data sintetis: `fixtures/ta/sparx-technology-demo.xmi` (31 elemen, 51 relasi) dan
-  `technology-template.csv` (`pnpm ta:fixture` membuat ulang); `pnpm demo:content`
-  mengajukannya sebagai Andi dan menyetujuinya sebagai Budi di Infrastruktur & Jaringan.
-
-## Review oleh mentor: tunnel + masuk cepat
-
-Untuk review jarak jauh tanpa server: jalankan app dengan profil `staging` di belakang
-Cloudflare Quick Tunnel (gratis, tanpa akun) dan `DEMO_LOGIN=true`. Halaman login lalu
-menampilkan daftar akun demo sintetis; satu klik masuk sebagai peran itu (Keluar untuk
-berganti). `DEMO_LOGIN` ditolak saat start pada profil `production`, hanya menerima akun
-`@example.test` dari `var/demo-accounts.json`, dan menjalankan login email biasa (rate limit
-dan penolakan akun nonaktif tetap berlaku); password tidak pernah dikirim ke browser.
-`WEB_PORT` menetapkan port lokal bila `APP_URL` adalah origin https tanpa port.
-
-## OCR untuk PDF pindai
-
-Halaman PDF tanpa teks yang berisi gambar dibaca oleh Tesseract (ind+eng) di dalam container
-converter — lokal, tanpa layanan eksternal, maks. 10 halaman per berkas. Halaman OCR ditandai
-`(OCR)` dan konversi memberi peringatan agar dicocokkan dengan original sebelum diajukan.
-Setelah menarik perubahan ini: `docker compose --env-file .env.local --profile knowledge up -d --build converter`.
-Rincian di [docs/DEPLOY.md](docs/DEPLOY.md) §2f.
-
-## Storage objek (S3)
-
-`STORAGE_DRIVER=s3` menaruh semua blob di bucket S3-compatible (AWS S3, MinIO, Ceph) —
-prasyarat lebih dari satu replika. Tanpa SDK: SigV4 ditulis sendiri dan diuji terhadap
-vektor AWS serta MinIO sungguhan. Kunci tetap immutable (`If-None-Match: *`), setiap
-unggahan membawa checksum. Untuk mencoba di laptop:
-`docker run -d -p 127.0.0.1:9000:9000 -e MINIO_ROOT_USER=u -e MINIO_ROOT_PASSWORD=p quay.io/minio/minio server /data`,
-buat bucket, lalu `STORAGE_DRIVER=s3` + `S3_*` di `.env.local` (http hanya diterima untuk
-loopback). Rincian di [docs/DEPLOY.md](docs/DEPLOY.md) §2e.
-
-## Ekspor audit log
-
-Audit Log bisa disaring per rentang tanggal dan aktivitas, lalu diekspor sebagai CSV atau
-JSON Lines (maksimal setahun, 50.000 baris, trailer menyebut jumlah baris). Cakupan dan
-penyamaran nama sama dengan halamannya; ekspor itu sendiri tercatat sebagai event
-`audit.exported`. Rincian di [docs/DEPLOY.md](docs/DEPLOY.md) §2d.
-
-## Retensi otomatis
-
-Worker menjalankan kebijakan tiap jam: dokumen yang kedaluwarsa dan tidak diperbarui dalam
-masa tenggang diarsipkan dengan alasan tercatat, review yang terlewat lama dieskalasi ke
-admin kategori, dan pemilik bisa mengonfirmasi "masih berlaku" dari halaman dokumen tanpa
-mengunggah versi baru. Jendelanya `RETENTION_GRACE_DAYS` / `RETENTION_OVERDUE_DAYS` (default
-30). Rincian di [docs/DEPLOY.md](docs/DEPLOY.md) §2c.
-
-## Email pemberitahuan
-
-Isi lonceng juga bisa dikirim ke kotak masuk sebagai ringkasan per orang (`MAIL_MODE=smtp`
-dengan relay organisasi, lihat [docs/DEPLOY.md](docs/DEPLOY.md) §2b). Di laptop,
-`MAIL_MODE=file` plus `MAIL_FROM=IntraDocs <noreply@intradocs.example.test>` di `.env.local`
-menulis setiap email ke `var/outbox/*.eml`. Setiap orang punya sakelar sendiri di Pengaturan.
-
-## Isi demo yang lebih penuh
-
-`pnpm demo:content` mengisi portal lewat aplikasi sendiri (unggah → scan → konversi →
-review → publikasi, dengan RLS dan jejak audit sungguhan) sehingga tidak ada halaman yang
-kosong saat demo: 18 dokumen sintetis di keenam kategori dan enam format (MD, TXT, HTML,
-DOCX, XLSX, PDF), item di antrean Andi, Dwi, dan Budi, satu permintaan revisi, satu
-penolakan, satu draf belum diajukan, masukan pembaca untuk pemilik, dua permintaan akses
-menunggu keputusan, bacaan wajib bertenggat, favorit dan riwayat baca Siti, serta beberapa
-percakapan asisten. Aman dijalankan ulang (judul yang sudah ada dilewati); `--no-ai`
-melewati percakapan asisten.
-
-## Demo AI Assistant dan fitur V1 (butuh profil `weknora`)
-
-Jalankan `pnpm weknora:setup` sekali, isi `AI_PROVIDER=weknora-local` (dan `AI_GENERATION=weknora-local` bila ingin jawaban tersusun, bukan hanya sumber; pin model penjawab dengan `pnpm weknora:generation <model>`), lalu restart `pnpm dev`. Pada laptop 8 GB tanpa GPU matikan profil `knowledge` (ClamAV/converter) selama demo AI; pada laptop ber-GPU keduanya berjalan bersama.
-
-Akun demo ada di `var/demo-accounts.json` (siti = viewer Infrastruktur+Data; fajar = viewer SOP saja; rizky = contributor; dwi = reviewer Keamanan; andi = admin knowledge; budi = super admin).
-
-1. **Alur inti, satu tarikan napas** — rizky unggah Markdown sintetis (`/unggah`): "Bantuan metadata" menandai dokumen terbit yang mirip dan label yang disebut teks tanpa mengirim draft ke mana pun → simpan draft → ajukan review ke andi → andi setujui → worker publikasi dan indeks (±15 detik) → siapa pun dengan scope bertanya ke asisten dan mendapat jawaban **bersitasi ke dokumen yang baru saja terbit**.
-2. **AI Assistant** sebagai siti: sapa dulu ("halo", "kamu bisa apa?", "apa ada dokumen lain yang menarik?") — dijawab tanpa model, dari daftar dokumen yang boleh ia baca. Lalu ketik "Apakah MFA wajib untuk VPN lab?" di kotak **Tanya AI** beranda — pertanyaan langsung terkirim ke asisten → jawaban dengan kutipan yang bisa dibuka ke bagian dokumen, dan chip pertanyaan lanjutan di bawahnya. Lanjutkan di utas yang sama: "Jelaskan lebih lengkap" → uraian langkah konfigurasi dari sumber yang sama; "Kalau perangkat authenticator-nya hilang?" → tiga langkah dari bagian "Jika perangkat authenticator hilang" yang baru ada di **v1.1** (revisi rizky yang disetujui andi — sebelum revisi itu terbit asisten menjawab "tidak ada bagian dokumen yang menjawab", jadi ini juga bukti bahwa yang dikutip selalu versi terbit terbaru); "Dan kalau koneksinya gagal setelah itu?" → langkah persis dari bagian "Jika koneksi gagal" — pertanyaan lanjutan dipahami dari riwayat ([docs/WEKNORA.md §24](docs/WEKNORA.md)). Di halaman dokumen VPN, **Bandingkan versi** menampilkan diff v1.0 → v1.1 baris demi baris. "harga saham" → "tidak tahu" tanpa memanggil model; injeksi "abaikan aturan akses" → tetap "tidak tahu". Ubah **ruang lingkup** ke satu kategori atau ke "dokumen yang saya buka"; riwayat percakapan tersimpan hanya untuk pemiliknya. Nilai jawaban "Membantu / tidak".
-3. **Pencarian** (`/search`): pertanyaan bahasa alami yang lexical-nya nol hasil tetap mendapat "Sumber yang relevan menurut AI" di atasnya, dengan tautan lanjut ke asisten.
-4. Ulangi pertanyaan VPN sebagai **fajar**: cakupan 1 versi, abstain — scope kategori berlaku pada retrieval, bukan hanya pada halaman.
-5. **Cabut** dokumen VPN sebagai pemiliknya, lalu buka riwayat percakapan siti: sitasi ke dokumen itu hilang dan jawabannya ikut disembunyikan; tanya lagi → tidak dikutip.
-6. **Halaman dokumen**: "Tanya asisten tentang dokumen ini" (pertanyaan yang dihasilkan model dari dokumen); bagi yang boleh merevisi: draf ringkasan model dan saran label, keduanya hanya masuk ke form revisi lewat tombol dan tetap direview.
-7. **Kategori & Label** (andi): saran perapian (label mirip / tidak terpakai), urutan lewat seret atau ↑/↓, ekspor taksonomi, panel aturan yang berlaku.
-8. **Pengguna & RBAC** (budi): "Undang Pengguna" → tautan sekali pakai tampil satu kali → buka di jendela privat, tetapkan password, masuk sebagai akun baru dengan scope yang diputuskan admin. **Role kustom**: "+ Role kustom baru" → mis. _Penulis SOP_ = Reviewer tanpa "Review & persetujuan" → tugaskan ke dwi lewat "Edit penugasan" → dwi melihat nama role barunya di topbar, menu Antrean Persetujuan hilang, dan `/admin/approval` menolak — tanpa login ulang; role kustom hanya mempersempit role dasarnya, tidak pernah menambah ([docs/UI.md U14](docs/UI.md)).
-9. **Dashboard** (andi/budi): ubin AI (pertanyaan, abstain, kutipan ditolak, dinilai membantu) dari jejak audit tanpa satu pun teks; knowledge gap termasuk pertanyaan asisten yang tak terjawab, dengan "Jawab sebagai dokumen". **Audit Log** membaca aktivitas dalam bahasa manusia.
-
-Ingin mencoba wiki dan chat bawaan WeKnora pada corpus yang sama? `pnpm weknora:lab` membuat knowledge base terpisah dengan semuanya menyala dan membuka UI WeKnora ke sana tanpa menyentuh yang dibaca portal — lihat [docs/WEKNORA.md §15](docs/WEKNORA.md).
-
-Yang sengaja **tidak** ada di portal dan alasannya ada di [docs/WEKNORA.md](docs/WEKNORA.md): wiki/Langfuse/unggah ke WeKnora (rekaman tanpa versi IntraDocs tidak bisa dikutip), UI WeKnora sebagai permukaan pengguna (tidak mengenal klasifikasi, scope, grant), dan teks buatan model sebagai sitasi (chunk `summary` ditolak gerbang, §22).
-
-## Konversi yang jujur
-
-- MD: UTF-8, normalisasi BOM/newline; renderer sanitasi HTML/URL. TXT: literal fenced text.
-- PDF: teks ber-layout + locator halaman; tidak mengarang urutan baca lintas kolom. File pindai/tanpa teks, encrypted, attachment/script aktif, atau rusak ditolak.
-- DOCX: heading, paragraf, nomor daftar dasar, tabel biasa, Unicode; locator paragraf/tabel, **bukan halaman palsu**. Struktur kompleks, gambar yang membutuhkan OCR, sel gabungan, atau penomoran tak didukung ditolak.
-- XLSX: nilai/cache yang sudah tersimpan + koordinat sheet/cell; format angka ditampilkan bila relevan. Formula tanpa cache ditolak; tidak menjalankan formula/macro/link eksternal.
-- Satu sheet maksimal 2.000 baris × 50 kolom; maksimal 20 sheet. ZIP internal dibatasi rasio/ukuran/jumlah entry; parsing dalam subprocess ber-timeout dan batas RAM/CPU.
-
-Pemilik/reviewer tetap wajib membandingkan sumber. Precheck pola adalah perlindungan terbatas, bukan sertifikasi DLP/ISO.
+Untuk demo pakai build produksi (`pnpm build && pnpm start`); `pnpm dev` mengompilasi setiap
+halaman saat pertama dibuka. `pnpm ops:ready` memeriksa semua layanan sekaligus.
 
 ## Pengujian
 
 ```sh
-pnpm check                  # lint + strict types + unit + content + build
-pnpm test:python            # jalankan dari venv Python di bawah
-pnpm test:integration       # PostgreSQL/RLS nyata; dataset sintetis
-pnpm test:http              # app + worker + ClamAV + converter harus berjalan
-pnpm test:e2e               # browser; install Chromium Playwright bila diperlukan
-pnpm verify:local           # gate bertahap, laporan PASS/FAIL/BLOCKED yang jujur
-pnpm storage:gc             # dry-run; tidak menghapus secara default
+pnpm check              # lint + TypeScript strict + unit + build
+pnpm test:integration   # PostgreSQL/RLS nyata
+pnpm test:http          # app + ClamAV + converter harus berjalan
+pnpm test:e2e           # Playwright + axe, desktop dan mobile
+pnpm rag:eval           # 40 pertanyaan berlabel: recall, abstain, kebocoran lintas izin
 ```
 
-Untuk tes native (tanpa menjalankan Python di container), siapkan venv agar parser `python -I` tetap menemukan dependency. Aktivasi venv mengikuti OS Anda:
+Suite yang mengubah data dijalankan berurutan, jangan paralel pada database yang sama. CI
+GitHub menjalankan format, lint, typecheck, unit, build, dan verifikasi source pada setiap PR;
+suite integrasi, HTTP, dan e2e butuh layanan lokal dan dijalankan di laptop.
 
-```sh
-python -m venv .venv
-# Linux/macOS: source .venv/bin/activate
-# Windows PowerShell: .venv\Scripts\Activate.ps1
-python -m pip install -r apps/knowledge-runtime/requirements-test.txt
-pnpm test:python
+## Dokumentasi
+
+| Dokumen                              | Isi                                                                    |
+| ------------------------------------ | ---------------------------------------------------------------------- |
+| [PRD](docs/PRD.md)                   | Kebutuhan per layar S01–S11 dan aturan yang tidak bisa ditawar         |
+| [ARCHITECTURE](docs/ARCHITECTURE.md) | Stack, batas data, otorisasi RLS, alur ingest–review–publikasi, RAG    |
+| [UI](docs/UI.md)                     | Kesetiaan terhadap mockup mentor dan delta yang disetujui              |
+| [PLAN](docs/PLAN.md)                 | Status, bukti tes, quality gate Q1–Q6, apa yang belum                  |
+| [DEPLOY](docs/DEPLOY.md)             | Staging/production, SSO, email, S3, OCR, runbook, keputusan organisasi |
+| [WEKNORA](docs/WEKNORA.md)           | Mesin RAG lokal, evaluasi Q4, Technology Architecture (§28)            |
+| [AGENTS](AGENTS.md)                  | Aturan kerja pengembangan                                              |
+
+## Struktur
+
+```
+apps/web               portal Next.js: halaman, API, reader aman
+apps/worker            publikasi, indeks, pengingat, retensi, email, sinkron WeKnora
+apps/knowledge-runtime converter Python terisolasi (tanpa jaringan, tanpa kredensial)
+packages/core          aturan domain, validasi, parser (dokumen, Sparx EA)
+packages/db            akses data, migrasi SQL, RLS, fungsi security-definer
+tests                  unit, integrasi, HTTP, e2e, RAG, Python
+fixtures               data sintetis (dokumen, model Sparx EA)
+reference              mockup mentor asli
 ```
 
-`python -I` sengaja mengabaikan user-site. Jangan melepas isolasi sebagai solusi dependency. Boot Compose belum dibuktikan pada sandbox; lihat batas dan bukti native pada PLAN.
+## Batas rilis ini
 
-Jangan menjalankan suite mutasi secara paralel pada database yang sama. Hindari build/typecheck bersamaan dengan dev compiler di mesin kecil. `pnpm build` lalu `pnpm start` menguji bundle produksi secara lokal, **bukan deployment produksi**.
-
-Fixture kecil yang disertakan benar-benar sintetis. `scripts/generate-conversion-fixtures.py` meregenerasi fixture menggunakan dependency test `reportlab` dan `python-docx`; workbook memiliki tipe numerik dan koordinat yang dapat diaudit. File invalid adalah rejection fixture yang disengaja.
-
-## Peta proyek
-
-- `apps/web`: portal Next.js, reader aman, UI dan HTTP boundary.
-- `apps/worker`: pg-boss reminder + durable outbox publisher; tidak bisa SELECT dokumen/auth.
-- `apps/knowledge-runtime`: converter Python non-root, read-only, jaringan Compose internal, tanpa provider.
-- `packages/core`: validasi, state machine, file/storage/scanner, chunking.
-- `packages/db`: DAL transaksi actor-local, SQL/RLS dan fixed security-definer functions.
-- `tests`: unit, renderer, PostgreSQL, HTTP end-to-end, Python, Playwright.
-- `docs`: PRD/arsitektur/UI/plan; `reference`: mockup mentor asli.
-
-Status terkini ada di **§0 docs/PLAN.md**. Jangan sertakan `.env*`, `var`, `node_modules`, `.next`, session, atau data organisasi ketika membagikan source.
+Ini rilis lokal dengan data sintetis, **bukan** izin pilot. Yang masih memerlukan organisasi:
+IdP SSO sungguhan, kebijakan data dan retensi, review security/ops, UAT oleh pemilik domain,
+TLS dan backup off-site ([docs/DEPLOY.md §6](docs/DEPLOY.md)). Angka kualitas AI berlaku untuk
+corpus sintetis ini, bukan untuk dokumen nyata.
